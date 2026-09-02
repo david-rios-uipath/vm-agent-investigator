@@ -1,0 +1,38 @@
+{
+  "docVersion": "1.0.0",
+  "resource": {
+    "name": "VmAgent",
+    "kind": "process",
+    "type": "flow",
+    "apiVersion": "orchestrator.uipath.com/v1",
+    "projectKey": "8cf3b320-4240-45fc-8ffb-c1a7c40f7207",
+    "dependencies": [
+      {
+        "kind": "package",
+        "name": "VmAgent"
+      }
+    ],
+    "runtimeDependencies": [],
+    "folders": [
+      {
+        "fullyQualifiedName": "solution_folder"
+      }
+    ],
+    "spec": {
+      "runtimeProfile": "Standard",
+      "type": "Flow",
+      "name": "VmAgent",
+      "package": {
+        "key": "7ad59c65-be1d-4c67-b05e-281228bebfe9"
+      },
+      "targetFrameworkValue": "Portable",
+      "retentionAction": "Delete",
+      "retentionPeriod": 30,
+      "staleRetentionAction": "Delete",
+      "staleRetentionPeriod": 180
+    },
+    "locks": [],
+    "key": "4a7879cf-7494-4ada-9e83-ea487a4b55cb",
+    "files": []
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "docVersion": "1.0.0",
+  "resource": {
+    "name": "VmAgent",
+    "kind": "package",
+    "apiVersion": "orchestrator.uipath.com/v1",
+    "projectKey": "8cf3b320-4240-45fc-8ffb-c1a7c40f7207",
+    "dependencies": [],
+    "runtimeDependencies": [],
+    "folders": [
+      {
+        "fullyQualifiedName": "solution_folder"
+      }
+    ],
+    "spec": {
+      "name": "VmAgent"
+    },
+    "locks": [],
+    "key": "7ad59c65-be1d-4c67-b05e-281228bebfe9",
+    "files": []
+  }
+}

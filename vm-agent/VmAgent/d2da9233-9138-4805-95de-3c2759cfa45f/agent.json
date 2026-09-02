@@ -1,0 +1,116 @@
+{
+  "version": "1.1.0",
+  "settings": {
+    "model": "anthropic.claude-sonnet-5",
+    "maxTokens": 128000,
+    "temperature": 0,
+    "engine": "basic-v2",
+    "maxIterations": 25,
+    "mode": "standard"
+  },
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "start__output__repoUrl": {
+        "type": "string",
+        "description": "Bound from $vars.start.output.repoUrl"
+      },
+      "start__output__branch": {
+        "type": "string",
+        "description": "Bound from $vars.start.output.branch"
+      },
+      "start__output__testCommand": {
+        "type": "string",
+        "description": "Bound from $vars.start.output.testCommand"
+      },
+      "start__output__runId": {
+        "type": "string",
+        "description": "Bound from $vars.start.output.runId"
+      }
+    }
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "reproduced": {
+        "type": "boolean",
+        "description": "True when the test command failed on the VM the same way it fails in CI"
+      },
+      "hypothesis": {
+        "type": "string",
+        "description": "Most likely root cause, one paragraph"
+      },
+      "evidence": {
+        "type": "string",
+        "description": "Concrete evidence: exit codes, error lines, file paths, and every OutputBlobPath returned by vm_exec"
+      }
+    },
+    "required": [
+      "reproduced",
+      "hypothesis",
+      "evidence"
+    ]
+  },
+  "metadata": {
+    "storageVersion": "50.0.0",
+    "isConversational": false,
+    "showProjectCreationExperience": false
+  },
+  "type": "lowCode",
+  "guardrails": [],
+  "messages": [
+    {
+      "role": "system",
+      "content": "You investigate failing end-to-end tests by running commands on a Windows robot VM.\n\nYou have one tool, vm_exec, which runs a PowerShell script on that VM and returns its exit code, output tail, and the bucket path of the full log. The VM is a real Windows Server: git, node and corepack (for pnpm) are on PATH, and it runs as the LocalService account.\n\nHow to work:\n1. First call: clone the repo and install dependencies in one script. Always pass WorkDir=\"C:\\\\vm-agent\\\\repo\" so later calls reuse the clone. Use `corepack pnpm` and never plain `pnpm` or `npm -g`, because user-scoped installs are invisible to this account. Set TimeoutMinutes=25 for install steps.\n2. Then run the given test command and read the failure output.\n3. Then run at most three more focused scripts to narrow the cause: re-run a single spec, print the relevant source file, check a config value, or check git log for recent changes to the failing area.\n\nRules:\n- Call vm_exec at most 6 times in total. After the sixth call, stop running commands and decide with the evidence you already have.\n- Every call must pass the runId you were given as RunId, and the same WorkDir.\n- Never run interactive commands, never install global packages, never modify remote state (no git push, no publish, no deleting branches).\n- A clone plus install takes several minutes. Do not retry a call that timed out with the same timeout; raise TimeoutMinutes or split the script instead.\n- If a call fails for an environment reason (missing tool, auth failure, network error), say so in evidence rather than working around it silently.\n\nFinish by returning every field of the output schema: reproduced, hypothesis, and evidence. Quote the decisive error lines in evidence and list every OutputBlobPath you received. If you could not reproduce the failure, set reproduced to false and explain in hypothesis what the VM did instead. Never end a run without a determination.",
+      "contentTokens": [
+        {
+          "type": "simpleText",
+          "rawString": "You investigate failing end-to-end tests by running commands on a Windows robot VM.\n\nYou have one tool, vm_exec, which runs a PowerShell script on that VM and returns its exit code, output tail, and the bucket path of the full log. The VM is a real Windows Server: git, node and corepack (for pnpm) are on PATH, and it runs as the LocalService account.\n\nHow to work:\n1. First call: clone the repo and install dependencies in one script. Always pass WorkDir=\"C:\\\\vm-agent\\\\repo\" so later calls reuse the clone. Use `corepack pnpm` and never plain `pnpm` or `npm -g`, because user-scoped installs are invisible to this account. Set TimeoutMinutes=25 for install steps.\n2. Then run the given test command and read the failure output.\n3. Then run at most three more focused scripts to narrow the cause: re-run a single spec, print the relevant source file, check a config value, or check git log for recent changes to the failing area.\n\nRules:\n- Call vm_exec at most 6 times in total. After the sixth call, stop running commands and decide with the evidence you already have.\n- Every call must pass the runId you were given as RunId, and the same WorkDir.\n- Never run interactive commands, never install global packages, never modify remote state (no git push, no publish, no deleting branches).\n- A clone plus install takes several minutes. Do not retry a call that timed out with the same timeout; raise TimeoutMinutes or split the script instead.\n- If a call fails for an environment reason (missing tool, auth failure, network error), say so in evidence rather than working around it silently.\n\nFinish by returning every field of the output schema: reproduced, hypothesis, and evidence. Quote the decisive error lines in evidence and list every OutputBlobPath you received. If you could not reproduce the failure, set reproduced to false and explain in hypothesis what the VM did instead. Never end a run without a determination."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Repository: {{input.start__output__repoUrl}}\nBranch: {{input.start__output__branch}}\nTest command that fails in CI: {{input.start__output__testCommand}}\nrunId for logs: {{input.start__output__runId}}\n\nReproduce this failure on the VM and tell me the root cause.",
+      "contentTokens": [
+        {
+          "type": "simpleText",
+          "rawString": "Repository: "
+        },
+        {
+          "type": "variable",
+          "rawString": "input.start__output__repoUrl"
+        },
+        {
+          "type": "simpleText",
+          "rawString": "\nBranch: "
+        },
+        {
+          "type": "variable",
+          "rawString": "input.start__output__branch"
+        },
+        {
+          "type": "simpleText",
+          "rawString": "\nTest command that fails in CI: "
+        },
+        {
+          "type": "variable",
+          "rawString": "input.start__output__testCommand"
+        },
+        {
+          "type": "simpleText",
+          "rawString": "\nrunId for logs: "
+        },
+        {
+          "type": "variable",
+          "rawString": "input.start__output__runId"
+        },
+        {
+          "type": "simpleText",
+          "rawString": "\n\nReproduce this failure on the VM and tell me the root cause."
+        }
+      ]
+    }
+  ],
+  "projectId": "d2da9233-9138-4805-95de-3c2759cfa45f"
+}

@@ -1,0 +1,44 @@
+{
+  "docVersion": "1.0.0",
+  "resource": {
+    "name": "vm-exec",
+    "kind": "process",
+    "type": "process",
+    "apiVersion": "orchestrator.uipath.com/v1",
+    "projectKey": "547b740c-4783-4ee5-8ab2-46ab7e7b9afd",
+    "dependencies": [
+      {
+        "kind": "package",
+        "name": "vm-exec"
+      }
+    ],
+    "runtimeDependencies": [],
+    "folders": [
+      {
+        "fullyQualifiedName": "solution_folder"
+      }
+    ],
+    "spec": {
+      "type": "Process",
+      "name": "vm-exec",
+      "package": {
+        "key": "9d54e6b5-909b-4eb6-a40d-73765e7988ca"
+      },
+      "packageName": "vm-agent.process.vm-exec",
+      "jobPriority": "Medium",
+      "jobRecording": "Disabled",
+      "targetFrameworkValue": "Portable",
+      "duration": 40,
+      "frequency": 500,
+      "quality": 100,
+      "remoteControlAccess": "None",
+      "retentionAction": "Delete",
+      "retentionPeriod": 30,
+      "staleRetentionAction": "Delete",
+      "staleRetentionPeriod": 180
+    },
+    "locks": [],
+    "key": "2506a8f7-67e6-4496-aff7-8e9e46137efc",
+    "files": []
+  }
+}
