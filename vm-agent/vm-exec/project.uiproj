@@ -1,0 +1,6 @@
+{
+  "Name": "vm-exec",
+  "ProjectType": "Process",
+  "Description": "Run an arbitrary script on the robot VM, return stdout and upload the full log to a bucket",
+  "MainFile": "Main.xaml"
+}

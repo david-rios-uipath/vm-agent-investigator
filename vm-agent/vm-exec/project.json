@@ -1,0 +1,91 @@
+{
+  "name": "vm-exec",
+  "projectId": "b727ea93-e71c-4808-a9be-5f4b96de1b14",
+  "description": "Run an arbitrary script on the robot VM, return stdout and upload the full log to a bucket",
+  "main": "Main.xaml",
+  "dependencies": {
+    "UiPath.System.Activities": "25.10.5"
+  },
+  "webServices": [],
+  "entitiesStores": [],
+  "schemaVersion": "4.1",
+  "studioVersion": "26.0.201.0",
+  "projectVersion": "1.0.0",
+  "runtimeOptions": {
+    "autoDispose": false,
+    "netFrameworkLazyLoading": false,
+    "isPausable": false,
+    "isAttended": false,
+    "requiresUserInteraction": false,
+    "supportsPersistence": false,
+    "workflowSerialization": "NewtonsoftJson",
+    "excludedLoggedData": [
+      "Private:*",
+      "*password*"
+    ],
+    "executionType": "Workflow",
+    "readyForPiP": false,
+    "startsInPiP": false,
+    "mustRestoreAllDependencies": true,
+    "pipType": "ChildSession"
+  },
+  "designOptions": {
+    "projectProfile": "Developement",
+    "outputType": "Process",
+    "libraryOptions": {
+      "privateWorkflows": []
+    },
+    "processOptions": {
+      "ignoredFiles": []
+    },
+    "fileInfoCollection": [],
+    "saveToCloud": false
+  },
+  "expressionLanguage": "VisualBasic",
+  "entryPoints": [
+    {
+      "filePath": "Main.xaml",
+      "uniqueId": "1a255c41-e3ed-49e9-8bfa-c26893a50753",
+      "input": [
+        {
+          "name": "Script",
+          "type": "System.String",
+          "required": true
+        },
+        {
+          "name": "WorkDir",
+          "type": "System.String",
+          "required": false
+        },
+        {
+          "name": "RunId",
+          "type": "System.String",
+          "required": false
+        },
+        {
+          "name": "TimeoutMinutes",
+          "type": "System.Int32",
+          "required": false
+        }
+      ],
+      "output": [
+        {
+          "name": "ExitCode",
+          "type": "System.Int32"
+        },
+        {
+          "name": "Stdout",
+          "type": "System.String"
+        },
+        {
+          "name": "OutputBlobPath",
+          "type": "System.String"
+        }
+      ]
+    }
+  ],
+  "isTemplate": false,
+  "templateProjectData": {},
+  "publishData": {},
+  "targetFramework": "Portable"
+}
