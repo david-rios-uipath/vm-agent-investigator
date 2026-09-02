@@ -26,6 +26,50 @@
       }
     },
     {
+      "id": "setupVm",
+      "type": "uipath.core.rpa-workflow.ca36341d-ecec-4ba6-aa76-134d0afe4ba7",
+      "typeVersion": "1.0.0",
+      "display": {
+        "label": "Set up VM (clone + install)"
+      },
+      "inputs": {
+        "Script": "=js:`$ErrorActionPreference = 'Stop'\n$repo = 'C:\\\\vm-agent\\\\repo'\n$branch = '${$vars.branch}'\n$url = '${$vars.repoUrl}'\nif ($env:GIT_TOKEN) { $url = $url -replace '^https://', \"https://x-access-token:$($env:GIT_TOKEN)@\" }\nNew-Item -ItemType Directory -Force -Path 'C:\\\\vm-agent' | Out-Null\nif (Test-Path \"$repo\\\\.git\") {\n  Write-Output \"[setup] reusing clone at $repo\"\n  git -C $repo fetch --depth 1 origin $branch\n  git -C $repo reset --hard FETCH_HEAD\n} else {\n  Write-Output \"[setup] cloning $branch\"\n  git clone --depth 1 --branch $branch $url $repo\n}\nSet-Location $repo\ncorepack enable pnpm\ncorepack pnpm install --frozen-lockfile\ncorepack pnpm exec playwright install chromium\nWrite-Output \"[setup] head: $(git -C $repo rev-parse --short HEAD)\"\nWrite-Output \"[setup] done\"\n`",
+        "WorkDir": "C:\\vm-agent",
+        "RunId": "=js:$vars.runId + '/setup'",
+        "TimeoutMinutes": 30
+      },
+      "outputs": {
+        "error": {
+          "type": "object",
+          "description": "Error information if the RPA process fails",
+          "source": "=Error",
+          "var": "error"
+        }
+      }
+    },
+    {
+      "id": "runTest",
+      "type": "uipath.core.rpa-workflow.ca36341d-ecec-4ba6-aa76-134d0afe4ba7",
+      "typeVersion": "1.0.0",
+      "display": {
+        "label": "Run failing test"
+      },
+      "inputs": {
+        "Script": "=js:`$ErrorActionPreference = 'Continue'\n$repo = 'C:\\\\vm-agent\\\\repo'\nSet-Location $repo\ncorepack enable pnpm\nWrite-Output \"[test] ${$vars.testCommand}\"\n${$vars.testCommand}\nexit $LASTEXITCODE\n`",
+        "WorkDir": "C:\\vm-agent",
+        "RunId": "=js:$vars.runId + '/test'",
+        "TimeoutMinutes": 45
+      },
+      "outputs": {
+        "error": {
+          "type": "object",
+          "description": "Error information if the RPA process fails",
+          "source": "=Error",
+          "var": "error"
+        }
+      }
+    },
+    {
       "id": "investigator",
       "type": "uipath.agent.autonomous",
       "typeVersion": "1.4",
@@ -38,26 +82,37 @@
           {
             "id": "start__output__repoUrl",
             "type": "string",
-            "binding": "=$vars.start.output.repoUrl",
-            "description": "Bound from $vars.start.output.repoUrl"
+            "binding": "=$vars.repoUrl"
           },
           {
             "id": "start__output__branch",
             "type": "string",
-            "binding": "=$vars.start.output.branch",
-            "description": "Bound from $vars.start.output.branch"
+            "binding": "=$vars.branch"
           },
           {
             "id": "start__output__testCommand",
             "type": "string",
-            "binding": "=$vars.start.output.testCommand",
-            "description": "Bound from $vars.start.output.testCommand"
+            "binding": "=$vars.testCommand"
           },
           {
             "id": "start__output__runId",
             "type": "string",
-            "binding": "=$vars.start.output.runId",
-            "description": "Bound from $vars.start.output.runId"
+            "binding": "=$vars.runId"
+          },
+          {
+            "id": "runTest__output__ExitCode",
+            "type": "integer",
+            "binding": "=$vars.runTest.output.ExitCode"
+          },
+          {
+            "id": "runTest__output__Stdout",
+            "type": "string",
+            "binding": "=$vars.runTest.output.Stdout"
+          },
+          {
+            "id": "runTest__output__OutputBlobPath",
+            "type": "string",
+            "binding": "=$vars.runTest.output.OutputBlobPath"
           }
         ],
         "agentOutputVariables": [
@@ -124,8 +179,22 @@
   ],
   "edges": [
     {
-      "id": "edge_start_output_investigator_input",
+      "id": "edge_start_output_setupVm_input",
       "sourceNodeId": "start",
+      "sourcePort": "output",
+      "targetNodeId": "setupVm",
+      "targetPort": "input"
+    },
+    {
+      "id": "edge_setupVm_output_runTest_input",
+      "sourceNodeId": "setupVm",
+      "sourcePort": "output",
+      "targetNodeId": "runTest",
+      "targetPort": "input"
+    },
+    {
+      "id": "edge_runTest_output_investigator_input",
+      "sourceNodeId": "runTest",
       "sourcePort": "output",
       "targetNodeId": "investigator",
       "targetPort": "input"
@@ -203,6 +272,145 @@
             }
           ]
         }
+      }
+    },
+    {
+      "nodeType": "uipath.core.rpa-workflow.ca36341d-ecec-4ba6-aa76-134d0afe4ba7",
+      "version": "1.0.0",
+      "category": "rpa-workflow",
+      "runtimeConstraints": {
+        "exclude": [
+          "api-function"
+        ]
+      },
+      "description": "vm-exec bound in the VM-pool folder; referenced as an agent tool so calls run on the Windows robot VM",
+      "tags": [],
+      "sortOrder": 630,
+      "supportsErrorHandling": true,
+      "display": {
+        "label": "vm-exec-vm",
+        "icon": "rpa"
+      },
+      "handleConfiguration": [
+        {
+          "position": "left",
+          "handles": [
+            {
+              "id": "input",
+              "type": "target",
+              "handleType": "input"
+            }
+          ]
+        },
+        {
+          "position": "right",
+          "handles": [
+            {
+              "id": "output",
+              "type": "source",
+              "handleType": "output"
+            },
+            {
+              "id": "error",
+              "label": "Error",
+              "type": "source",
+              "handleType": "output",
+              "visible": "{inputs.errorHandlingEnabled}",
+              "constraints": {
+                "maxConnections": 1
+              }
+            }
+          ]
+        }
+      ],
+      "model": {
+        "type": "bpmn:ServiceTask",
+        "serviceType": "Orchestrator.StartJob",
+        "version": "v2",
+        "section": "Published",
+        "listingVersion": "1.0.0",
+        "bindings": {
+          "resource": "process",
+          "resourceSubType": "Process",
+          "resourceKey": "e2e-investigator.vm-exec-vm",
+          "orchestratorType": "process",
+          "values": [
+            {
+              "name": "name",
+              "propertyAttribute": "name",
+              "default": "vm-exec-vm"
+            },
+            {
+              "name": "folderPath",
+              "propertyAttribute": "folderPath",
+              "default": "e2e-investigator"
+            }
+          ]
+        },
+        "context": [
+          {
+            "name": "name",
+            "type": "string",
+            "value": "<bindings.name>"
+          },
+          {
+            "name": "folderPath",
+            "type": "string",
+            "value": "<bindings.folderPath>"
+          },
+          {
+            "name": "_label",
+            "type": "string",
+            "value": "vm-exec-vm"
+          }
+        ]
+      },
+      "inputDefinition": {},
+      "inputDefaults": {},
+      "outputDefinition": {
+        "error": {
+          "type": "object",
+          "description": "Error information if the node fails",
+          "source": "=Error",
+          "var": "error",
+          "schema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "type": "object",
+            "required": [
+              "code",
+              "message",
+              "detail",
+              "category",
+              "status"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Error code as a string"
+              },
+              "message": {
+                "type": "string",
+                "description": "High-level error message"
+              },
+              "detail": {
+                "type": "string",
+                "description": "Detailed error description"
+              },
+              "category": {
+                "type": "string",
+                "description": "Error category"
+              },
+              "status": {
+                "type": "integer",
+                "description": "HTTP status code"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "debug": {
+        "runtime": "bpmnEngine"
       }
     },
     {
@@ -641,44 +849,6 @@
       }
     },
     {
-      "nodeType": "core.control.end",
-      "version": "1.0",
-      "category": "control-flow",
-      "description": "Mark the end of a process path",
-      "tags": [
-        "control-flow",
-        "end",
-        "finish",
-        "complete"
-      ],
-      "sortOrder": 66,
-      "display": {
-        "label": "End",
-        "icon": "circle-check",
-        "shape": "circle"
-      },
-      "handleConfiguration": [
-        {
-          "position": "left",
-          "handles": [
-            {
-              "id": "input",
-              "type": "target",
-              "handleType": "input"
-            }
-          ]
-        }
-      ],
-      "model": {
-        "type": "bpmn:EndEvent"
-      },
-      "runtimeConstraints": {
-        "exclude": [
-          "api-function"
-        ]
-      }
-    },
-    {
       "nodeType": "uipath.agent.resource.tool.process.ca36341d-ecec-4ba6-aa76-134d0afe4ba7",
       "version": "1.0.0",
       "category": "agent.tool.rpa",
@@ -788,6 +958,44 @@
         }
       },
       "outputDefinition": {}
+    },
+    {
+      "nodeType": "core.control.end",
+      "version": "1.0",
+      "category": "control-flow",
+      "description": "Mark the end of a process path",
+      "tags": [
+        "control-flow",
+        "end",
+        "finish",
+        "complete"
+      ],
+      "sortOrder": 66,
+      "display": {
+        "label": "End",
+        "icon": "circle-check",
+        "shape": "circle"
+      },
+      "handleConfiguration": [
+        {
+          "position": "left",
+          "handles": [
+            {
+              "id": "input",
+              "type": "target",
+              "handleType": "input"
+            }
+          ]
+        }
+      ],
+      "model": {
+        "type": "bpmn:EndEvent"
+      },
+      "runtimeConstraints": {
+        "exclude": [
+          "api-function"
+        ]
+      }
     }
   ],
   "variables": {
@@ -840,6 +1048,24 @@
         "binding": {
           "nodeId": "start",
           "outputId": "output"
+        }
+      },
+      {
+        "id": "setupVm.error",
+        "type": "object",
+        "description": "Error information if the RPA process fails",
+        "binding": {
+          "nodeId": "setupVm",
+          "outputId": "error"
+        }
+      },
+      {
+        "id": "runTest.error",
+        "type": "object",
+        "description": "Error information if the RPA process fails",
+        "binding": {
+          "nodeId": "runTest",
+          "outputId": "error"
         }
       },
       {
@@ -901,19 +1127,19 @@
       },
       "investigator": {
         "position": {
-          "x": 448,
-          "y": 48
+          "x": 980,
+          "y": 144
         },
         "size": {
-          "width": 288,
+          "width": 96,
           "height": 96
         },
         "collapsed": false
       },
       "vmExecTool": {
         "position": {
-          "x": 592,
-          "y": 240
+          "x": 980,
+          "y": 340
         },
         "size": {
           "width": 96,
@@ -923,8 +1149,30 @@
       },
       "end": {
         "position": {
-          "x": 832,
-          "y": 96
+          "x": 1240,
+          "y": 144
+        },
+        "size": {
+          "width": 96,
+          "height": 96
+        },
+        "collapsed": false
+      },
+      "setupVm": {
+        "position": {
+          "x": 500,
+          "y": 144
+        },
+        "size": {
+          "width": 96,
+          "height": 96
+        },
+        "collapsed": false
+      },
+      "runTest": {
+        "position": {
+          "x": 740,
+          "y": 144
         },
         "size": {
           "width": 96,

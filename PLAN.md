@@ -87,6 +87,27 @@ tool-call or timeout cap that a published agent does not.
 Record per run: tool calls, jobs dispatched, wall time, whether the
 hypothesis matches the earlier manual triage.
 
+## Step 5 — split the flow into deterministic stages (done 2026-09-02)
+
+Flow is now: manual trigger → `setupVm` (RPA) → `runTest` (RPA) → `investigator`
+(inline agent, `vm_exec` tool) → End. Both RPA nodes are the *same*
+`vm-exec-vm` process with different `Script` inputs, so no new project.
+
+- `setupVm` — idempotent: clone-or-fetch into `C:\vm-agent\repo`, inject
+  `GIT_TOKEN` into the URL when present, `corepack enable pnpm`,
+  `pnpm install --frozen-lockfile`, `playwright install chromium`.
+  Re-running is cheap and a cold VM self-heals, so a reschedule to another
+  pool VM costs time rather than correctness.
+- `runTest` — runs the CI command in the existing clone, uploads the full log,
+  returns `ExitCode` / `Stdout` tail / `OutputBlobPath`.
+- `investigator` — receives those three plus the original inputs, so its first
+  LLM call already has the failure. Prompt covers narrowing only; the tool-call
+  cap is left at 6 deliberately (tune by iteration, not up front).
+
+Why: in the 2026-09-02 16:16 run the agent spent 16 tool calls, most of them
+re-deriving setup. Determinism moves that cost out of the LLM loop and makes a
+setup failure fail loudly at its own node.
+
 ## Open risks
 
 - Agent tool call timeout: Orchestrator process as tool may have its own
