@@ -50,7 +50,7 @@
   },
   "settings": {},
   "properties": {
-    "folderPath": "e2e-investigator",
+    "folderPath": "solution_folder",
     "processName": "vm-exec",
     "exampleCalls": []
   },
@@ -58,7 +58,7 @@
     "policies": []
   },
   "id": "29664e8a-bd00-4e62-889b-cc98493010d4",
-  "referenceKey": "e9708dfd-323a-4f58-a54d-4518cf96387e",
+  "referenceKey": "209d4dde-a982-4fc5-a498-4f818f667453",
   "isEnabled": true,
   "argumentProperties": {},
   "canvasNodeId": "vmExecTool"

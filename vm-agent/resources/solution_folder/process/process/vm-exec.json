@@ -2,13 +2,13 @@
   "docVersion": "1.0.0",
   "resource": {
     "name": "vm-exec",
-    "kind": "Process",
-    "type": "Process",
+    "kind": "process",
+    "type": "process",
     "apiVersion": "orchestrator.uipath.com/v1",
-    "isOverridable": true,
+    "projectKey": "6889fe8c-4289-47bc-89c1-a36db6cba825",
     "dependencies": [
       {
-        "kind": "Package",
+        "kind": "package",
         "name": "vm-exec"
       }
     ],
@@ -20,30 +20,24 @@
     ],
     "spec": {
       "type": "Process",
+      "name": "vm-exec",
+      "package": {
+        "key": "66c331c5-d0b9-44cc-a130-568277d7aad2"
+      },
       "jobPriority": "Medium",
       "jobRecording": "Disabled",
-      "remoteControlAccess": "None",
-      "name": "vm-exec",
-      "description": "Run an arbitrary script on the robot VM; returns stdout tail + bucket log path",
-      "package": {
-        "name": "vm-exec",
-        "key": "vm-exec:1.0.0"
-      },
-      "packageName": "vm-exec",
-      "packageVersion": "1.0.0",
-      "hiddenForAttendedUser": false,
-      "alwaysRunning": false,
-      "autoStartProcess": false,
       "targetFrameworkValue": "Portable",
+      "duration": 40,
+      "frequency": 500,
+      "quality": 100,
+      "remoteControlAccess": "None",
       "retentionAction": "Delete",
       "retentionPeriod": 30,
       "staleRetentionAction": "Delete",
-      "staleRetentionPeriod": 180,
-      "entryPoints": "[{\"UniqueId\":\"1a255c41-e3ed-49e9-8bfa-c26893a50753\",\"Path\":\"Main.xaml\",\"DisplayName\":null,\"InputArguments\":\"{\\n  \\\"type\\\": \\\"object\\\",\\n  \\\"properties\\\": {\\n    \\\"Script\\\": {\\n      \\\"type\\\": \\\"string\\\"\\n    },\\n    \\\"WorkDir\\\": {\\n      \\\"type\\\": \\\"string\\\"\\n    },\\n    \\\"RunId\\\": {\\n      \\\"type\\\": \\\"string\\\",\\n      \\\"x-default-expression\\\": \\\"\\\\\\\"manual\\\\\\\"\\\",\\n      \\\"default\\\": \\\"manual\\\"\\n    },\\n    \\\"TimeoutMinutes\\\": {\\n      \\\"type\\\": \\\"integer\\\",\\n      \\\"minimum\\\": -2147483648,\\n      \\\"maximum\\\": 2147483647,\\n      \\\"x-default-expression\\\": \\\"30\\\",\\n      \\\"default\\\": 30\\n    }\\n  },\\n  \\\"required\\\": []\\n}\",\"OutputArguments\":\"{\\n  \\\"type\\\": \\\"object\\\",\\n  \\\"properties\\\": {\\n    \\\"ExitCode\\\": {\\n      \\\"type\\\": \\\"integer\\\",\\n      \\\"minimum\\\": -2147483648,\\n      \\\"maximum\\\": 2147483647\\n    },\\n    \\\"Stdout\\\": {\\n      \\\"type\\\": \\\"string\\\"\\n    },\\n    \\\"OutputBlobPath\\\": {\\n      \\\"type\\\": \\\"string\\\"\\n    }\\n  }\\n}\",\"Type\":1,\"TargetRuntime\":null,\"ContentRoot\":null,\"DataVariation\":null,\"Id\":986526}]",
-      "tags": []
+      "staleRetentionPeriod": 180
     },
     "locks": [],
-    "key": "e9708dfd-323a-4f58-a54d-4518cf96387e",
+    "key": "209d4dde-a982-4fc5-a498-4f818f667453",
     "files": []
   }
 }

@@ -1,12 +1,17 @@
 {
-  "DocVersion": "1.0.0",
-  "StudioMinVersion": "2025.10.0",
-  "SolutionId": "81bbb67a-35e9-496e-53fa-08df0831c1f1",
-  "Projects": [
-    {
-      "Type": "Flow",
-      "ProjectRelativePath": "VmAgent/project.uiproj",
-      "Id": "8cf3b320-4240-45fc-8ffb-c1a7c40f7207"
-    }
-  ]
+    "DocVersion": "1.0.0",
+    "StudioMinVersion": "2025.10.0",
+    "SolutionId": "40a4ecb7-9f94-47b2-5437-08df0831c1f1",
+    "Projects": [
+        {
+            "Type": "Flow",
+            "ProjectRelativePath": "VmAgent/project.uiproj",
+            "Id": "8cf3b320-4240-45fc-8ffb-c1a7c40f7207"
+        },
+        {
+            "Type": "Process",
+            "ProjectRelativePath": "vm-exec/project.uiproj",
+            "Id": "6889fe8c-4289-47bc-89c1-a36db6cba825"
+        }
+    ]
 }

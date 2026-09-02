@@ -34,16 +34,6 @@
         "icon": "autonomous-agent"
       },
       "inputs": {
-        "systemPrompt": "You investigate failing end-to-end tests by running commands on a Windows robot VM.\n\nYou have one tool, vm_exec, which runs a PowerShell script on that VM and returns its exit code, output tail, and the bucket path of the full log. The VM is a real Windows Server: git, node and corepack (for pnpm) are on PATH, and it runs as the LocalService account.\n\nHow to work:\n1. First call: clone the repo and install dependencies in one script. Always pass WorkDir=\"C:\\\\vm-agent\\\\repo\" so later calls reuse the clone. Use `corepack pnpm` and never plain `pnpm` or `npm -g`, because user-scoped installs are invisible to this account. Set TimeoutMinutes=25 for install steps.\n2. Then run the given test command and read the failure output.\n3. Then run at most three more focused scripts to narrow the cause: re-run a single spec, print the relevant source file, check a config value, or check git log for recent changes to the failing area.\n\nRules:\n- Call vm_exec at most 6 times in total. After the sixth call, stop running commands and decide with the evidence you already have.\n- Every call must pass the runId you were given as RunId, and the same WorkDir.\n- Never run interactive commands, never install global packages, never modify remote state (no git push, no publish, no deleting branches).\n- A clone plus install takes several minutes. Do not retry a call that timed out with the same timeout; raise TimeoutMinutes or split the script instead.\n- If a call fails for an environment reason (missing tool, auth failure, network error), say so in evidence rather than working around it silently.\n\nFinish by returning every field of the output schema: reproduced, hypothesis, and evidence. Quote the decisive error lines in evidence and list every OutputBlobPath you received. If you could not reproduce the failure, set reproduced to false and explain in hypothesis what the VM did instead. Never end a run without a determination.\n\nKnown VM environment facts (from earlier runs on this pool):\n- pnpm is installed only through corepack, so a subprocess that shells out to a bare `pnpm` fails with \"'pnpm' is not recognized as an internal or external command\". Playwright's config.webServer does exactly that. Before running tests, run `corepack enable pnpm` once in the same script so a real pnpm shim exists on PATH for spawned subprocesses.\n- If a run still fails only because a spawned process could not find pnpm, that is a VM environment artifact, not the CI failure you were asked to reproduce. Say so explicitly in evidence, set reproduced to false, and do not present it as the root cause.",
-        "userPrompt": "Repository: {{ $vars.start.output.repoUrl }}\nBranch: {{ $vars.start.output.branch }}\nTest command that fails in CI: {{ $vars.start.output.testCommand }}\nrunId for logs: {{ $vars.start.output.runId }}\n\nReproduce this failure on the VM and tell me the root cause.",
-        "model": "anthropic.claude-sonnet-5",
-        "mode": "standard",
-        "temperature": 0,
-        "maxTokenPerResponse": 128000,
-        "maxIterations": 25,
-        "isConversational": false,
-        "guardrails": [],
-        "name": "E2E investigator",
         "agentInputVariables": [
           {
             "id": "start__output__repoUrl",
@@ -97,96 +87,14 @@
     },
     {
       "id": "vmExecTool",
-      "type": "uipath.agent.resource.tool.process.e9708dfd-323a-4f58-a54d-4518cf96387e",
+      "type": "uipath.agent.resource.tool.process.209d4dde-a982-4fc5-a498-4f818f667453",
       "typeVersion": "1.0.0",
       "display": {
         "label": "vm-exec",
         "icon": "rpa"
       },
       "inputs": {
-        "source": "29664e8a-bd00-4e62-889b-cc98493010d4",
-        "id": "vmExecTool",
-        "name": "vm_exec",
-        "description": "Run a PowerShell script on the Windows robot VM and get its output. The VM is a persistent Windows Server with git, node, and corepack/pnpm on PATH. Use it to clone a repo, install dependencies, run a Playwright spec, and inspect files or logs. Returns the exit code, the last 32000 chars of merged stdout+stderr, and the bucket path of the complete log.",
-        "guardrails": [],
-        "isEnabled": true,
-        "referenceKey": "e9708dfd-323a-4f58-a54d-4518cf96387e",
-        "inputSchema": {
-          "type": "object",
-          "properties": {
-            "Script": {
-              "type": "string",
-              "description": "PowerShell script to run on the VM. Multiple lines allowed. Runs with powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass."
-            },
-            "WorkDir": {
-              "type": "string",
-              "description": "Working directory on the VM. Always pass the same value across calls so a clone survives between calls. Default is %TEMP%\\vm-agent."
-            },
-            "RunId": {
-              "type": "string",
-              "description": "Log grouping prefix in the storage bucket. Pass the runId given to you."
-            },
-            "TimeoutMinutes": {
-              "type": "integer",
-              "description": "Kill the script after this many minutes. Exit code 124 means it timed out."
-            },
-            "guardrails": {
-              "type": "array"
-            }
-          },
-          "required": [
-            "Script"
-          ]
-        },
-        "outputSchema": {
-          "type": "object",
-          "properties": {
-            "ExitCode": {
-              "type": "integer",
-              "description": "0 = success, 124 = timeout, -1 = runner exception"
-            },
-            "Stdout": {
-              "type": "string",
-              "description": "Merged stdout+stderr, tail-truncated to 32000 chars"
-            },
-            "OutputBlobPath": {
-              "type": "string",
-              "description": "Path of the complete log inside the e2e-investigations bucket"
-            }
-          }
-        },
-        "properties": {
-          "folderPath": "e2e-investigator",
-          "processName": "vm-exec",
-          "exampleCalls": []
-        },
-        "argumentProperties": {},
-        "settings": {},
-        "folderPath": "e2e-investigator",
-        "Script": {
-          "mode": "prompt",
-          "textValue": "",
-          "promptValue": "PowerShell script to run on the VM. Multiple lines allowed. Runs with powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass.",
-          "argumentPath": ""
-        },
-        "WorkDir": {
-          "mode": "prompt",
-          "textValue": "",
-          "promptValue": "Working directory on the VM. Always pass the same value across calls so a clone survives between calls. Default is %TEMP%\\vm-agent.",
-          "argumentPath": ""
-        },
-        "RunId": {
-          "mode": "prompt",
-          "textValue": "",
-          "promptValue": "Log grouping prefix in the storage bucket. Pass the runId given to you.",
-          "argumentPath": ""
-        },
-        "TimeoutMinutes": {
-          "mode": "prompt",
-          "textValue": "",
-          "promptValue": "Kill the script after this many minutes. Exit code 124 means it timed out.",
-          "argumentPath": ""
-        }
+        "source": "29664e8a-bd00-4e62-889b-cc98493010d4"
       }
     },
     {
@@ -733,19 +641,59 @@
       }
     },
     {
-      "nodeType": "uipath.agent.resource.tool.process.e9708dfd-323a-4f58-a54d-4518cf96387e",
+      "nodeType": "core.control.end",
+      "version": "1.0",
+      "category": "control-flow",
+      "description": "Mark the end of a process path",
+      "tags": [
+        "control-flow",
+        "end",
+        "finish",
+        "complete"
+      ],
+      "sortOrder": 66,
+      "display": {
+        "label": "End",
+        "icon": "circle-check",
+        "shape": "circle"
+      },
+      "handleConfiguration": [
+        {
+          "position": "left",
+          "handles": [
+            {
+              "id": "input",
+              "type": "target",
+              "handleType": "input"
+            }
+          ]
+        }
+      ],
+      "model": {
+        "type": "bpmn:EndEvent"
+      },
+      "runtimeConstraints": {
+        "exclude": [
+          "api-function"
+        ]
+      }
+    },
+    {
+      "nodeType": "uipath.agent.resource.tool.process.209d4dde-a982-4fc5-a498-4f818f667453",
       "version": "1.0.0",
-      "category": "agent.tool.rpa.published",
+      "category": "agent.tool.rpa",
       "runtimeConstraints": {
         "exclude": [
           "api-function"
         ]
       },
       "tags": [
-        "agent-tool"
+        "agent-tool",
+        "in-solution",
+        "local"
       ],
-      "sortOrder": 580,
-      "description": "Run an arbitrary script on the robot VM; returns stdout tail + bucket log path",
+      "sortOrder": 560,
+      "description": "(In-solution) vm-exec",
       "display": {
         "label": "vm-exec",
         "icon": "rpa",
@@ -786,11 +734,10 @@
         "type": "bpmn:ServiceTask",
         "serviceType": "Orchestrator.StartJob",
         "version": "v2",
-        "listingVersion": "1.0.0",
         "bindings": {
           "resource": "process",
           "resourceSubType": "Process",
-          "resourceKey": "e2e-investigator.vm-exec",
+          "resourceKey": "209d4dde-a982-4fc5-a498-4f818f667453",
           "orchestratorType": "process",
           "values": [
             {
@@ -801,15 +748,12 @@
             {
               "name": "folderPath",
               "propertyAttribute": "folderPath",
-              "default": "e2e-investigator"
-            },
-            {
-              "name": "folderKey",
-              "propertyAttribute": "folderKey",
-              "default": "0b28296b-1f4a-4ea9-a3d5-8b0abaac1cf0"
+              "default": ""
             }
           ]
         },
+        "projectId": "6889fe8c-4289-47bc-89c1-a36db6cba825",
+        "projectName": "vm-exec",
         "context": [
           {
             "name": "name",
@@ -846,44 +790,6 @@
         }
       },
       "outputDefinition": {}
-    },
-    {
-      "nodeType": "core.control.end",
-      "version": "1.0",
-      "category": "control-flow",
-      "description": "Mark the end of a process path",
-      "tags": [
-        "control-flow",
-        "end",
-        "finish",
-        "complete"
-      ],
-      "sortOrder": 66,
-      "display": {
-        "label": "End",
-        "icon": "circle-check",
-        "shape": "circle"
-      },
-      "handleConfiguration": [
-        {
-          "position": "left",
-          "handles": [
-            {
-              "id": "input",
-              "type": "target",
-              "handleType": "input"
-            }
-          ]
-        }
-      ],
-      "model": {
-        "type": "bpmn:EndEvent"
-      },
-      "runtimeConstraints": {
-        "exclude": [
-          "api-function"
-        ]
-      }
     }
   ],
   "variables": {
@@ -1036,7 +942,7 @@
       "name": "name",
       "type": "string",
       "resource": "process",
-      "resourceKey": "e2e-investigator.vm-exec",
+      "resourceKey": "209d4dde-a982-4fc5-a498-4f818f667453",
       "default": "vm-exec",
       "propertyAttribute": "name",
       "resourceSubType": "Process"
@@ -1046,8 +952,8 @@
       "name": "folderPath",
       "type": "string",
       "resource": "process",
-      "resourceKey": "e2e-investigator.vm-exec",
-      "default": "e2e-investigator",
+      "resourceKey": "209d4dde-a982-4fc5-a498-4f818f667453",
+      "default": "",
       "propertyAttribute": "folderPath",
       "resourceSubType": "Process"
     }
