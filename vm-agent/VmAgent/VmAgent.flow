@@ -779,7 +779,7 @@
       "type": "string",
       "resource": "process",
       "resourceKey": "2506a8f7-67e6-4496-aff7-8e9e46137efc",
-      "default": "solution_folder",
+      "default": "",
       "propertyAttribute": "folderPath",
       "resourceSubType": "Process"
     }
