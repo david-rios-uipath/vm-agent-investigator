@@ -2,8 +2,8 @@
   "version": "1.1.0",
   "settings": {
     "model": "anthropic.claude-sonnet-5",
-    "maxTokens": 128000,
-    "temperature": 0,
+    "maxTokens": 16384,
+    "temperature": 0.5,
     "engine": "basic-v2",
     "maxIterations": 25,
     "mode": "standard"
@@ -13,31 +13,28 @@
     "properties": {
       "start__output__repoUrl": {
         "type": "string",
-        "description": "Repository under test"
+        "description": "Bound from $vars.start.output.repoUrl"
       },
       "start__output__branch": {
         "type": "string",
-        "description": "Branch under test"
+        "description": "Bound from $vars.start.output.branch"
       },
       "start__output__testCommand": {
         "type": "string",
-        "description": "The test command that fails in CI"
+        "description": "Bound from $vars.start.output.testCommand"
       },
       "start__output__runId": {
         "type": "string",
-        "description": "Log grouping prefix for the storage bucket"
+        "description": "Bound from $vars.start.output.runId"
       },
       "runTest__output__ExitCode": {
-        "type": "integer",
-        "description": "Exit code of the already-executed test run"
-      },
-      "runTest__output__Stdout": {
-        "type": "string",
-        "description": "Tail of the already-executed test run output"
+        "description": "Bound from $vars.runTest.output.ExitCode"
       },
       "runTest__output__OutputBlobPath": {
-        "type": "string",
-        "description": "Bucket path of the complete test run log"
+        "description": "Bound from $vars.runTest.output.OutputBlobPath"
+      },
+      "runTest__output__Stdout": {
+        "description": "Bound from $vars.runTest.output.Stdout"
       }
     }
   },
@@ -45,15 +42,23 @@
     "type": "object",
     "properties": {
       "reproduced": {
-        "type": "boolean"
+        "type": "boolean",
+        "description": "True when the test command failed on the VM the same way it fails in CI"
       },
       "hypothesis": {
-        "type": "string"
+        "type": "string",
+        "description": "Most likely root cause, one paragraph"
       },
       "evidence": {
-        "type": "string"
+        "type": "string",
+        "description": "Concrete evidence: exit codes, error lines, file paths, and every OutputBlobPath used"
       }
-    }
+    },
+    "required": [
+      "reproduced",
+      "hypothesis",
+      "evidence"
+    ]
   },
   "metadata": {
     "storageVersion": "50.0.0",
@@ -140,7 +145,7 @@
       ]
     }
   ],
-  "projectId": "d2da9233-9138-4805-95de-3c2759cfa45f",
-  "id": "d2da9233-9138-4805-95de-3c2759cfa45f",
-  "name": "E2E investigator"
+  "projectId": "e41af830-1e4b-4d6b-a7e0-5595f152ea88",
+  "id": "e41af830-1e4b-4d6b-a7e0-5595f152ea88",
+  "name": "e2e"
 }

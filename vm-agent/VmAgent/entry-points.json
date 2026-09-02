@@ -1,0 +1,96 @@
+{
+  "$schema": "https://cloud.uipath.com/draft/2024-12/entry-point",
+  "$id": "entry-points.json",
+  "entryPoints": [
+    {
+      "filePath": "content/VmAgent.bpmn#start",
+      "uniqueId": "9169d066-e626-4372-b2f6-fb1c45863eb4",
+      "type": "processorchestration",
+      "input": {
+        "type": "object",
+        "properties": {
+          "repoUrl": {
+            "type": "string",
+            "title": "repoUrl"
+          },
+          "branch": {
+            "type": "string",
+            "title": "branch"
+          },
+          "testCommand": {
+            "type": "string",
+            "title": "testCommand"
+          },
+          "runId": {
+            "type": "string",
+            "title": "runId"
+          }
+        }
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "reproduced": {
+            "type": "boolean",
+            "title": "reproduced"
+          },
+          "hypothesis": {
+            "type": "string",
+            "title": "hypothesis"
+          },
+          "evidence": {
+            "type": "string",
+            "title": "evidence"
+          }
+        }
+      },
+      "displayName": "Manual trigger"
+    },
+    {
+      "filePath": "content/e41af830-1e4b-4d6b-a7e0-5595f152ea88/agent.json",
+      "uniqueId": "e41af830-1e4b-4d6b-a7e0-5595f152ea88",
+      "type": "agent",
+      "targetRuntime": "pythonAgent",
+      "input": {
+        "type": "object",
+        "properties": {
+          "start__output__repoUrl": {
+            "type": "string",
+            "description": "Bound from $vars.start.output.repoUrl"
+          },
+          "start__output__branch": {
+            "type": "string",
+            "description": "Bound from $vars.start.output.branch"
+          },
+          "start__output__testCommand": {
+            "type": "string",
+            "description": "Bound from $vars.start.output.testCommand"
+          },
+          "start__output__runId": {
+            "type": "string",
+            "description": "Bound from $vars.start.output.runId"
+          },
+          "runTest__output__ExitCode": {
+            "description": "Bound from $vars.runTest.output.ExitCode"
+          },
+          "runTest__output__OutputBlobPath": {
+            "description": "Bound from $vars.runTest.output.OutputBlobPath"
+          },
+          "runTest__output__Stdout": {
+            "description": "Bound from $vars.runTest.output.Stdout"
+          }
+        }
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string"
+          }
+        }
+      },
+      "displayName": "e2e",
+      "hiddenAtDesignTime": true
+    }
+  ]
+}

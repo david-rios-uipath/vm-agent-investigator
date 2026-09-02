@@ -1,4 +1,6 @@
 {
+  "ProjectType": "Flow",
   "Name": "VmAgent",
-  "ProjectType": "Flow"
+  "Description": null,
+  "MainFile": null
 }
