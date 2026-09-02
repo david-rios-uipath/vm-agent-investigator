@@ -40,50 +40,16 @@
         "TimeoutMinutes": 30
       },
       "outputs": {
-        "error": {
-          "type": "object",
-          "description": "Error information if the node fails",
-          "source": "=Error",
-          "var": "error",
-          "schema": {
-            "$schema": "http://json-schema.org/draft-07/schema#",
-            "type": "object",
-            "required": [
-              "code",
-              "message",
-              "detail",
-              "category",
-              "status"
-            ],
-            "properties": {
-              "code": {
-                "type": "string",
-                "description": "Error code as a string"
-              },
-              "message": {
-                "type": "string",
-                "description": "High-level error message"
-              },
-              "detail": {
-                "type": "string",
-                "description": "Detailed error description"
-              },
-              "category": {
-                "type": "string",
-                "description": "Error category"
-              },
-              "status": {
-                "type": "integer",
-                "description": "HTTP status code"
-              }
-            },
-            "additionalProperties": false
-          }
-        },
         "output": {
           "type": "object",
-          "description": "Process output arguments (ExitCode, Stdout, OutputBlobPath)",
+          "source": "=this",
           "var": "output"
+        },
+        "error": {
+          "type": "object",
+          "description": "Error information if the RPA process fails",
+          "source": "=Error",
+          "var": "error"
         }
       }
     },
@@ -102,50 +68,16 @@
         "TimeoutMinutes": 45
       },
       "outputs": {
-        "error": {
-          "type": "object",
-          "description": "Error information if the node fails",
-          "source": "=Error",
-          "var": "error",
-          "schema": {
-            "$schema": "http://json-schema.org/draft-07/schema#",
-            "type": "object",
-            "required": [
-              "code",
-              "message",
-              "detail",
-              "category",
-              "status"
-            ],
-            "properties": {
-              "code": {
-                "type": "string",
-                "description": "Error code as a string"
-              },
-              "message": {
-                "type": "string",
-                "description": "High-level error message"
-              },
-              "detail": {
-                "type": "string",
-                "description": "Detailed error description"
-              },
-              "category": {
-                "type": "string",
-                "description": "Error category"
-              },
-              "status": {
-                "type": "integer",
-                "description": "HTTP status code"
-              }
-            },
-            "additionalProperties": false
-          }
-        },
         "output": {
           "type": "object",
-          "description": "Process output arguments (ExitCode, Stdout, OutputBlobPath)",
+          "source": "=this",
           "var": "output"
+        },
+        "error": {
+          "type": "object",
+          "description": "Error information if the RPA process fails",
+          "source": "=Error",
+          "var": "error"
         }
       }
     },
@@ -393,7 +325,7 @@
     {
       "nodeType": "uipath.core.rpa-workflow.ca36341d-ecec-4ba6-aa76-134d0afe4ba7",
       "version": "1.0.0",
-      "category": "rpa-workflow.published",
+      "category": "rpa-workflow",
       "runtimeConstraints": {
         "exclude": [
           "api-function"
@@ -443,6 +375,7 @@
         "type": "bpmn:ServiceTask",
         "serviceType": "Orchestrator.StartJob",
         "version": "v2",
+        "section": "Published",
         "listingVersion": "1.0.0",
         "bindings": {
           "resource": "process",
@@ -459,11 +392,6 @@
               "name": "folderPath",
               "propertyAttribute": "folderPath",
               "default": "e2e-investigator"
-            },
-            {
-              "name": "folderKey",
-              "propertyAttribute": "folderKey",
-              "default": "0b28296b-1f4a-4ea9-a3d5-8b0abaac1cf0"
             }
           ]
         },
@@ -485,9 +413,85 @@
           }
         ]
       },
-      "inputDefinition": {},
-      "inputDefaults": {},
+      "form": {
+        "id": "activity-properties",
+        "title": "RPA Workflow",
+        "sections": [
+          {
+            "id": "inputs",
+            "title": "Inputs",
+            "collapsible": true,
+            "defaultExpanded": true,
+            "fields": [
+              {
+                "name": "inputs.Script",
+                "type": "text",
+                "label": "Script"
+              },
+              {
+                "name": "inputs.WorkDir",
+                "type": "text",
+                "label": "WorkDir"
+              },
+              {
+                "name": "inputs.RunId",
+                "type": "text",
+                "label": "RunId"
+              },
+              {
+                "name": "inputs.TimeoutMinutes",
+                "type": "number",
+                "label": "TimeoutMinutes"
+              }
+            ]
+          }
+        ]
+      },
+      "inputDefinition": {
+        "type": "object",
+        "properties": {
+          "Script": {
+            "type": "string"
+          },
+          "WorkDir": {
+            "type": "string"
+          },
+          "RunId": {
+            "type": "string"
+          },
+          "TimeoutMinutes": {
+            "type": "number"
+          }
+        }
+      },
+      "inputDefaults": {
+        "Script": "",
+        "WorkDir": "",
+        "RunId": "",
+        "TimeoutMinutes": 0
+      },
       "outputDefinition": {
+        "output": {
+          "type": "object",
+          "source": "=this",
+          "var": "output",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "ExitCode": {
+                "type": "integer",
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "Stdout": {
+                "type": "string"
+              },
+              "OutputBlobPath": {
+                "type": "string"
+              }
+            }
+          }
+        },
         "error": {
           "type": "object",
           "description": "Error information if the node fails",
@@ -536,7 +540,7 @@
     {
       "nodeType": "uipath.agent.resource.tool.process.ca36341d-ecec-4ba6-aa76-134d0afe4ba7",
       "version": "1.0.0",
-      "category": "agent.tool.rpa.published",
+      "category": "agent.tool.rpa",
       "runtimeConstraints": {
         "exclude": [
           "api-function"
@@ -545,7 +549,7 @@
       "tags": [
         "agent-tool"
       ],
-      "sortOrder": 580,
+      "sortOrder": 560,
       "description": "vm-exec bound in the VM-pool folder; referenced as an agent tool so calls run on the Windows robot VM",
       "display": {
         "label": "vm-exec-vm",
@@ -587,6 +591,7 @@
         "type": "bpmn:ServiceTask",
         "serviceType": "Orchestrator.StartJob",
         "version": "v2",
+        "section": "Published",
         "listingVersion": "1.0.0",
         "bindings": {
           "resource": "process",
@@ -603,11 +608,6 @@
               "name": "folderPath",
               "propertyAttribute": "folderPath",
               "default": "e2e-investigator"
-            },
-            {
-              "name": "folderKey",
-              "propertyAttribute": "folderKey",
-              "default": "0b28296b-1f4a-4ea9-a3d5-8b0abaac1cf0"
             }
           ]
         },
@@ -631,19 +631,93 @@
         "source": true
       },
       "form": {
-        "id": "tool-form",
-        "title": "vm-exec-vm",
-        "sections": []
+        "id": "activity-properties",
+        "title": "RPA Workflow",
+        "sections": [
+          {
+            "id": "inputs",
+            "title": "Inputs",
+            "collapsible": true,
+            "defaultExpanded": true,
+            "fields": [
+              {
+                "name": "inputs.Script",
+                "type": "text",
+                "label": "Script"
+              },
+              {
+                "name": "inputs.WorkDir",
+                "type": "text",
+                "label": "WorkDir"
+              },
+              {
+                "name": "inputs.RunId",
+                "type": "text",
+                "label": "RunId"
+              },
+              {
+                "name": "inputs.TimeoutMinutes",
+                "type": "number",
+                "label": "TimeoutMinutes"
+              }
+            ]
+          }
+        ]
       },
-      "inputDefinition": {},
+      "inputDefinition": {
+        "type": "object",
+        "properties": {
+          "Script": {
+            "type": "string"
+          },
+          "WorkDir": {
+            "type": "string"
+          },
+          "RunId": {
+            "type": "string"
+          },
+          "TimeoutMinutes": {
+            "type": "number"
+          }
+        }
+      },
       "inputDefaults": {
+        "Script": "",
+        "WorkDir": "",
+        "RunId": "",
+        "TimeoutMinutes": 0,
         "inputSchema": {
           "type": "object",
-          "properties": {}
+          "properties": {
+            "Script": {
+              "type": "string"
+            },
+            "WorkDir": {
+              "type": "string"
+            },
+            "RunId": {
+              "type": "string"
+            },
+            "TimeoutMinutes": {
+              "type": "number"
+            }
+          }
         },
         "outputSchema": {
           "type": "object",
-          "properties": {}
+          "properties": {
+            "ExitCode": {
+              "type": "integer",
+              "minimum": -2147483648,
+              "maximum": 2147483647
+            },
+            "Stdout": {
+              "type": "string"
+            },
+            "OutputBlobPath": {
+              "type": "string"
+            }
+          }
         }
       },
       "outputDefinition": {}
@@ -1270,6 +1344,22 @@
         "binding": {
           "nodeId": "setupVm",
           "outputId": "output"
+        },
+        "schema": {
+          "type": "object",
+          "properties": {
+            "ExitCode": {
+              "type": "integer",
+              "minimum": -2147483648,
+              "maximum": 2147483647
+            },
+            "Stdout": {
+              "type": "string"
+            },
+            "OutputBlobPath": {
+              "type": "string"
+            }
+          }
         }
       },
       {
@@ -1279,6 +1369,22 @@
         "binding": {
           "nodeId": "runTest",
           "outputId": "output"
+        },
+        "schema": {
+          "type": "object",
+          "properties": {
+            "ExitCode": {
+              "type": "integer",
+              "minimum": -2147483648,
+              "maximum": 2147483647
+            },
+            "Stdout": {
+              "type": "string"
+            },
+            "OutputBlobPath": {
+              "type": "string"
+            }
+          }
         }
       }
     ]

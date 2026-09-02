@@ -20,7 +20,7 @@
         "description": "Log grouping prefix in the storage bucket. Pass the runId given to you."
       },
       "TimeoutMinutes": {
-        "type": "integer",
+        "type": "number",
         "description": "Kill the script after this many minutes. Exit code 124 means it timed out."
       },
       "guardrails": {
