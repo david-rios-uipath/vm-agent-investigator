@@ -1,0 +1,32 @@
+{
+  "docVersion": "1.0.0",
+  "resource": {
+    "name": "vm-exec_1",
+    "kind": "package",
+    "apiVersion": "orchestrator.uipath.com/v1",
+    "isOverridable": true,
+    "dependencies": [],
+    "runtimeDependencies": [],
+    "folders": [
+      {
+        "fullyQualifiedName": "solution_folder"
+      }
+    ],
+    "spec": {
+      "fileName": "vm-exec.1.0.0.nupkg",
+      "fileReference": "Package_vm-exec_1_1.0.0",
+      "name": "vm-exec_1"
+    },
+    "locks": [],
+    "key": "vm-exec:1.0.0",
+    "files": [
+      {
+        "key": "Package_vm-exec_1_1.0.0",
+        "name": "Package_vm-exec_1.1.0.0.nupkg",
+        "url": "https://alpha.uipath.com/popoc/DefaultTenant/orchestrator_/odata/Processes/UiPath.Server.Configuration.OData.DownloadPackage(key='vm-exec:1.0.0')?feedId=6d7ba070-448e-4a3f-894b-a81c89d0faa3",
+        "kind": "Package",
+        "version": "1.0.0"
+      }
+    ]
+  }
+}

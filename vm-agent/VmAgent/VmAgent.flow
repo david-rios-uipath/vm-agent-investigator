@@ -87,7 +87,7 @@
     },
     {
       "id": "vmExecTool",
-      "type": "uipath.agent.resource.tool.process.209d4dde-a982-4fc5-a498-4f818f667453",
+      "type": "uipath.agent.resource.tool.process.ca36341d-ecec-4ba6-aa76-134d0afe4ba7",
       "typeVersion": "1.0.0",
       "display": {
         "label": "vm-exec",
@@ -679,7 +679,7 @@
       }
     },
     {
-      "nodeType": "uipath.agent.resource.tool.process.209d4dde-a982-4fc5-a498-4f818f667453",
+      "nodeType": "uipath.agent.resource.tool.process.ca36341d-ecec-4ba6-aa76-134d0afe4ba7",
       "version": "1.0.0",
       "category": "agent.tool.rpa",
       "runtimeConstraints": {
@@ -688,14 +688,12 @@
         ]
       },
       "tags": [
-        "agent-tool",
-        "in-solution",
-        "local"
+        "agent-tool"
       ],
       "sortOrder": 560,
-      "description": "(In-solution) vm-exec",
+      "description": "vm-exec bound in the VM-pool folder; referenced as an agent tool so calls run on the Windows robot VM",
       "display": {
-        "label": "vm-exec",
+        "label": "vm-exec-vm",
         "icon": "rpa",
         "shape": "circle"
       },
@@ -734,26 +732,26 @@
         "type": "bpmn:ServiceTask",
         "serviceType": "Orchestrator.StartJob",
         "version": "v2",
+        "section": "Published",
+        "listingVersion": "1.0.0",
         "bindings": {
           "resource": "process",
           "resourceSubType": "Process",
-          "resourceKey": "209d4dde-a982-4fc5-a498-4f818f667453",
+          "resourceKey": "e2e-investigator.vm-exec-vm",
           "orchestratorType": "process",
           "values": [
             {
               "name": "name",
               "propertyAttribute": "name",
-              "default": "vm-exec"
+              "default": "vm-exec-vm"
             },
             {
               "name": "folderPath",
               "propertyAttribute": "folderPath",
-              "default": ""
+              "default": "e2e-investigator"
             }
           ]
         },
-        "projectId": "6889fe8c-4289-47bc-89c1-a36db6cba825",
-        "projectName": "vm-exec",
         "context": [
           {
             "name": "name",
@@ -768,14 +766,14 @@
           {
             "name": "_label",
             "type": "string",
-            "value": "vm-exec"
+            "value": "vm-exec-vm"
           }
         ],
         "source": true
       },
       "form": {
         "id": "tool-form",
-        "title": "vm-exec",
+        "title": "vm-exec-vm",
         "sections": []
       },
       "inputDefinition": {},
@@ -942,8 +940,8 @@
       "name": "name",
       "type": "string",
       "resource": "process",
-      "resourceKey": "209d4dde-a982-4fc5-a498-4f818f667453",
-      "default": "vm-exec",
+      "resourceKey": "e2e-investigator.vm-exec-vm",
+      "default": "vm-exec-vm",
       "propertyAttribute": "name",
       "resourceSubType": "Process"
     },
@@ -952,8 +950,8 @@
       "name": "folderPath",
       "type": "string",
       "resource": "process",
-      "resourceKey": "209d4dde-a982-4fc5-a498-4f818f667453",
-      "default": "",
+      "resourceKey": "e2e-investigator.vm-exec-vm",
+      "default": "e2e-investigator",
       "propertyAttribute": "folderPath",
       "resourceSubType": "Process"
     }
