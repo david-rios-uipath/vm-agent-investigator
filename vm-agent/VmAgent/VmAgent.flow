@@ -34,9 +34,9 @@
         "icon": "rpa"
       },
       "inputs": {
-        "Script": "=js:`$ErrorActionPreference = 'Stop'\n$repo = 'C:\\\\vm-agent\\\\repo'\n$branch = '${$vars.branch}'\n$url = '${$vars.repoUrl}'\nif ($env:GIT_TOKEN) { $url = $url -replace '^https://', \"https://x-access-token:$($env:GIT_TOKEN)@\" }\nNew-Item -ItemType Directory -Force -Path 'C:\\\\vm-agent' | Out-Null\nif (Test-Path \"$repo\\\\.git\") {\n  Write-Output \"[setup] reusing clone at $repo\"\n  git -C $repo fetch --depth 1 origin $branch\n  git -C $repo reset --hard FETCH_HEAD\n} else {\n  Write-Output \"[setup] cloning $branch\"\n  git clone --depth 1 --branch $branch $url $repo\n}\nSet-Location $repo\ncorepack enable pnpm\ncorepack pnpm install --frozen-lockfile\ncorepack pnpm exec playwright install chromium\nWrite-Output \"[setup] head: $(git -C $repo rev-parse --short HEAD)\"\nWrite-Output \"[setup] done\"\n`",
+        "Script": "=js:`$ErrorActionPreference = 'Stop'\n$repo = 'C:\\\\vm-agent\\\\repo'\n$branch = '${$vars.start.output.branch}'\n$url = '${$vars.start.output.repoUrl}'\nif ($env:GIT_TOKEN) { $url = $url -replace '^https://', \"https://x-access-token:$($env:GIT_TOKEN)@\" }\nNew-Item -ItemType Directory -Force -Path 'C:\\\\vm-agent' | Out-Null\nif (Test-Path \"$repo\\\\.git\") {\n  Write-Output \"[setup] reusing clone at $repo\"\n  git -C $repo fetch --depth 1 origin $branch\n  git -C $repo reset --hard FETCH_HEAD\n} else {\n  Write-Output \"[setup] cloning $branch\"\n  git clone --depth 1 --branch $branch $url $repo\n}\nSet-Location $repo\ncorepack enable pnpm\ncorepack pnpm install --frozen-lockfile\ncorepack pnpm exec playwright install chromium\nWrite-Output \"[setup] head: $(git -C $repo rev-parse --short HEAD)\"\nWrite-Output \"[setup] done\"\n`",
         "WorkDir": "C:\\vm-agent",
-        "RunId": "=js:$vars.runId + '/setup'",
+        "RunId": "=js:$vars.start.output.runId + '/setup'",
         "TimeoutMinutes": 30
       },
       "outputs": {
@@ -91,9 +91,9 @@
         "icon": "rpa"
       },
       "inputs": {
-        "Script": "=js:`$ErrorActionPreference = 'Continue'\n$repo = 'C:\\\\vm-agent\\\\repo'\nSet-Location $repo\ncorepack enable pnpm\nWrite-Output \"[test] ${$vars.testCommand}\"\n${$vars.testCommand}\nexit $LASTEXITCODE\n`",
+        "Script": "=js:`$ErrorActionPreference = 'Continue'\n$repo = 'C:\\\\vm-agent\\\\repo'\nSet-Location $repo\ncorepack enable pnpm\nWrite-Output \"[test] ${$vars.start.output.testCommand}\"\n${$vars.start.output.testCommand}\nexit $LASTEXITCODE\n`",
         "WorkDir": "C:\\vm-agent",
-        "RunId": "=js:$vars.runId + '/test'",
+        "RunId": "=js:$vars.start.output.runId + '/test'",
         "TimeoutMinutes": 45
       },
       "outputs": {
@@ -190,22 +190,22 @@
           {
             "id": "start__output__repoUrl",
             "type": "string",
-            "binding": "=$vars.repoUrl"
+            "binding": "=$vars.start.output.repoUrl"
           },
           {
             "id": "start__output__branch",
             "type": "string",
-            "binding": "=$vars.branch"
+            "binding": "=$vars.start.output.branch"
           },
           {
             "id": "start__output__testCommand",
             "type": "string",
-            "binding": "=$vars.testCommand"
+            "binding": "=$vars.start.output.testCommand"
           },
           {
             "id": "start__output__runId",
             "type": "string",
-            "binding": "=$vars.runId"
+            "binding": "=$vars.start.output.runId"
           },
           {
             "id": "runTest__output__ExitCode",
