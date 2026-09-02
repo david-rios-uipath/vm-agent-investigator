@@ -33,23 +33,15 @@
     "type": "object",
     "properties": {
       "reproduced": {
-        "type": "boolean",
-        "description": "True when the test command failed on the VM the same way it fails in CI"
+        "type": "boolean"
       },
       "hypothesis": {
-        "type": "string",
-        "description": "Most likely root cause, one paragraph"
+        "type": "string"
       },
       "evidence": {
-        "type": "string",
-        "description": "Concrete evidence: exit codes, error lines, file paths, and every OutputBlobPath returned by vm_exec"
+        "type": "string"
       }
-    },
-    "required": [
-      "reproduced",
-      "hypothesis",
-      "evidence"
-    ]
+    }
   },
   "metadata": {
     "storageVersion": "50.0.0",
@@ -112,5 +104,7 @@
       ]
     }
   ],
-  "projectId": "d2da9233-9138-4805-95de-3c2759cfa45f"
+  "projectId": "d2da9233-9138-4805-95de-3c2759cfa45f",
+  "id": "d2da9233-9138-4805-95de-3c2759cfa45f",
+  "name": "E2E investigator"
 }

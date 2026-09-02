@@ -49,16 +49,17 @@
     }
   },
   "settings": {},
+  "properties": {
+    "folderPath": "e2e-investigator",
+    "processName": "vm-exec",
+    "exampleCalls": []
+  },
   "guardrail": {
     "policies": []
   },
-  "properties": {
-    "processName": "vm-exec",
-    "folderPath": "solution_folder",
-    "exampleCalls": []
-  },
   "id": "29664e8a-bd00-4e62-889b-cc98493010d4",
-  "referenceKey": "2506a8f7-67e6-4496-aff7-8e9e46137efc",
+  "referenceKey": "e9708dfd-323a-4f58-a54d-4518cf96387e",
   "isEnabled": true,
-  "argumentProperties": {}
+  "argumentProperties": {},
+  "canvasNodeId": "vmExecTool"
 }

@@ -6,13 +6,30 @@
     "type": "flow",
     "apiVersion": "orchestrator.uipath.com/v1",
     "projectKey": "8cf3b320-4240-45fc-8ffb-c1a7c40f7207",
+    "isOverridable": true,
     "dependencies": [
       {
         "kind": "package",
         "name": "VmAgent"
       }
     ],
-    "runtimeDependencies": [],
+    "runtimeDependencies": [
+      {
+        "bindingType": "process",
+        "bindingKey": "vm-exec",
+        "bindingValues": {
+          "name": {
+            "defaultValue": "vm-exec",
+            "isExpression": false
+          }
+        },
+        "bindingMetadata": {
+          "bindingsVersion": "2.2",
+          "solutionsSupport": "true"
+        },
+        "resourceKind": "Process"
+      }
+    ],
     "folders": [
       {
         "fullyQualifiedName": "solution_folder"
