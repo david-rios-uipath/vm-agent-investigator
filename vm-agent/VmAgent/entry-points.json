@@ -25,6 +25,11 @@
             "type": "number",
             "title": "maxIterations",
             "default": 6
+          },
+          "smokeOnly": {
+            "type": "boolean",
+            "title": "smokeOnly",
+            "default": false
           }
         }
       },

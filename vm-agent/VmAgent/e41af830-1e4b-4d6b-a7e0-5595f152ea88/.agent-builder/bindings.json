@@ -5,6 +5,11 @@
       "resource": "process",
       "key": "vm-exec-vm",
       "value": {
+        "folderKey": {
+          "defaultValue": "0b28296b-1f4a-4ea9-a3d5-8b0abaac1cf0",
+          "isExpression": false,
+          "displayName": "Folder key"
+        },
         "name": {
           "defaultValue": "vm-exec-vm",
           "isExpression": false,
