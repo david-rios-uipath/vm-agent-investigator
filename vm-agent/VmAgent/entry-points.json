@@ -178,6 +178,68 @@
       },
       "displayName": "Investigation Summarizer",
       "hiddenAtDesignTime": true
+    },
+    {
+      "filePath": "content/86439ed0-f87f-4651-b049-9b2b870842c3/agent.json",
+      "uniqueId": "86439ed0-f87f-4651-b049-9b2b870842c3",
+      "type": "agent",
+      "targetRuntime": "pythonAgent",
+      "input": {
+        "type": "object",
+        "properties": {
+          "start__output__testCommand": {
+            "type": "string"
+          },
+          "start__output__repoUrl": {
+            "type": "string"
+          },
+          "start__output__branch": {
+            "type": "string"
+          },
+          "testEvidence__output__exitCode": {
+            "type": "integer"
+          },
+          "testEvidence__output__stdout": {
+            "type": "string"
+          },
+          "readNotes__output__Stdout": {
+            "type": "string"
+          },
+          "verifyFix__output__Stdout": {
+            "type": "string"
+          },
+          "fixAttempts": {
+            "type": "number"
+          },
+          "deriveRunId__output": {
+            "description": "Bound from $vars.deriveRunId.output"
+          }
+        }
+      },
+      "output": {
+        "type": "object",
+        "required": [
+          "patchWritten",
+          "fixSummary",
+          "confidence"
+        ],
+        "properties": {
+          "patchWritten": {
+            "type": "boolean",
+            "description": "true only if fix.patch was written and is non-empty"
+          },
+          "fixSummary": {
+            "type": "string",
+            "description": "What was changed and why, or why no fix was written"
+          },
+          "confidence": {
+            "type": "string",
+            "description": "high | medium | low"
+          }
+        }
+      },
+      "displayName": "Fixer",
+      "hiddenAtDesignTime": true
     }
   ]
 }

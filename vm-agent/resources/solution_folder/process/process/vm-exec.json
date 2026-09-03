@@ -36,11 +36,7 @@
       "retentionPeriod": 30,
       "staleRetentionAction": "Delete",
       "staleRetentionPeriod": 180,
-      "packageName": "vm-agent.7.process.vm-exec",
-      "entryPointUniqueId": "1a255c41-e3ed-49e9-8bfa-c26893a50753",
-      "entryPointName": "Main.xaml",
-      "inputArgumentsSchemaV2": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"Script\": {\n      \"type\": \"string\"\n    },\n    \"WorkDir\": {\n      \"type\": \"string\"\n    },\n    \"RunId\": {\n      \"type\": \"string\"\n    },\n    \"TimeoutMinutes\": {\n      \"type\": \"integer\",\n      \"minimum\": -2147483648,\n      \"maximum\": 2147483647\n    }\n  },\n  \"required\": []\n}",
-      "outputArgumentsSchemaV2": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"ExitCode\": {\n      \"type\": \"integer\",\n      \"minimum\": -2147483648,\n      \"maximum\": 2147483647\n    },\n    \"Stdout\": {\n      \"type\": \"string\"\n    },\n    \"OutputBlobPath\": {\n      \"type\": \"string\"\n    }\n  },\n  \"required\": []\n}"
+      "packageName": "vm-agent.7.process.vm-exec"
     },
     "locks": [],
     "key": "209d4dde-a982-4fc5-a498-4f818f667453",

@@ -3,22 +3,21 @@
   "resources": [
     {
       "resource": "process",
-      "key": "vm-exec",
-      "id": "processvm-exec",
+      "key": "vm-exec-vm",
       "value": {
-        "folderPath": {
-          "defaultValue": "solution_folder",
-          "isExpression": false,
-          "displayName": "Folder path"
-        },
         "name": {
-          "defaultValue": "vm-exec",
+          "defaultValue": "vm-exec-vm",
           "isExpression": false,
           "displayName": "Process name"
+        },
+        "folderPath": {
+          "defaultValue": "e2e-investigator",
+          "isExpression": false,
+          "displayName": "Folder path"
         }
       },
       "metadata": {
-        "subType": "Process",
+        "subType": "process",
         "bindingsVersion": "2.2",
         "solutionsSupport": "true"
       }

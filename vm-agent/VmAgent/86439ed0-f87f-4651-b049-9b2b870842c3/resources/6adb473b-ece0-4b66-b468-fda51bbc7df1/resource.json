@@ -58,7 +58,7 @@
     "policies": []
   },
   "id": "6adb473b-ece0-4b66-b468-fda51bbc7df1",
-  "referenceKey": "209d4dde-a982-4fc5-a498-4f818f667453",
+  "referenceKey": "ca36341d-ecec-4ba6-aa76-134d0afe4ba7",
   "isEnabled": true,
   "argumentProperties": {
     "$['WorkDir']": {

@@ -27,6 +27,40 @@
     },
     {
       "kind": "process",
+      "name": "vm-exec-vm",
+      "resourceKey": "ca36341d-ecec-4ba6-aa76-134d0afe4ba7",
+      "folderPaths": [
+        "solution_folder"
+      ],
+      "configuration": {
+        "description": "vm-exec bound in the VM-pool folder; referenced as an agent tool so calls run on the Windows robot VM",
+        "packageName": "vm-exec",
+        "inputArguments": null,
+        "jobPriority": "Medium",
+        "hiddenForAttendedUser": false,
+        "alwaysRunning": false,
+        "autoStartProcess": false,
+        "jobRecording": "Disabled",
+        "duration": 40,
+        "frequency": 500,
+        "quality": 100,
+        "remoteControlAccess": "None",
+        "retentionAction": "Delete",
+        "retentionPeriod": 30,
+        "retentionBucketRef": null,
+        "staleRetentionAction": "Delete",
+        "staleRetentionPeriod": 180,
+        "staleRetentionBucketRef": null,
+        "connections": null,
+        "tags": []
+      },
+      "linkToResource": {
+        "name": "vm-exec-vm",
+        "folderPath": "e2e-investigator"
+      }
+    },
+    {
+      "kind": "process",
       "name": "vm-exec",
       "resourceKey": "209d4dde-a982-4fc5-a498-4f818f667453",
       "folderPaths": [

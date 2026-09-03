@@ -27,7 +27,7 @@
     },
     {
       "id": "setupVm",
-      "type": "uipath.core.rpa-workflow.209d4dde-a982-4fc5-a498-4f818f667453",
+      "type": "uipath.core.rpa-workflow.ca36341d-ecec-4ba6-aa76-134d0afe4ba7",
       "typeVersion": "1.0.0",
       "display": {
         "label": "Set up VM (clone + install)",
@@ -112,7 +112,7 @@
     },
     {
       "id": "runTest",
-      "type": "uipath.core.rpa-workflow.209d4dde-a982-4fc5-a498-4f818f667453",
+      "type": "uipath.core.rpa-workflow.ca36341d-ecec-4ba6-aa76-134d0afe4ba7",
       "typeVersion": "1.0.0",
       "display": {
         "label": "Run failing test",
@@ -197,7 +197,7 @@
     },
     {
       "id": "vmExecTool",
-      "type": "uipath.agent.resource.tool.process.209d4dde-a982-4fc5-a498-4f818f667453",
+      "type": "uipath.agent.resource.tool.process.ca36341d-ecec-4ba6-aa76-134d0afe4ba7",
       "typeVersion": "1.0.0",
       "display": {
         "label": "vm-exec",
@@ -211,7 +211,7 @@
         "description": "Run a PowerShell script on the Windows robot VM and get its output. The VM is a persistent Windows Server with git, node, corepack/pnpm and rg (ripgrep) on PATH; the repo is at C:\\vm-agent\\repo. Returns the exit code, the last 8000 chars of merged stdout+stderr, and the bucket path of the complete log. WorkDir, RunId and a 3-minute timeout are fixed by the flow. Each call costs 45-75 seconds of fixed overhead regardless of script length, so batch: one call should run every command a step needs, with Write-Output '### <label>' separators. Output is capped at 8000 chars, so filter (rg -n, Select-String, Select-Object -First N, Get-Content -TotalCount N) instead of dumping whole files.",
         "guardrails": [],
         "isEnabled": true,
-        "referenceKey": "209d4dde-a982-4fc5-a498-4f818f667453",
+        "referenceKey": "ca36341d-ecec-4ba6-aa76-134d0afe4ba7",
         "inputSchema": {
           "type": "object",
           "properties": {
@@ -831,7 +831,7 @@
     },
     {
       "id": "readNotes",
-      "type": "uipath.core.rpa-workflow.209d4dde-a982-4fc5-a498-4f818f667453",
+      "type": "uipath.core.rpa-workflow.ca36341d-ecec-4ba6-aa76-134d0afe4ba7",
       "typeVersion": "1.0.0",
       "display": {
         "label": "Read notes",
@@ -1191,7 +1191,7 @@
     },
     {
       "id": "vmExecToolFixer",
-      "type": "uipath.agent.resource.tool.process.209d4dde-a982-4fc5-a498-4f818f667453",
+      "type": "uipath.agent.resource.tool.process.ca36341d-ecec-4ba6-aa76-134d0afe4ba7",
       "typeVersion": "1.0.0",
       "display": {
         "label": "vm-exec",
@@ -1205,7 +1205,7 @@
         "description": "Run a PowerShell script on the Windows robot VM and get its output. The VM is a persistent Windows Server with git, node, corepack/pnpm and rg (ripgrep) on PATH; the repo is at C:\\vm-agent\\repo. Returns the exit code, the last 8000 chars of merged stdout+stderr, and the bucket path of the complete log. WorkDir, RunId and a 3-minute timeout are fixed by the flow. Each call costs 45-75 seconds of fixed overhead regardless of script length, so batch: one call should run every command a step needs, with Write-Output '### <label>' separators. Output is capped at 8000 chars, so filter (rg -n, Select-String, Select-Object -First N, Get-Content -TotalCount N) instead of dumping whole files.",
         "guardrails": [],
         "isEnabled": true,
-        "referenceKey": "209d4dde-a982-4fc5-a498-4f818f667453",
+        "referenceKey": "ca36341d-ecec-4ba6-aa76-134d0afe4ba7",
         "inputSchema": {
           "type": "object",
           "properties": {
@@ -1370,7 +1370,7 @@
     },
     {
       "id": "verifyFix",
-      "type": "uipath.core.rpa-workflow.209d4dde-a982-4fc5-a498-4f818f667453",
+      "type": "uipath.core.rpa-workflow.ca36341d-ecec-4ba6-aa76-134d0afe4ba7",
       "typeVersion": "1.0.0",
       "display": {
         "label": "Verify fix",
@@ -1634,7 +1634,7 @@
     },
     {
       "id": "openPr",
-      "type": "uipath.core.rpa-workflow.209d4dde-a982-4fc5-a498-4f818f667453",
+      "type": "uipath.core.rpa-workflow.ca36341d-ecec-4ba6-aa76-134d0afe4ba7",
       "typeVersion": "1.0.0",
       "display": {
         "label": "Open draft PR",
@@ -1987,7 +1987,7 @@
     },
     {
       "id": "ciHistory",
-      "type": "uipath.core.rpa-workflow.209d4dde-a982-4fc5-a498-4f818f667453",
+      "type": "uipath.core.rpa-workflow.ca36341d-ecec-4ba6-aa76-134d0afe4ba7",
       "typeVersion": "1.0.0",
       "display": {
         "label": "CI history for this spec",
@@ -2654,20 +2654,20 @@
       }
     },
     {
-      "nodeType": "uipath.core.rpa-workflow.209d4dde-a982-4fc5-a498-4f818f667453",
+      "nodeType": "uipath.core.rpa-workflow.ca36341d-ecec-4ba6-aa76-134d0afe4ba7",
       "version": "1.0.0",
-      "category": "rpa-workflow.in-solution",
+      "category": "rpa-workflow.published",
       "runtimeConstraints": {
         "exclude": [
           "api-function"
         ]
       },
-      "description": "",
+      "description": "vm-exec bound in the VM-pool folder; referenced as an agent tool so calls run on the Windows robot VM",
       "tags": [],
-      "sortOrder": 5,
+      "sortOrder": 630,
       "supportsErrorHandling": true,
       "display": {
-        "label": "vm-exec",
+        "label": "vm-exec-vm",
         "icon": "rpa"
       },
       "handleConfiguration": [
@@ -2702,44 +2702,34 @@
           ]
         }
       ],
-      "toolbarExtensions": {
-        "design": {
-          "actions": [
-            {
-              "id": "open-workflow",
-              "icon": "external-link",
-              "label": "Open"
-            }
-          ]
-        }
-      },
-      "projectId": "6889fe8c-4289-47bc-89c1-a36db6cba825",
       "model": {
         "type": "bpmn:ServiceTask",
         "serviceType": "Orchestrator.StartJob",
         "version": "v2",
-        "skipBindingsReference": true,
+        "listingVersion": "1.0.3",
         "bindings": {
           "resource": "process",
           "resourceSubType": "Process",
-          "resourceKey": "209d4dde-a982-4fc5-a498-4f818f667453",
+          "resourceKey": "e2e-investigator.vm-exec-vm",
           "orchestratorType": "process",
           "values": [
             {
               "name": "name",
               "propertyAttribute": "name",
-              "default": "vm-exec"
+              "default": "vm-exec-vm"
             },
             {
               "name": "folderPath",
               "propertyAttribute": "folderPath",
-              "default": ""
+              "default": "e2e-investigator"
+            },
+            {
+              "name": "folderKey",
+              "propertyAttribute": "folderKey",
+              "default": "0b28296b-1f4a-4ea9-a3d5-8b0abaac1cf0"
             }
           ]
         },
-        "projectId": "6889fe8c-4289-47bc-89c1-a36db6cba825",
-        "projectName": "vm-exec",
-        "isInSolution": true,
         "context": [
           {
             "name": "name",
@@ -2754,7 +2744,7 @@
           {
             "name": "_label",
             "type": "string",
-            "value": "vm-exec"
+            "value": "vm-exec-vm"
           }
         ]
       },
@@ -2904,9 +2894,9 @@
       }
     },
     {
-      "nodeType": "uipath.agent.resource.tool.process.209d4dde-a982-4fc5-a498-4f818f667453",
+      "nodeType": "uipath.agent.resource.tool.process.ca36341d-ecec-4ba6-aa76-134d0afe4ba7",
       "version": "1.0.0",
-      "category": "agent.tool.rpa.in-solution",
+      "category": "agent.tool.rpa.published",
       "runtimeConstraints": {
         "exclude": [
           "api-function"
@@ -2916,9 +2906,9 @@
         "agent-tool"
       ],
       "sortOrder": 580,
-      "description": "",
+      "description": "vm-exec bound in the VM-pool folder; referenced as an agent tool so calls run on the Windows robot VM",
       "display": {
-        "label": "vm-exec",
+        "label": "vm-exec-vm",
         "icon": "rpa",
         "shape": "circle"
       },
@@ -2953,43 +2943,34 @@
           ]
         }
       ],
-      "toolbarExtensions": {
-        "design": {
-          "actions": [
-            {
-              "id": "open-workflow",
-              "icon": "external-link",
-              "label": "Open"
-            }
-          ]
-        }
-      },
       "model": {
         "type": "bpmn:ServiceTask",
         "serviceType": "Orchestrator.StartJob",
         "version": "v2",
-        "skipBindingsReference": true,
+        "listingVersion": "1.0.3",
         "bindings": {
           "resource": "process",
           "resourceSubType": "Process",
-          "resourceKey": "209d4dde-a982-4fc5-a498-4f818f667453",
+          "resourceKey": "e2e-investigator.vm-exec-vm",
           "orchestratorType": "process",
           "values": [
             {
               "name": "name",
               "propertyAttribute": "name",
-              "default": "vm-exec"
+              "default": "vm-exec-vm"
             },
             {
               "name": "folderPath",
               "propertyAttribute": "folderPath",
-              "default": ""
+              "default": "e2e-investigator"
+            },
+            {
+              "name": "folderKey",
+              "propertyAttribute": "folderKey",
+              "default": "0b28296b-1f4a-4ea9-a3d5-8b0abaac1cf0"
             }
           ]
         },
-        "projectId": "6889fe8c-4289-47bc-89c1-a36db6cba825",
-        "projectName": "vm-exec",
-        "isInSolution": true,
         "context": [
           {
             "name": "name",
@@ -3004,7 +2985,7 @@
           {
             "name": "_label",
             "type": "string",
-            "value": "vm-exec"
+            "value": "vm-exec-vm"
           }
         ],
         "source": true
@@ -3093,28 +3074,16 @@
               "type": "string"
             },
             "WorkDir": {
-              "type": "string",
-              "x-default-expression": "\"C:\\vm-agent\"",
-              "default": "C:\\vm-agent"
+              "type": "string"
             },
             "RunId": {
-              "type": "string",
-              "x-default-expression": "\"manual\"",
-              "default": "manual"
+              "type": "string"
             },
             "TimeoutMinutes": {
-              "type": "integer",
-              "minimum": -2147483648,
-              "maximum": 2147483647,
-              "x-default-expression": "30",
-              "default": 30
+              "type": "number"
             },
             "MaxOutputChars": {
-              "type": "integer",
-              "minimum": -2147483648,
-              "maximum": 2147483647,
-              "x-default-expression": "8000",
-              "default": 8000
+              "type": "number"
             }
           }
         },
@@ -5485,6 +5454,38 @@
       ]
     }
   },
+  "bindings": [
+    {
+      "id": "bVmExecName",
+      "name": "name",
+      "type": "string",
+      "resource": "process",
+      "resourceKey": "e2e-investigator.vm-exec-vm",
+      "default": "vm-exec-vm",
+      "propertyAttribute": "name",
+      "resourceSubType": "Process"
+    },
+    {
+      "id": "bVmExecFolderPath",
+      "name": "folderPath",
+      "type": "string",
+      "resource": "process",
+      "resourceKey": "e2e-investigator.vm-exec-vm",
+      "default": "e2e-investigator",
+      "propertyAttribute": "folderPath",
+      "resourceSubType": "Process"
+    },
+    {
+      "id": "bFSZOddFk",
+      "name": "folderKey",
+      "type": "string",
+      "resource": "process",
+      "resourceKey": "e2e-investigator.vm-exec-vm",
+      "default": "0b28296b-1f4a-4ea9-a3d5-8b0abaac1cf0",
+      "propertyAttribute": "folderKey",
+      "resourceSubType": "Process"
+    }
+  ],
   "layout": {
     "nodes": {
       "start": {
@@ -6081,27 +6082,5 @@
         ]
       }
     }
-  },
-  "bindings": [
-    {
-      "id": "bVmExecName",
-      "name": "name",
-      "type": "string",
-      "resource": "process",
-      "resourceKey": "vm-exec",
-      "default": "vm-exec",
-      "propertyAttribute": "name",
-      "resourceSubType": "Process"
-    },
-    {
-      "id": "bVmExecFolderPath",
-      "name": "folderPath",
-      "type": "string",
-      "resource": "process",
-      "resourceKey": "vm-exec",
-      "default": "solution_folder",
-      "propertyAttribute": "folderPath",
-      "resourceSubType": "Process"
-    }
-  ]
+  }
 }
