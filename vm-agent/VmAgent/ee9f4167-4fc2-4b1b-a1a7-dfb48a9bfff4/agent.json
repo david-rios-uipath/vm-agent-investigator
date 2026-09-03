@@ -1,0 +1,175 @@
+{
+  "version": "1.2.0",
+  "settings": {
+    "model": "anthropic.claude-opus-4-8",
+    "maxTokens": 16384,
+    "temperature": 0,
+    "engine": "basic-v2",
+    "maxIterations": 25,
+    "mode": "standard"
+  },
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "start__output__testCommand": {
+        "type": "string",
+        "description": "Bound from $vars.start.output.testCommand"
+      },
+      "start__output__repoUrl": {
+        "type": "string",
+        "description": "Bound from $vars.start.output.repoUrl"
+      },
+      "start__output__branch": {
+        "type": "string",
+        "description": "Bound from $vars.start.output.branch"
+      },
+      "runTest__output__ExitCode": {
+        "type": "integer",
+        "description": "Bound from $vars.runTest.output.ExitCode"
+      },
+      "runTest__output__OutputBlobPath": {
+        "type": "string",
+        "description": "Bound from $vars.runTest.output.OutputBlobPath"
+      },
+      "iteration": {
+        "type": "number",
+        "description": "Bound from $vars.iteration"
+      },
+      "start__output__maxIterations": {
+        "type": "number",
+        "description": "Bound from $vars.start.output.maxIterations"
+      },
+      "runTest__output__Stdout": {
+        "type": "string",
+        "description": "Bound from $vars.runTest.output.Stdout"
+      },
+      "readNotes__output__Stdout": {
+        "type": "string",
+        "description": "Bound from $vars.readNotes.output.Stdout"
+      }
+    }
+  },
+  "outputSchema": {
+    "type": "object",
+    "required": [
+      "reproduced",
+      "hypothesis",
+      "evidence"
+    ],
+    "properties": {
+      "reproduced": {
+        "type": "boolean"
+      },
+      "hypothesis": {
+        "type": "string"
+      },
+      "evidence": {
+        "type": "string"
+      }
+    }
+  },
+  "metadata": {
+    "storageVersion": "50.0.0",
+    "isConversational": false,
+    "showProjectCreationExperience": false
+  },
+  "type": "lowCode",
+  "guardrails": [],
+  "messages": [
+    {
+      "role": "system",
+      "content": "You write the final report for an automated e2e test investigation. You have no tools.\nYou are given: the failing test command, the test run's exit code and output tail, the bucket path of the full log, and the investigator's notebook (its own record across passes).\n\nBase every claim on the notebook and the test output. Never invent a cause that the notebook does not support.\n\nSet classification to:\n  - regression: the notebook identifies a code change that breaks the test\n  - flake: timing/ordering dependent, passes on retry, no code cause\n  - infrastructure: the VM, licensing, environment or tooling caused it, not the product\n  - known-platform-issue: a known Studio Web / Orchestrator / solution failure\n  - inconclusive: the notebook does not establish a cause\n\nIf the notebook is missing or empty, set classification to inconclusive, explain that inunverified, and report what the raw test output alone shows.\n\nQuote decisive error lines in evidence, with file:line where the notebook has them, and list the bucket log paths. State plainly in unverified what remains unchecked. An honest gap is more useful than a confident guess.",
+      "contentTokens": [
+        {
+          "type": "simpleText",
+          "rawString": "You write the final report for an automated e2e test investigation. You have no tools.\nYou are given: the failing test command, the test run's exit code and output tail, the bucket path of the full log, and the investigator's notebook (its own record across passes).\n\nBase every claim on the notebook and the test output. Never invent a cause that the notebook does not support.\n\nSet classification to:\n  - regression: the notebook identifies a code change that breaks the test\n  - flake: timing/ordering dependent, passes on retry, no code cause\n  - infrastructure: the VM, licensing, environment or tooling caused it, not the product\n  - known-platform-issue: a known Studio Web / Orchestrator / solution failure\n  - inconclusive: the notebook does not establish a cause\n\nIf the notebook is missing or empty, set classification to inconclusive, explain that inunverified, and report what the raw test output alone shows.\n\nQuote decisive error lines in evidence, with file:line where the notebook has them, and list the bucket log paths. State plainly in unverified what remains unchecked. An honest gap is more useful than a confident guess."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": "Test command: {{input.start__output__testCommand}}\nRepository: {{input.start__output__repoUrl}} @ {{input.start__output__branch}}\nTest exit code: {{input.runTest__output__ExitCode}}\nFull test log in bucket: {{input.runTest__output__OutputBlobPath}}\nInvestigation passes used: {{input.iteration}} of {{input.start__output__maxIterations}}\n\nTest run output tail: {{input.runTest__output__Stdout}}\n\nInvestigator notebook: {{input.readNotes__output__Stdout}}\n\nWrite the final report. Base every claim on the notebook and the test output above, and fill every field of the output schema.",
+      "contentTokens": [
+        {
+          "type": "simpleText",
+          "rawString": "Test command: "
+        },
+        {
+          "type": "variable",
+          "rawString": "input.start__output__testCommand"
+        },
+        {
+          "type": "simpleText",
+          "rawString": "\nRepository: "
+        },
+        {
+          "type": "variable",
+          "rawString": "input.start__output__repoUrl"
+        },
+        {
+          "type": "simpleText",
+          "rawString": " @ "
+        },
+        {
+          "type": "variable",
+          "rawString": "input.start__output__branch"
+        },
+        {
+          "type": "simpleText",
+          "rawString": "\nTest exit code: "
+        },
+        {
+          "type": "variable",
+          "rawString": "input.runTest__output__ExitCode"
+        },
+        {
+          "type": "simpleText",
+          "rawString": "\nFull test log in bucket: "
+        },
+        {
+          "type": "variable",
+          "rawString": "input.runTest__output__OutputBlobPath"
+        },
+        {
+          "type": "simpleText",
+          "rawString": "\nInvestigation passes used: "
+        },
+        {
+          "type": "variable",
+          "rawString": "input.iteration"
+        },
+        {
+          "type": "simpleText",
+          "rawString": " of "
+        },
+        {
+          "type": "variable",
+          "rawString": "input.start__output__maxIterations"
+        },
+        {
+          "type": "simpleText",
+          "rawString": "\n\nTest run output tail: "
+        },
+        {
+          "type": "variable",
+          "rawString": "input.runTest__output__Stdout"
+        },
+        {
+          "type": "simpleText",
+          "rawString": "\n\nInvestigator notebook: "
+        },
+        {
+          "type": "variable",
+          "rawString": "input.readNotes__output__Stdout"
+        },
+        {
+          "type": "simpleText",
+          "rawString": "\n\nWrite the final report. Base every claim on the notebook and the test output above, and fill every field of the output schema."
+        }
+      ]
+    }
+  ],
+  "projectId": "ee9f4167-4fc2-4b1b-a1a7-dfb48a9bfff4",
+  "id": "ee9f4167-4fc2-4b1b-a1a7-dfb48a9bfff4",
+  "name": "Investigation Summarizer"
+}

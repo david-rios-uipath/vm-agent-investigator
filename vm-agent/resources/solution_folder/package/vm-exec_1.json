@@ -7,6 +7,15 @@
     "isOverridable": true,
     "dependencies": [],
     "runtimeDependencies": [],
+    "files": [
+      {
+        "name": "package_vm-exec_1.1.0.0.nupkg",
+        "kind": "Package",
+        "version": "1.0.0",
+        "url": "https://alpha.uipath.com/bc2ddac5-57bc-40e6-93fe-3b319b60ce36/be014e6a-4c8c-4642-82c5-3c1131ab46bb/orchestrator_/odata/Processes/UiPath.Server.Configuration.OData.DownloadPackage(key=\u0027vm-exec:1.0.0\u0027)?feedId=6d7ba070-448e-4a3f-894b-a81c89d0faa3",
+        "key": "package_vm-exec_1_1.0.0"
+      }
+    ],
     "folders": [
       {
         "fullyQualifiedName": "solution_folder"
@@ -14,19 +23,11 @@
     ],
     "spec": {
       "fileName": "vm-exec.1.0.0.nupkg",
-      "fileReference": "Package_vm-exec_1_1.0.0",
-      "name": "vm-exec_1"
+      "fileReference": "package_vm-exec_1_1.0.0",
+      "name": "vm-exec_1",
+      "description": null
     },
     "locks": [],
-    "key": "vm-exec:1.0.0",
-    "files": [
-      {
-        "key": "Package_vm-exec_1_1.0.0",
-        "name": "Package_vm-exec_1.1.0.0.nupkg",
-        "url": "https://alpha.uipath.com/popoc/DefaultTenant/orchestrator_/odata/Processes/UiPath.Server.Configuration.OData.DownloadPackage(key='vm-exec:1.0.0')?feedId=6d7ba070-448e-4a3f-894b-a81c89d0faa3",
-        "kind": "Package",
-        "version": "1.0.0"
-      }
-    ]
+    "key": "vm-exec:1.0.0"
   }
 }

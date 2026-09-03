@@ -6,13 +6,15 @@
     "type": "process",
     "apiVersion": "orchestrator.uipath.com/v1",
     "projectKey": "6889fe8c-4289-47bc-89c1-a36db6cba825",
+    "isOverridable": true,
     "dependencies": [
       {
-        "kind": "package",
-        "name": "vm-exec"
+        "name": "vm-exec",
+        "kind": "package"
       }
     ],
     "runtimeDependencies": [],
+    "files": [],
     "folders": [
       {
         "fullyQualifiedName": "solution_folder"
@@ -34,10 +36,10 @@
       "retentionAction": "Delete",
       "retentionPeriod": 30,
       "staleRetentionAction": "Delete",
-      "staleRetentionPeriod": 180
+      "staleRetentionPeriod": 180,
+      "packageName": "vm-agent.7.process.vm-exec"
     },
     "locks": [],
-    "key": "209d4dde-a982-4fc5-a498-4f818f667453",
-    "files": []
+    "key": "209d4dde-a982-4fc5-a498-4f818f667453"
   }
 }

@@ -1,6 +1,7 @@
 {
   "$schema": "https://cloud.uipath.com/draft/2024-12/operate",
-  "projectId": "31b0a5d8-7787-4c4d-84ca-a78490eb8e70",
+  "projectId": "b8e23aec-7c6e-43ee-b425-8ee22aecf770",
+  "main": "content/VmAgent.bpmn#start",
   "contentType": "Flow",
   "targetFramework": "Portable",
   "runtimeOptions": {

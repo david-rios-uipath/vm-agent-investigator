@@ -9,8 +9,8 @@
     "isOverridable": true,
     "dependencies": [
       {
-        "kind": "package",
-        "name": "VmAgent"
+        "name": "VmAgent",
+        "kind": "package"
       }
     ],
     "runtimeDependencies": [
@@ -25,11 +25,13 @@
         },
         "bindingMetadata": {
           "bindingsVersion": "2.2",
-          "solutionsSupport": "true"
+          "solutionsSupport": "true",
+          "isSolutionResource": true
         },
         "resourceKind": "Process"
       }
     ],
+    "files": [],
     "folders": [
       {
         "fullyQualifiedName": "solution_folder"
@@ -46,10 +48,10 @@
       "retentionAction": "Delete",
       "retentionPeriod": 30,
       "staleRetentionAction": "Delete",
-      "staleRetentionPeriod": 180
+      "staleRetentionPeriod": 180,
+      "packageName": "vm-agent.7.flow.VmAgent"
     },
     "locks": [],
-    "key": "4a7879cf-7494-4ada-9e83-ea487a4b55cb",
-    "files": []
+    "key": "4a7879cf-7494-4ada-9e83-ea487a4b55cb"
   }
 }

@@ -24,16 +24,17 @@
           "runId": {
             "type": "string",
             "title": "runId"
+          },
+          "maxIterations": {
+            "type": "number",
+            "title": "maxIterations",
+            "default": 6
           }
         }
       },
       "output": {
         "type": "object",
         "properties": {
-          "reproduced": {
-            "type": "boolean",
-            "title": "reproduced"
-          },
           "hypothesis": {
             "type": "string",
             "title": "hypothesis"
@@ -41,6 +42,10 @@
           "evidence": {
             "type": "string",
             "title": "evidence"
+          },
+          "reproduced": {
+            "type": "boolean",
+            "title": "reproduced"
           }
         }
       },
@@ -55,6 +60,69 @@
         "type": "object",
         "properties": {
           "start__output__repoUrl": {
+            "type": "string"
+          },
+          "start__output__branch": {
+            "type": "string"
+          },
+          "start__output__testCommand": {
+            "type": "string"
+          },
+          "start__output__runId": {
+            "type": "string"
+          },
+          "runTest__output__ExitCode": {
+            "type": "integer"
+          },
+          "runTest__output__Stdout": {
+            "type": "string"
+          },
+          "runTest__output__OutputBlobPath": {
+            "type": "string"
+          },
+          "iteration": {
+            "type": "number",
+            "description": "Bound from $vars.iteration"
+          }
+        }
+      },
+      "output": {
+        "type": "object",
+        "required": [
+          "investigationComplete",
+          "nextFocus",
+          "rationale"
+        ],
+        "properties": {
+          "investigationComplete": {
+            "type": "boolean"
+          },
+          "nextFocus": {
+            "type": "string",
+            "description": "What the next pass should focus on. Empty when investigation complete."
+          },
+          "rationale": {
+            "type": "string",
+            "description": "Why was the investigation marked as complete/not complete?"
+          }
+        }
+      },
+      "displayName": "Investigator",
+      "hiddenAtDesignTime": true
+    },
+    {
+      "filePath": "content/ee9f4167-4fc2-4b1b-a1a7-dfb48a9bfff4/agent.json",
+      "uniqueId": "ee9f4167-4fc2-4b1b-a1a7-dfb48a9bfff4",
+      "type": "agent",
+      "targetRuntime": "pythonAgent",
+      "input": {
+        "type": "object",
+        "properties": {
+          "start__output__testCommand": {
+            "type": "string",
+            "description": "Bound from $vars.start.output.testCommand"
+          },
+          "start__output__repoUrl": {
             "type": "string",
             "description": "Bound from $vars.start.output.repoUrl"
           },
@@ -62,34 +130,52 @@
             "type": "string",
             "description": "Bound from $vars.start.output.branch"
           },
-          "start__output__testCommand": {
-            "type": "string",
-            "description": "Bound from $vars.start.output.testCommand"
-          },
-          "start__output__runId": {
-            "type": "string",
-            "description": "Bound from $vars.start.output.runId"
-          },
           "runTest__output__ExitCode": {
+            "type": "integer",
             "description": "Bound from $vars.runTest.output.ExitCode"
           },
           "runTest__output__OutputBlobPath": {
+            "type": "string",
             "description": "Bound from $vars.runTest.output.OutputBlobPath"
           },
+          "iteration": {
+            "type": "number",
+            "description": "Bound from $vars.iteration"
+          },
+          "start__output__maxIterations": {
+            "type": "number",
+            "description": "Bound from $vars.start.output.maxIterations"
+          },
           "runTest__output__Stdout": {
+            "type": "string",
             "description": "Bound from $vars.runTest.output.Stdout"
+          },
+          "readNotes__output__Stdout": {
+            "type": "string",
+            "description": "Bound from $vars.readNotes.output.Stdout"
           }
         }
       },
       "output": {
         "type": "object",
+        "required": [
+          "reproduced",
+          "hypothesis",
+          "evidence"
+        ],
         "properties": {
-          "content": {
+          "reproduced": {
+            "type": "boolean"
+          },
+          "hypothesis": {
+            "type": "string"
+          },
+          "evidence": {
             "type": "string"
           }
         }
       },
-      "displayName": "e2e",
+      "displayName": "Investigation Summarizer",
       "hiddenAtDesignTime": true
     }
   ]

@@ -1,0 +1,409 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:uipath="http://uipath.org/schema/bpmn" exporter="UiPath Flow (https://uipath.com)" exporterVersion="development">
+  <bpmn:process id="Process_1" name="Flow Process">
+    <bpmn:extensionElements>
+      <uipath:variables version="v1">
+        <uipath:input id="repoUrl" name="repoUrl" type="string" elementId="start" />
+        <uipath:input id="branch" name="branch" type="string" elementId="start" />
+        <uipath:input id="testCommand" name="testCommand" type="string" elementId="start" />
+        <uipath:input id="runId" name="runId" type="string" elementId="start" />
+        <uipath:input id="maxIterations" name="maxIterations" type="double" elementId="start" default="6" />
+        <uipath:inputOutput id="iteration" name="iteration" type="double" elementId="Process_1" default="1" />
+        <uipath:inputOutput id="start.output.repoUrl" name="repoUrl" type="string" elementId="start" />
+        <uipath:inputOutput id="start.output.branch" name="branch" type="string" elementId="start" />
+        <uipath:inputOutput id="start.output.testCommand" name="testCommand" type="string" elementId="start" />
+        <uipath:inputOutput id="start.output.runId" name="runId" type="string" elementId="start" />
+        <uipath:inputOutput id="start.output.maxIterations" name="maxIterations" type="double" elementId="start" />
+        <uipath:inputOutput id="setupVm.error" name="error" type="object" elementId="setupVm" />
+        <uipath:inputOutput id="runTest.error" name="error" type="object" elementId="runTest" />
+        <uipath:inputOutput id="end.hypothesis" name="hypothesis" type="string" elementId="end" />
+        <uipath:inputOutput id="end.evidence" name="evidence" type="string" elementId="end" />
+        <uipath:inputOutput id="end.reproduced" name="reproduced" type="string" elementId="end" />
+        <uipath:inputOutput id="investigator.error" name="error" type="object" elementId="investigator" />
+        <uipath:inputOutput id="setupInstructions.output" name="output" type="object" elementId="setupInstructions" />
+        <uipath:inputOutput id="setupInstructions.error" name="error" type="object" elementId="setupInstructions" />
+        <uipath:inputOutput id="testRunInstructions.output" name="output" type="object" elementId="testRunInstructions" />
+        <uipath:inputOutput id="testRunInstructions.error" name="error" type="object" elementId="testRunInstructions" />
+        <uipath:inputOutput id="decision1.matchedCase" name="matchedCase" type="string" elementId="decision1" />
+        <uipath:inputOutput id="decision1.matchedCaseId" name="matchedCaseId" type="string" elementId="decision1" />
+        <uipath:inputOutput id="investigationSummarizer.error" name="error" type="object" elementId="investigationSummarizer" />
+        <uipath:inputOutput id="readNotes.error" name="error" type="object" elementId="readNotes" />
+        <uipath:inputOutput id="readNotesInstructions.output" name="output" type="object" elementId="readNotesInstructions" />
+        <uipath:inputOutput id="readNotesInstructions.error" name="error" type="object" elementId="readNotesInstructions" />
+        <uipath:inputOutput id="script1.output" name="output" type="object" elementId="script1" />
+        <uipath:inputOutput id="script1.error" name="error" type="object" elementId="script1" />
+        <uipath:inputOutput id="investigator.output" name="output" type="object" elementId="investigator" />
+        <uipath:inputOutput id="investigationSummarizer.output" name="output" type="object" elementId="investigationSummarizer" />
+        <uipath:inputOutput id="setupVm.output" name="output" type="jsonSchema" elementId="setupVm" />
+        <uipath:inputOutput id="runTest.output" name="output" type="jsonSchema" elementId="runTest" />
+        <uipath:inputOutput id="readNotes.output" name="output" type="jsonSchema" elementId="readNotes" />
+        <uipath:output id="hypothesis" name="hypothesis" type="string" elementId="Process_1" />
+        <uipath:output id="evidence" name="evidence" type="string" elementId="Process_1" />
+        <uipath:output id="reproduced" name="reproduced" type="boolean" elementId="Process_1" />
+      </uipath:variables>
+      <uipath:bindings version="v1">
+        <uipath:binding id="bVmExecName" name="name" type="string" default="vm-exec-vm" resource="process" resourceSubType="Process" resourceKey="e2e-investigator.vm-exec-vm" propertyAttribute="name" />
+        <uipath:binding id="bVmExecFolderPath" name="folderPath" type="string" default="e2e-investigator" resource="process" resourceSubType="Process" resourceKey="e2e-investigator.vm-exec-vm" propertyAttribute="folderPath" />
+        <uipath:binding id="bFSZOddFk" name="folderKey" type="string" default="0b28296b-1f4a-4ea9-a3d5-8b0abaac1cf0" resource="process" resourceSubType="Process" resourceKey="e2e-investigator.vm-exec-vm" propertyAttribute="folderKey" />
+      </uipath:bindings>
+    </bpmn:extensionElements>
+    <bpmn:startEvent id="start" name="Manual trigger">
+      <bpmn:extensionElements>
+        <uipath:entryPointId value="9169d066-e626-4372-b2f6-fb1c45863eb4" />
+        <uipath:mapping version="v1">
+          <uipath:type value="BPMN.Variables" version="v1" />
+          <uipath:output name="start.output.repoUrl" type="string" source="=vars.repoUrl" var="start.output.repoUrl" />
+          <uipath:output name="start.output.branch" type="string" source="=vars.branch" var="start.output.branch" />
+          <uipath:output name="start.output.testCommand" type="string" source="=vars.testCommand" var="start.output.testCommand" />
+          <uipath:output name="start.output.runId" type="string" source="=vars.runId" var="start.output.runId" />
+          <uipath:output name="start.output.maxIterations" type="double" source="=vars.maxIterations" var="start.output.maxIterations" />
+        </uipath:mapping>
+      </bpmn:extensionElements>
+      <bpmn:outgoing>edge_start-output-core.action.script-1788369234104-input</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:serviceTask id="setupVm" name="Set up VM (clone + install)">
+      <bpmn:extensionElements>
+        <uipath:activity version="v1">
+          <uipath:type value="Orchestrator.StartJob" version="v2" />
+          <uipath:context>
+            <uipath:input name="name" type="string" value="=bindings.bVmExecName" />
+            <uipath:input name="folderPath" type="string" value="=bindings.bVmExecFolderPath" />
+            <uipath:input name="_label" type="string" value="vm-exec-vm" />
+            <uipath:inputSchema type="jsonSchema"><![CDATA[{"$schema":"http://json-schema.org/draft-07/schema#","type":"object","properties":{"Script":{"type":"string"},"WorkDir":{"type":"string"},"RunId":{"type":"string"},"TimeoutMinutes":{"type":"number"}},"required":[]}]]></uipath:inputSchema>
+          </uipath:context>
+          <uipath:input name="JobArguments" type="json" target="bodyField"><![CDATA[{"Script":"=js:vars.setupInstructions.output","WorkDir":"C:\\vm-agent","RunId":"=js:vars.start.output.runId + '/setup'","TimeoutMinutes":30}]]></uipath:input>
+          <uipath:output name="setupVm.output" type="object" source="=this" var="setupVm.output" />
+          <uipath:output name="setupVm.error" type="object" source="=Error" var="setupVm.error" />
+        </uipath:activity>
+      </bpmn:extensionElements>
+      <bpmn:incoming>edge_core.action.script-1788369234104-success-setupVm-input</bpmn:incoming>
+      <bpmn:outgoing>edge_setupVm-output-core.action.script-1788369273375-input</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="runTest" name="Run failing test">
+      <bpmn:extensionElements>
+        <uipath:activity version="v1">
+          <uipath:type value="Orchestrator.StartJob" version="v2" />
+          <uipath:context>
+            <uipath:input name="name" type="string" value="=bindings.bVmExecName" />
+            <uipath:input name="folderPath" type="string" value="=bindings.bVmExecFolderPath" />
+            <uipath:input name="_label" type="string" value="vm-exec-vm" />
+            <uipath:inputSchema type="jsonSchema"><![CDATA[{"$schema":"http://json-schema.org/draft-07/schema#","type":"object","properties":{"Script":{"type":"string"},"WorkDir":{"type":"string"},"RunId":{"type":"string"},"TimeoutMinutes":{"type":"number"}},"required":[]}]]></uipath:inputSchema>
+          </uipath:context>
+          <uipath:input name="JobArguments" type="json" target="bodyField"><![CDATA[{"Script":"=js:vars.testRunInstructions.output","WorkDir":"C:\\vm-agent","RunId":"=js:vars.start.output.runId + '/test'","TimeoutMinutes":45}]]></uipath:input>
+          <uipath:output name="runTest.output" type="object" source="=this" var="runTest.output" />
+          <uipath:output name="runTest.error" type="object" source="=Error" var="runTest.error" />
+        </uipath:activity>
+      </bpmn:extensionElements>
+      <bpmn:incoming>edge_core.action.script-1788369273375-success-runTest-input</bpmn:incoming>
+      <bpmn:outgoing>xy-edge__runTestoutput-autonomousAgent1input</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="end" name="End">
+      <bpmn:extensionElements>
+        <uipath:mapping version="v1">
+          <uipath:type value="BPMN.Variables" version="v1" />
+          <uipath:output name="hypothesis" type="string" source="=js:vars.investigationSummarizer.output.hypothesis" var="hypothesis" custom="true" />
+          <uipath:output name="evidence" type="string" source="=js:vars.investigationSummarizer.output.evidence" var="evidence" custom="true" />
+          <uipath:output name="reproduced" type="boolean" source="=js:vars.investigationSummarizer.output.reproduced" var="reproduced" custom="true" />
+        </uipath:mapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>edge_uipath.agent.autonomous-1788376730089-success-end-input</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:serviceTask id="investigator" name="Investigator">
+      <bpmn:extensionElements>
+        <uipath:activity version="v1">
+          <uipath:type value="Orchestrator.StartInlineAgentJob" version="v2" />
+          <uipath:context>
+            <uipath:input name="_label" type="string" value="Investigator" />
+            <uipath:input name="name" type="string" value="Investigator" />
+            <uipath:input name="entryPoint" type="string" value="e41af830-1e4b-4d6b-a7e0-5595f152ea88/agent.json" />
+            <uipath:inputSchema type="jsonSchema"><![CDATA[{"$schema":"http://json-schema.org/draft-07/schema#","type":"object","properties":{"start__output__repoUrl":{"type":"string"},"start__output__branch":{"type":"string"},"start__output__testCommand":{"type":"string"},"start__output__runId":{"type":"string"},"runTest__output__ExitCode":{"type":"integer"},"runTest__output__Stdout":{"type":"string"},"runTest__output__OutputBlobPath":{"type":"string"},"iteration":{"type":"number"}},"required":[]}]]></uipath:inputSchema>
+          </uipath:context>
+          <uipath:input name="JobArguments" type="json" target="bodyField"><![CDATA[{"start__output__repoUrl":"=js:vars.start.output.repoUrl","start__output__branch":"=js:vars.start.output.branch","start__output__testCommand":"=js:vars.start.output.testCommand","start__output__runId":"=js:vars.start.output.runId","runTest__output__ExitCode":"=js:vars.runTest.output.ExitCode","runTest__output__Stdout":"=js:vars.runTest.output.Stdout","runTest__output__OutputBlobPath":"=js:vars.runTest.output.OutputBlobPath","iteration":"=js:vars.iteration"}]]></uipath:input>
+          <uipath:output name="investigator.output" type="object" source="=this" var="investigator.output" />
+          <uipath:output name="investigator.error" type="object" source="=Error" var="investigator.error" />
+        </uipath:activity>
+        <uipath:mapping version="v1">
+          <uipath:type value="BPMN.Variables" version="v1" />
+          <uipath:output name="iteration" type="double" source="=js:vars.iteration + 1" var="iteration" custom="true" />
+        </uipath:mapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>xy-edge__runTestoutput-autonomousAgent1input</bpmn:incoming>
+      <bpmn:incoming>edge_core.action.script-1788383054190-success-autonomousAgent1-input</bpmn:incoming>
+      <bpmn:outgoing>edge_autonomousAgent1-success-core.logic.decision-1788376225914-input</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:scriptTask id="setupInstructions" name="Setup instructions" scriptFormat="JavaScript">
+      <bpmn:extensionElements>
+        <uipath:mapping version="v1">
+          <uipath:type value="BPMN.Variables" version="v1" />
+          <uipath:context>
+            <uipath:inputSchema type="jsonSchema"><![CDATA[{"$schema":"http://json-schema.org/draft-07/schema#","type":"object","properties":{"vars":{"type":"object"},"metadata":{"type":"object"}},"required":[]}]]></uipath:inputSchema>
+          </uipath:context>
+          <uipath:input name="args" type="json" target="bodyField"><![CDATA[{"vars":"=vars","metadata":"=metadata"}]]></uipath:input>
+          <uipath:output name="setupInstructions.output" type="object" source="=result.response" var="setupInstructions.output" />
+          <uipath:output name="setupInstructions.error" type="object" source="=Error" var="setupInstructions.error" />
+        </uipath:mapping>
+        <uipath:scriptVersion value="v3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>edge_start-output-core.action.script-1788369234104-input</bpmn:incoming>
+      <bpmn:outgoing>edge_core.action.script-1788369234104-success-setupVm-input</bpmn:outgoing>
+      <bpmn:script><![CDATA[return `$ErrorActionPreference = 'Stop'
+  $repo = 'C:\\vm-agent\\repo'
+  $bin  = 'C:\\vm-agent\\bin'
+  $branch = '${vars.start.output.branch}'
+  $url = '${vars.start.output.repoUrl}'
+  if ($env:GIT_TOKEN) { $url = $url -replace '^https://', "https://x-access-token:$($env:GIT_TOKEN)@" }
+  New-Item -ItemType Directory -Force -Path 'C:\\vm-agent' | Out-Null
+  New-Item -ItemType Directory -Force -Path $bin | Out-Null
+  $env:PATH = "$bin;$env:PATH"
+  if (Test-Path "$repo\\.git") {
+    Write-Output "[setup] reusing clone at $repo"
+    git -C $repo fetch --depth 50 origin $branch
+    if ($LASTEXITCODE -ne 0) { throw "[setup] git fetch failed with $LASTEXITCODE" }
+    git -C $repo reset --hard FETCH_HEAD
+    if ($LASTEXITCODE -ne 0) { throw "[setup] git reset failed with $LASTEXITCODE" }
+  } else {
+    Write-Output "[setup] cloning $branch"
+    git clone --depth 50 --branch $branch $url $repo
+    if ($LASTEXITCODE -ne 0) { throw "[setup] git clone failed with $LASTEXITCODE" }
+  }
+  Set-Location $repo
+  corepack enable --install-directory $bin pnpm
+  if (Test-Path "$bin\\pnpm.cmd") { Write-Output "[setup] pnpm shim at $bin\\pnpm.cmd" } else { Write-Output "[setup] WARNING: no pnpm shim in $bin" }
+  cmd.exe /c "set PATH=$bin;%PATH% && corepack pnpm install --frozen-lockfile"
+  if ($LASTEXITCODE -ne 0) { throw "[setup] pnpm install failed with $LASTEXITCODE" }
+  cmd.exe /c "set PATH=$bin;%PATH% && corepack pnpm exec playwright install chromium"
+  if ($LASTEXITCODE -ne 0) { throw "[setup] playwright install failed with $LASTEXITCODE" }
+  Write-Output "[setup] head: $(git -C $repo rev-parse --short HEAD)"
+  $pnpmVer = cmd.exe /c "set PATH=$bin;%PATH% && pnpm --version"
+  Write-Output "[setup] pnpm: $pnpmVer"
+  Write-Output "[setup] done"
+`]]></bpmn:script>
+    </bpmn:scriptTask>
+    <bpmn:scriptTask id="testRunInstructions" name="Test run instructions" scriptFormat="JavaScript">
+      <bpmn:extensionElements>
+        <uipath:mapping version="v1">
+          <uipath:type value="BPMN.Variables" version="v1" />
+          <uipath:context>
+            <uipath:inputSchema type="jsonSchema"><![CDATA[{"$schema":"http://json-schema.org/draft-07/schema#","type":"object","properties":{"vars":{"type":"object"},"metadata":{"type":"object"}},"required":[]}]]></uipath:inputSchema>
+          </uipath:context>
+          <uipath:input name="args" type="json" target="bodyField"><![CDATA[{"vars":"=vars","metadata":"=metadata"}]]></uipath:input>
+          <uipath:output name="testRunInstructions.output" type="object" source="=result.response" var="testRunInstructions.output" />
+          <uipath:output name="testRunInstructions.error" type="object" source="=Error" var="testRunInstructions.error" />
+        </uipath:mapping>
+        <uipath:scriptVersion value="v3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>edge_setupVm-output-core.action.script-1788369273375-input</bpmn:incoming>
+      <bpmn:outgoing>edge_core.action.script-1788369273375-success-runTest-input</bpmn:outgoing>
+      <bpmn:script><![CDATA[return `$ErrorActionPreference = 'Continue'
+  $repo = 'C:\\vm-agent\\repo'
+  $bin  = 'C:\\vm-agent\\bin'
+  Set-Location $repo
+  $cmd = '${vars.start.output.testCommand}'
+  Write-Output "[test] $cmd"
+  cmd.exe /c "set PATH=$bin;%PATH% && set CI=true && $cmd"
+  $exit = $LASTEXITCODE
+
+  $stamp = Get-Date -UFormat "%Y%m%d-%H%M%S"
+  $art = "C:\\vm-agent\\artifacts\\$stamp"
+  New-Item -ItemType Directory -Force -Path $art | Out-Null
+  if (Test-Path "$repo\\e2e\\test-results") {
+    Compress-Archive -Path "$repo\\e2e\\test-results\\*" -DestinationPath "$art\\test-results.zip" -Force
+  }
+  if (Test-Path "$repo\\e2e\\playwright-report") {
+    Compress-Archive -Path "$repo\\e2e\\playwright-report\\*" -DestinationPath "$art\\playwright-report.zip" -Force
+  }
+  Write-Output "[artifacts] $art"
+  Get-ChildItem -Path "$repo\\e2e\\test-results" -Recurse -File -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -eq 'error-context.md' -or $_.Name -eq 'trace.zip' } |
+    ForEach-Object { Write-Output "[artifact] $($_.FullName)" }
+
+  exit $exit
+  `]]></bpmn:script>
+    </bpmn:scriptTask>
+    <bpmn:inclusiveGateway id="decision1" name="Decision">
+      <bpmn:incoming>edge_autonomousAgent1-success-core.logic.decision-1788376225914-input</bpmn:incoming>
+      <bpmn:outgoing>edge_decision1-true-core.action.script-1788377935950-input</bpmn:outgoing>
+      <bpmn:outgoing>edge_decision1-false-core.action.script-1788383054190-input</bpmn:outgoing>
+    </bpmn:inclusiveGateway>
+    <bpmn:serviceTask id="investigationSummarizer" name="Investigation Summarizer">
+      <bpmn:extensionElements>
+        <uipath:activity version="v1">
+          <uipath:type value="Orchestrator.StartInlineAgentJob" version="v2" />
+          <uipath:context>
+            <uipath:input name="_label" type="string" value="Investigation Summarizer" />
+            <uipath:input name="name" type="string" value="Investigation Summarizer" />
+            <uipath:input name="entryPoint" type="string" value="ee9f4167-4fc2-4b1b-a1a7-dfb48a9bfff4/agent.json" />
+            <uipath:inputSchema type="jsonSchema"><![CDATA[{"$schema":"http://json-schema.org/draft-07/schema#","type":"object","properties":{"start__output__testCommand":{"type":"string"},"start__output__repoUrl":{"type":"string"},"start__output__branch":{"type":"string"},"runTest__output__ExitCode":{"type":"integer"},"runTest__output__OutputBlobPath":{"type":"string"},"iteration":{"type":"number"},"start__output__maxIterations":{"type":"number"},"runTest__output__Stdout":{"type":"string"},"readNotes__output__Stdout":{"type":"string"}},"required":[]}]]></uipath:inputSchema>
+          </uipath:context>
+          <uipath:input name="JobArguments" type="json" target="bodyField"><![CDATA[{"start__output__testCommand":"=js:vars.start.output.testCommand","start__output__repoUrl":"=js:vars.start.output.repoUrl","start__output__branch":"=js:vars.start.output.branch","runTest__output__ExitCode":"=js:vars.runTest.output.ExitCode","runTest__output__OutputBlobPath":"=js:vars.runTest.output.OutputBlobPath","iteration":"=js:vars.iteration","start__output__maxIterations":"=js:vars.start.output.maxIterations","runTest__output__Stdout":"=js:vars.runTest.output.Stdout","readNotes__output__Stdout":"=js:vars.readNotes.output.Stdout"}]]></uipath:input>
+          <uipath:output name="investigationSummarizer.output" type="object" source="=this" var="investigationSummarizer.output" />
+          <uipath:output name="investigationSummarizer.error" type="object" source="=Error" var="investigationSummarizer.error" />
+        </uipath:activity>
+      </bpmn:extensionElements>
+      <bpmn:incoming>edge_uipath.core.rpa-workflow.ca36341d-ecec-4ba6-aa76-134d0afe4ba7-1788377893011-output-investigationSummarizer-input</bpmn:incoming>
+      <bpmn:outgoing>edge_uipath.agent.autonomous-1788376730089-success-end-input</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="readNotes" name="Read notes">
+      <bpmn:extensionElements>
+        <uipath:activity version="v1">
+          <uipath:type value="Orchestrator.StartJob" version="v2" />
+          <uipath:context>
+            <uipath:input name="name" type="string" value="=bindings.bVmExecName" />
+            <uipath:input name="folderPath" type="string" value="=bindings.bVmExecFolderPath" />
+            <uipath:input name="_label" type="string" value="vm-exec-vm" />
+            <uipath:inputSchema type="jsonSchema"><![CDATA[{"$schema":"http://json-schema.org/draft-07/schema#","type":"object","properties":{"Script":{"type":"string"},"WorkDir":{"type":"string"},"RunId":{"type":"string"},"TimeoutMinutes":{"type":"number"}},"required":[]}]]></uipath:inputSchema>
+          </uipath:context>
+          <uipath:input name="JobArguments" type="json" target="bodyField"><![CDATA[{"Script":"=js:vars.readNotesInstructions.output","WorkDir":"C:\\vm-agent","RunId":"=js:vars.start.output.runId + '/read'","TimeoutMinutes":30}]]></uipath:input>
+          <uipath:output name="readNotes.output" type="object" source="=this" var="readNotes.output" />
+          <uipath:output name="readNotes.error" type="object" source="=Error" var="readNotes.error" />
+        </uipath:activity>
+      </bpmn:extensionElements>
+      <bpmn:incoming>edge_core.action.script-1788377935950-success-vmExecVm1-input</bpmn:incoming>
+      <bpmn:outgoing>edge_uipath.core.rpa-workflow.ca36341d-ecec-4ba6-aa76-134d0afe4ba7-1788377893011-output-investigationSummarizer-input</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:scriptTask id="readNotesInstructions" name="Read notes instructions" scriptFormat="JavaScript">
+      <bpmn:extensionElements>
+        <uipath:mapping version="v1">
+          <uipath:type value="BPMN.Variables" version="v1" />
+          <uipath:context>
+            <uipath:inputSchema type="jsonSchema"><![CDATA[{"$schema":"http://json-schema.org/draft-07/schema#","type":"object","properties":{"vars":{"type":"object"},"metadata":{"type":"object"}},"required":[]}]]></uipath:inputSchema>
+          </uipath:context>
+          <uipath:input name="args" type="json" target="bodyField"><![CDATA[{"vars":"=vars","metadata":"=metadata"}]]></uipath:input>
+          <uipath:output name="readNotesInstructions.output" type="object" source="=result.response" var="readNotesInstructions.output" />
+          <uipath:output name="readNotesInstructions.error" type="object" source="=Error" var="readNotesInstructions.error" />
+        </uipath:mapping>
+        <uipath:scriptVersion value="v3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>edge_decision1-true-core.action.script-1788377935950-input</bpmn:incoming>
+      <bpmn:outgoing>edge_core.action.script-1788377935950-success-vmExecVm1-input</bpmn:outgoing>
+      <bpmn:script><![CDATA[return `$notes = "C:\\vm-agent\\notes\\${vars.start.output.runId}\\NOTES.md"
+  if (Test-Path $notes) { Get-Content $notes } else { Write-Output "[notes] MISSING - no notebook was written" }
+`]]></bpmn:script>
+    </bpmn:scriptTask>
+    <bpmn:scriptTask id="script1" name="Next Focus" scriptFormat="JavaScript">
+      <bpmn:extensionElements>
+        <uipath:mapping version="v1">
+          <uipath:type value="BPMN.Variables" version="v1" />
+          <uipath:context>
+            <uipath:inputSchema type="jsonSchema"><![CDATA[{"$schema":"http://json-schema.org/draft-07/schema#","type":"object","properties":{"vars":{"type":"object"},"metadata":{"type":"object"}},"required":[]}]]></uipath:inputSchema>
+          </uipath:context>
+          <uipath:input name="args" type="json" target="bodyField"><![CDATA[{"vars":"=vars","metadata":"=metadata"}]]></uipath:input>
+          <uipath:output name="script1.output" type="object" source="=result.response" var="script1.output" />
+          <uipath:output name="script1.error" type="object" source="=Error" var="script1.error" />
+        </uipath:mapping>
+        <uipath:scriptVersion value="v3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>edge_decision1-false-core.action.script-1788383054190-input</bpmn:incoming>
+      <bpmn:outgoing>edge_core.action.script-1788383054190-success-autonomousAgent1-input</bpmn:outgoing>
+      <bpmn:script><![CDATA[return vars.investigator.output.nextFocus ?? '']]></bpmn:script>
+    </bpmn:scriptTask>
+    <bpmn:sequenceFlow id="edge_start-output-core.action.script-1788369234104-input" sourceRef="start" targetRef="setupInstructions" />
+    <bpmn:sequenceFlow id="edge_core.action.script-1788369234104-success-setupVm-input" sourceRef="setupInstructions" targetRef="setupVm" />
+    <bpmn:sequenceFlow id="edge_setupVm-output-core.action.script-1788369273375-input" sourceRef="setupVm" targetRef="testRunInstructions" />
+    <bpmn:sequenceFlow id="edge_core.action.script-1788369273375-success-runTest-input" sourceRef="testRunInstructions" targetRef="runTest" />
+    <bpmn:sequenceFlow id="xy-edge__runTestoutput-autonomousAgent1input" sourceRef="runTest" targetRef="investigator" />
+    <bpmn:sequenceFlow id="edge_autonomousAgent1-success-core.logic.decision-1788376225914-input" sourceRef="investigator" targetRef="decision1" />
+    <bpmn:sequenceFlow id="edge_uipath.agent.autonomous-1788376730089-success-end-input" sourceRef="investigationSummarizer" targetRef="end" />
+    <bpmn:sequenceFlow id="edge_uipath.core.rpa-workflow.ca36341d-ecec-4ba6-aa76-134d0afe4ba7-1788377893011-output-investigationSummarizer-input" sourceRef="readNotes" targetRef="investigationSummarizer" />
+    <bpmn:sequenceFlow id="edge_decision1-true-core.action.script-1788377935950-input" name="True" sourceRef="decision1" targetRef="readNotesInstructions">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=js:vars.iteration &gt; vars.start.output.maxIterations || vars.investigator.output.investigationComplete</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="edge_core.action.script-1788377935950-success-vmExecVm1-input" sourceRef="readNotesInstructions" targetRef="readNotes" />
+    <bpmn:sequenceFlow id="edge_decision1-false-core.action.script-1788383054190-input" name="False" sourceRef="decision1" targetRef="script1">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=js:!(vars.iteration &gt; vars.start.output.maxIterations || vars.investigator.output.investigationComplete
+)</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="edge_core.action.script-1788383054190-success-autonomousAgent1-input" sourceRef="script1" targetRef="investigator" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="Diagram_1">
+    <bpmndi:BPMNPlane id="Plane_1" bpmnElement="Process_1">
+      <bpmndi:BPMNShape id="start_di" bpmnElement="start">
+        <dc:Bounds x="57" y="52" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="setupInstructions_di" bpmnElement="setupInstructions">
+        <dc:Bounds x="175" y="30" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="setupVm_di" bpmnElement="setupVm">
+        <dc:Bounds x="325" y="30" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="testRunInstructions_di" bpmnElement="testRunInstructions">
+        <dc:Bounds x="475" y="30" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="runTest_di" bpmnElement="runTest">
+        <dc:Bounds x="625" y="30" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="investigator_di" bpmnElement="investigator">
+        <dc:Bounds x="775" y="30" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="decision1_di" bpmnElement="decision1">
+        <dc:Bounds x="950" y="45" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="readNotesInstructions_di" bpmnElement="readNotesInstructions">
+        <dc:Bounds x="1075" y="30" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="readNotes_di" bpmnElement="readNotes">
+        <dc:Bounds x="1225" y="30" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="investigationSummarizer_di" bpmnElement="investigationSummarizer">
+        <dc:Bounds x="1375" y="30" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="end_di" bpmnElement="end">
+        <dc:Bounds x="1557" y="52" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="script1_di" bpmnElement="script1">
+        <dc:Bounds x="1075" y="170" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="edge_start-output-core.action.script-1788369234104-input_di" bpmnElement="edge_start-output-core.action.script-1788369234104-input">
+        <di:waypoint x="93" y="70" />
+        <di:waypoint x="175" y="70" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_core.action.script-1788369234104-success-setupVm-input_di" bpmnElement="edge_core.action.script-1788369234104-success-setupVm-input">
+        <di:waypoint x="275" y="70" />
+        <di:waypoint x="325" y="70" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_setupVm-output-core.action.script-1788369273375-input_di" bpmnElement="edge_setupVm-output-core.action.script-1788369273375-input">
+        <di:waypoint x="425" y="70" />
+        <di:waypoint x="475" y="70" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_core.action.script-1788369273375-success-runTest-input_di" bpmnElement="edge_core.action.script-1788369273375-success-runTest-input">
+        <di:waypoint x="575" y="70" />
+        <di:waypoint x="625" y="70" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="xy-edge__runTestoutput-autonomousAgent1input_di" bpmnElement="xy-edge__runTestoutput-autonomousAgent1input">
+        <di:waypoint x="725" y="70" />
+        <di:waypoint x="775" y="70" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_autonomousAgent1-success-core.logic.decision-1788376225914-input_di" bpmnElement="edge_autonomousAgent1-success-core.logic.decision-1788376225914-input">
+        <di:waypoint x="875" y="70" />
+        <di:waypoint x="950" y="70" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_decision1-true-core.action.script-1788377935950-input_di" bpmnElement="edge_decision1-true-core.action.script-1788377935950-input">
+        <di:waypoint x="1000" y="70" />
+        <di:waypoint x="1075" y="70" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_decision1-false-core.action.script-1788383054190-input_di" bpmnElement="edge_decision1-false-core.action.script-1788383054190-input">
+        <di:waypoint x="975" y="95" />
+        <di:waypoint x="975" y="210" />
+        <di:waypoint x="1075" y="210" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_core.action.script-1788377935950-success-vmExecVm1-input_di" bpmnElement="edge_core.action.script-1788377935950-success-vmExecVm1-input">
+        <di:waypoint x="1175" y="70" />
+        <di:waypoint x="1225" y="70" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_uipath.core.rpa-workflow.ca36341d-ecec-4ba6-aa76-134d0afe4ba7-1788377893011-output-investigationSummarizer-input_di" bpmnElement="edge_uipath.core.rpa-workflow.ca36341d-ecec-4ba6-aa76-134d0afe4ba7-1788377893011-output-investigationSummarizer-input">
+        <di:waypoint x="1325" y="70" />
+        <di:waypoint x="1375" y="70" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_uipath.agent.autonomous-1788376730089-success-end-input_di" bpmnElement="edge_uipath.agent.autonomous-1788376730089-success-end-input">
+        <di:waypoint x="1475" y="70" />
+        <di:waypoint x="1557" y="70" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="edge_core.action.script-1788383054190-success-autonomousAgent1-input_di" bpmnElement="edge_core.action.script-1788383054190-success-autonomousAgent1-input">
+        <di:waypoint x="1125" y="250" />
+        <di:waypoint x="1125" y="280" />
+        <di:waypoint x="825" y="280" />
+        <di:waypoint x="825" y="110" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

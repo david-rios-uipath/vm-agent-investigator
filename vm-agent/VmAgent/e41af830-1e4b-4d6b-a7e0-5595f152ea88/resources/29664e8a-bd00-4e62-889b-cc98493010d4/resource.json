@@ -2,7 +2,7 @@
   "$resourceType": "tool",
   "name": "vm_exec",
   "description": "Run a PowerShell script on the Windows robot VM and get its output. The VM is a persistent Windows Server with git, node, and corepack/pnpm on PATH. Use it to clone a repo, install dependencies, run a Playwright spec, and inspect files or logs. Returns the exit code, the last 32000 chars of merged stdout+stderr, and the bucket path of the complete log.",
-  "location": "external",
+  "location": "solution",
   "type": "process",
   "inputSchema": {
     "type": "object",

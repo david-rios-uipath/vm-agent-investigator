@@ -226,5 +226,72 @@
   ],
   "projectId": "e41af830-1e4b-4d6b-a7e0-5595f152ea88",
   "id": "e41af830-1e4b-4d6b-a7e0-5595f152ea88",
-  "name": "Investigator"
+  "name": "Investigator",
+  "resources": [
+    {
+      "$resourceType": "tool",
+      "name": "vm_exec",
+      "description": "Run a PowerShell script on the Windows robot VM and get its output. The VM is a persistent Windows Server with git, node, and corepack/pnpm on PATH. Use it to clone a repo, install dependencies, run a Playwright spec, and inspect files or logs. Returns the exit code, the last 32000 chars of merged stdout+stderr, and the bucket path of the complete log.",
+      "type": "process",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "Script": {
+            "type": "string",
+            "description": "PowerShell script to run on the VM. Multiple lines allowed. Runs with powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass."
+          },
+          "WorkDir": {
+            "type": "string",
+            "description": "Working directory on the VM. Always pass the same value across calls so a clone survives between calls. Default is %TEMP%\\vm-agent."
+          },
+          "RunId": {
+            "type": "string",
+            "description": "Log grouping prefix in the storage bucket. Pass the runId given to you."
+          },
+          "TimeoutMinutes": {
+            "type": "number",
+            "description": "Kill the script after this many minutes. Exit code 124 means it timed out."
+          },
+          "guardrails": {
+            "type": "array"
+          }
+        },
+        "required": [
+          "Script"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ExitCode": {
+            "type": "integer",
+            "description": "0 = success, 124 = timeout, -1 = runner exception"
+          },
+          "Stdout": {
+            "type": "string",
+            "description": "Merged stdout+stderr, tail-truncated to 32000 chars"
+          },
+          "OutputBlobPath": {
+            "type": "string",
+            "description": "Path of the complete log inside the e2e-investigations bucket"
+          }
+        }
+      },
+      "settings": {},
+      "properties": {
+        "folderPath": "e2e-investigator",
+        "processName": "vm-exec-vm",
+        "exampleCalls": []
+      },
+      "guardrail": {
+        "policies": []
+      },
+      "id": "29664e8a-bd00-4e62-889b-cc98493010d4",
+      "referenceKey": "ca36341d-ecec-4ba6-aa76-134d0afe4ba7",
+      "isEnabled": true,
+      "argumentProperties": {},
+      "canvasNodeId": "vmExecTool"
+    }
+  ],
+  "features": []
 }

@@ -31,10 +31,15 @@
       "typeVersion": "1.0.0",
       "display": {
         "label": "Set up VM (clone + install)",
+        "subLabel": "",
         "icon": "rpa"
       },
       "inputs": {
-        "Script": "=js:`$ErrorActionPreference = 'Stop'\n$repo = 'C:\\\\vm-agent\\\\repo'\n$bin  = 'C:\\\\vm-agent\\\\bin'\n$branch = '${$vars.start.output.branch}'\n$url = '${$vars.start.output.repoUrl}'\nif ($env:GIT_TOKEN) { $url = $url -replace '^https://', \"https://x-access-token:$($env:GIT_TOKEN)@\" }\nNew-Item -ItemType Directory -Force -Path 'C:\\\\vm-agent' | Out-Null\nNew-Item -ItemType Directory -Force -Path $bin | Out-Null\n$env:PATH = \"$bin;$env:PATH\"\nif (Test-Path \"$repo\\\\.git\") {\n  Write-Output \"[setup] reusing clone at $repo\"\n  git -C $repo fetch --depth 1 origin $branch\n  git -C $repo reset --hard FETCH_HEAD\n} else {\n  Write-Output \"[setup] cloning $branch\"\n  git clone --depth 1 --branch $branch $url $repo\n}\nSet-Location $repo\ncorepack enable --install-directory $bin pnpm\nif (Test-Path \"$bin\\\\pnpm.cmd\") { Write-Output \"[setup] pnpm shim at $bin\\\\pnpm.cmd\" } else { Write-Output \"[setup] WARNING: no pnpm shim in $bin\" }\ncmd.exe /c \"set PATH=$bin;%PATH% && corepack pnpm install --frozen-lockfile\"\ncmd.exe /c \"set PATH=$bin;%PATH% && corepack pnpm exec playwright install chromium\"\nWrite-Output \"[setup] head: $(git -C $repo rev-parse --short HEAD)\"\nWrite-Output \"[setup] pnpm: $(cmd.exe /c \"set PATH=$bin;%PATH% && pnpm --version\")\"\nWrite-Output \"[setup] done\"\n`",
+        "Script": {
+          "type": "jsExpression",
+          "expression": "$vars.setupInstructions.output",
+          "fieldType": "string"
+        },
         "WorkDir": "C:\\vm-agent",
         "RunId": "=js:$vars.start.output.runId + '/setup'",
         "TimeoutMinutes": 30
@@ -43,13 +48,64 @@
         "output": {
           "type": "object",
           "source": "=this",
-          "var": "output"
+          "var": "output",
+          "description": "Process output arguments (ExitCode, Stdout, OutputBlobPath)",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "ExitCode": {
+                "type": "integer",
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "Stdout": {
+                "type": "string"
+              },
+              "OutputBlobPath": {
+                "type": "string"
+              }
+            }
+          }
         },
         "error": {
           "type": "object",
-          "description": "Error information if the RPA process fails",
+          "description": "Error information if the node fails",
           "source": "=Error",
-          "var": "error"
+          "var": "error",
+          "schema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "type": "object",
+            "required": [
+              "code",
+              "message",
+              "detail",
+              "category",
+              "status"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Error code as a string"
+              },
+              "message": {
+                "type": "string",
+                "description": "High-level error message"
+              },
+              "detail": {
+                "type": "string",
+                "description": "Detailed error description"
+              },
+              "category": {
+                "type": "string",
+                "description": "Error category"
+              },
+              "status": {
+                "type": "integer",
+                "description": "HTTP status code"
+              }
+            },
+            "additionalProperties": false
+          }
         }
       }
     },
@@ -59,10 +115,15 @@
       "typeVersion": "1.0.0",
       "display": {
         "label": "Run failing test",
+        "subLabel": "",
         "icon": "rpa"
       },
       "inputs": {
-        "Script": "=js:`$ErrorActionPreference = 'Continue'\n$repo = 'C:\\\\vm-agent\\\\repo'\n$bin  = 'C:\\\\vm-agent\\\\bin'\nSet-Location $repo\n$cmd = '${$vars.start.output.testCommand}'\nWrite-Output \"[test] $cmd\"\ncmd.exe /c \"set PATH=$bin;%PATH% && $cmd\"\nexit $LASTEXITCODE\n`",
+        "Script": {
+          "type": "jsExpression",
+          "expression": "$vars.testRunInstructions.output",
+          "fieldType": "string"
+        },
         "WorkDir": "C:\\vm-agent",
         "RunId": "=js:$vars.start.output.runId + '/test'",
         "TimeoutMinutes": 45
@@ -71,13 +132,64 @@
         "output": {
           "type": "object",
           "source": "=this",
-          "var": "output"
+          "var": "output",
+          "description": "Process output arguments (ExitCode, Stdout, OutputBlobPath)",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "ExitCode": {
+                "type": "integer",
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "Stdout": {
+                "type": "string"
+              },
+              "OutputBlobPath": {
+                "type": "string"
+              }
+            }
+          }
         },
         "error": {
           "type": "object",
-          "description": "Error information if the RPA process fails",
+          "description": "Error information if the node fails",
           "source": "=Error",
-          "var": "error"
+          "var": "error",
+          "schema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "type": "object",
+            "required": [
+              "code",
+              "message",
+              "detail",
+              "category",
+              "status"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Error code as a string"
+              },
+              "message": {
+                "type": "string",
+                "description": "High-level error message"
+              },
+              "detail": {
+                "type": "string",
+                "description": "Detailed error description"
+              },
+              "category": {
+                "type": "string",
+                "description": "Error category"
+              },
+              "status": {
+                "type": "integer",
+                "description": "HTTP status code"
+              }
+            },
+            "additionalProperties": false
+          }
         }
       }
     },
@@ -90,7 +202,89 @@
         "icon": "rpa"
       },
       "inputs": {
-        "source": "29664e8a-bd00-4e62-889b-cc98493010d4"
+        "source": "29664e8a-bd00-4e62-889b-cc98493010d4",
+        "id": "vmExecTool",
+        "name": "vm_exec",
+        "description": "Run a PowerShell script on the Windows robot VM and get its output. The VM is a persistent Windows Server with git, node, and corepack/pnpm on PATH. Use it to clone a repo, install dependencies, run a Playwright spec, and inspect files or logs. Returns the exit code, the last 32000 chars of merged stdout+stderr, and the bucket path of the complete log.",
+        "guardrails": [],
+        "isEnabled": true,
+        "referenceKey": "ca36341d-ecec-4ba6-aa76-134d0afe4ba7",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "Script": {
+              "type": "string",
+              "description": "PowerShell script to run on the VM. Multiple lines allowed. Runs with powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass."
+            },
+            "WorkDir": {
+              "type": "string",
+              "description": "Working directory on the VM. Always pass the same value across calls so a clone survives between calls. Default is %TEMP%\\vm-agent."
+            },
+            "RunId": {
+              "type": "string",
+              "description": "Log grouping prefix in the storage bucket. Pass the runId given to you."
+            },
+            "TimeoutMinutes": {
+              "type": "number",
+              "description": "Kill the script after this many minutes. Exit code 124 means it timed out."
+            },
+            "guardrails": {
+              "type": "array"
+            }
+          },
+          "required": [
+            "Script"
+          ]
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "ExitCode": {
+              "type": "integer",
+              "description": "0 = success, 124 = timeout, -1 = runner exception"
+            },
+            "Stdout": {
+              "type": "string",
+              "description": "Merged stdout+stderr, tail-truncated to 32000 chars"
+            },
+            "OutputBlobPath": {
+              "type": "string",
+              "description": "Path of the complete log inside the e2e-investigations bucket"
+            }
+          }
+        },
+        "properties": {
+          "folderPath": "e2e-investigator",
+          "processName": "vm-exec-vm",
+          "exampleCalls": []
+        },
+        "argumentProperties": {},
+        "settings": {},
+        "folderPath": "e2e-investigator",
+        "Script": {
+          "mode": "prompt",
+          "textValue": "",
+          "promptValue": "PowerShell script to run on the VM. Multiple lines allowed. Runs with powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass.",
+          "argumentPath": ""
+        },
+        "WorkDir": {
+          "mode": "prompt",
+          "textValue": "",
+          "promptValue": "Working directory on the VM. Always pass the same value across calls so a clone survives between calls. Default is %TEMP%\\vm-agent.",
+          "argumentPath": ""
+        },
+        "RunId": {
+          "mode": "prompt",
+          "textValue": "",
+          "promptValue": "Log grouping prefix in the storage bucket. Pass the runId given to you.",
+          "argumentPath": ""
+        },
+        "TimeoutMinutes": {
+          "mode": "prompt",
+          "textValue": "",
+          "promptValue": "Kill the script after this many minutes. Exit code 124 means it timed out.",
+          "argumentPath": ""
+        }
       }
     },
     {
@@ -99,35 +293,58 @@
       "typeVersion": "1.0",
       "display": {
         "label": "End",
+        "subLabel": "",
         "icon": "circle-check"
       },
       "inputs": {},
       "outputs": {
-        "reproduced": {
-          "type": "boolean",
-          "source": "=js:$vars.autonomousAgent1.output.reproduced"
-        },
         "hypothesis": {
-          "type": "string",
-          "source": "=js:$vars.autonomousAgent1.output.hypothesis"
+          "source": {
+            "type": "jsExpression",
+            "expression": "$vars.investigationSummarizer.output.hypothesis",
+            "fieldType": "string"
+          },
+          "type": "string"
         },
         "evidence": {
-          "type": "string",
-          "source": "=js:$vars.autonomousAgent1.output.evidence"
+          "source": {
+            "type": "jsExpression",
+            "expression": "$vars.investigationSummarizer.output.evidence",
+            "fieldType": "string"
+          },
+          "type": "string"
+        },
+        "reproduced": {
+          "source": {
+            "type": "jsExpression",
+            "expression": "$vars.investigationSummarizer.output.reproduced",
+            "fieldType": "boolean"
+          },
+          "type": "string"
         }
       }
     },
     {
-      "id": "autonomousAgent1",
+      "id": "investigator",
       "type": "uipath.agent.autonomous",
       "typeVersion": "1.4",
       "display": {
-        "label": "e2e",
+        "label": "Investigator",
+        "subLabel": "",
         "shape": "rectangle",
-        "icon": "autonomous-agent",
-        "subLabel": ""
+        "icon": "autonomous-agent"
       },
       "inputs": {
+        "systemPrompt": "You investigate failing end-to-end tests by running PowerShell on a Windows robot VM through the\n  vm_exec tool. The repository is already cloned at C:\\vm-agent\\repo. The run context, tools, and\n  procedure for this pass are in the user message.\n\n  Invariants, every pass:\n  - The notebook on the VM is the deliverable. Your output fields only control whether the loop\n    runs again; anything not written to the notebook is lost.\n  - Every vm_exec call passes WorkDir=\"C:\\vm-agent\" and the RunId from the run context.\n  - Reads only. Never run interactive commands, install global packages, or modify remote state\n    (no git push, publish, branch deletion; no POST/PATCH/DELETE to GitHub).\n  - Prefer evidence over theory: run the script that could falsify a claim, quote error lines\n    verbatim with file:line, and record environment failures (missing tool, auth, network) in the\n    notebook instead of working around them silently.\n  - If any value in the run context is blank, do not invent one. Record it in the notebook,\n    return investigationComplete=false, and name the missing field in rationale.",
+        "userPrompt": "   Current pass: {{ $vars.iteration }}\n\n    Run context:\n    - repository: {{ $vars.start.output.repoUrl }} @ {{ $vars.start.output.branch }}\n    - test command: {{ $vars.start.output.testCommand }}\n    - runId: {{ $vars.start.output.runId }}\n    - test exit code: {{ $vars.runTest.output.ExitCode }}\n    - full log bucket path: {{ $vars.runTest.output.OutputBlobPath }}\n    - test output tail:\n    {{ $vars.runTest.output.Stdout }}\n\n    The repository has ALREADY been cloned and its dependencies installed at C:\\vm-agent\\repo on that VM,\n    and the failing test command has ALREADY been run once — its exit code, output tail, and full-log\n    bucket path are in the run context above. Your job is to explain WHY it failed, and to write that\n    explanation into a notebook file on the VM.\n\n    THE NOTEBOOK IS THE DELIVERABLE.\n\n    Your report is not returned through your output fields. It is the file\n    C:\\vm-agent\\notes\\{{ $vars.start.output.runId }}\\NOTES.md on the VM. A later step reads that file and\n    writes the final report; anything not in it is lost. Your output fields only control whether the loop\n    runs again.\n\n    You have two tools.\n\n    vm_exec runs a PowerShell script on the same VM and returns its exit code, output tail, and the\n    bucket path of the full log. Always pass WorkDir=\"C:\\vm-agent\" so you operate on the existing clone,\n    and pass RunId=\"{{ $vars.start.output.runId }}\".\n\n    GitHub HTTP Request reaches the repository's history on github.com — CI runs, pull requests, issues.\n    Use it for what the VM does not have, never for source code; the clone is local and faster. At most\n    2 calls for the whole run. If a call errors, record the error in the notebook and do not retry it.\n\n    How to work:\n    1. Read the exit code and output tail in the run context first. Do not re-run the full suite to see\n    what you were already told.\n    2. If C:\\vm-agent\\notes\\{{ $vars.start.output.runId }}\\NOTES.md already exists, read it first. It is\n    your own record from an earlier pass. Continue from it; do not repeat work it already contains.\n    3. Early — ideally on pass 1, before you build any theory — ask GitHub whether this is new:\n\n         GET /repos/<owner>/<repo>/actions/runs?branch={{ $vars.start.output.branch }}&per_page=20\n\n       Derive <owner>/<repo> from the repository URL in the run context. Whether this spec was already\n       failing on this branch before today decides whether you are looking at a regression, a\n       long-standing flake, or an environment fault. Knowing that first stops you spending vm_exec calls\n       on the wrong question. Record the answer in the notebook.\n\n    4. Work one leg at a time. A leg is a single causal claim — \"the undo count never advances\n       because the editor never fires the change event\", \"the prompt edit is written to a stale\n       store instance\". Stay on a leg until it is settled.\n\n       Each step of a leg:\n       a. State the claim you are testing.\n       b. Run the script that could FALSIFY it — print the value, read the artifact, check\n          the handler. Not a script that merely looks nearby.\n       c. Record the verdict in the notebook: confirmed, refuted, or still open and why.\n       d. If the result narrows the SAME claim, keep going. That is the same leg, and there\n          is no reason to stop.\n\n       Going deeper is not a new leg. Symptom, then the assertion that produced it, then the\n       value the assertion read, then where that value is set — that is one leg, followed\n       properly. You may take as many steps as it needs.\n\n    5. Hand off when the leg is settled and the next claim is a different question. Not before.\n       A refuted leg is a completed leg: record what it ruled out, then hand off with the next\n       claim in nextFocus. Do not hand off mid-leg with an unverified guess — verify it or\n       record it as refuted first.\n\n    6. Playwright artifacts are usually the fastest way to settle a leg about a UI assertion.\n       error-context.md and trace.zip under C:\\vm-agent\\repo\\e2e\\test-results\\... hold the DOM\n       and step trace at the moment of failure. Read them before theorizing about source.\n       trace.zip is a zip of JSON — Expand-Archive it and read trace.trace for the step timeline.\n    7. The clone carries 50 commits of history. `git log`, `git show` and `git blame` work locally and\n       are the right way to find what changed in the failing area. If a git history command returns\n       suspiciously little — one commit for a file many people touch — say so in the notebook rather\n       than treating that single commit as the suspect.\n\n    8. Ceiling: 10 vm_exec calls per pass, with the last reserved for the notebook write. This\n       is a safety limit, not a target. Reaching it means the leg was too broad — say so in\n       rationale. Stopping well under it with a leg still open is the more common failure.\n\n    Searching the repo: use `rg` (ripgrep), which skips node_modules by default:\n\n        rg -n \"someSymbol\" --type ts\n\n    Never use `Get-ChildItem -Recurse` to search the tree. It walks into every node_modules in the\n    monorepo and will run for minutes or hang outright.\n\n    Before you return, write the notebook. This is mandatory and is your final vm_exec call:\n\n      $dir = \"C:\\vm-agent\\notes\\{{ $vars.start.output.runId }}\"\n      New-Item -ItemType Directory -Force -Path $dir | Out-Null\n      $body = @'\n      ## Pass {{ $vars.iteration }}\n      Hypothesis: <one sentence, or \"no cause established\">\n      Decisive error lines: <quoted verbatim, with file:line>\n      Evidence: <what you ran and what it showed>\n      Artifacts read: <error-context.md / trace.zip paths, or \"none\">\n      Artifacts read: <error-context.md / trace.zip paths, or \"none\">\n      CI history: <what the GitHub Actions runs showed, or \"not checked\">\n      Bucket logs: <every OutputBlobPath you used, including the one you were given>\n      Unchecked: <what a next pass should look at>\n      '@\n      Add-Content -Path \"$dir\\NOTES.md\" -Value $body\n\n    Append; never overwrite. Later passes add sections, they do not replace earlier ones. Quote error\n    lines verbatim rather than paraphrasing them. Write the notebook even when you found nothing — \"no\n    cause established, here is what I ruled out\" is a usable result; a missing file is not.\n\n    Rules:\n    - Every call must pass RunId=\"{{ $vars.start.output.runId }}\" and WorkDir=\"C:\\vm-agent\".\n    - Never run interactive commands, never install global packages, never modify remote state (no git\n    push, no publish, no deleting branches). GitHub calls are reads only — never POST, PATCH or DELETE.\n    - If the clone is unexpectedly missing (a different VM served your call), re-create it:\n    `git clone --depth 50 --branch {{ $vars.start.output.branch }} {{ $vars.start.output.repoUrl }} C:\\vm-agent\\repo`,\n    then continue.\n    - pnpm exists only through corepack. Use `corepack pnpm`, and run `corepack enable pnpm` first if a\n    subprocess needs a bare `pnpm` on PATH (Playwright's config.webServer does). A failure that is only\n    \"'pnpm' is not recognized\" is a VM environment artifact, not the CI failure you were asked to explain\n    — say so in the notebook.\n    - If a call fails for an environment reason (missing tool, auth failure, network error), record it in\n    the notebook rather than working around it silently.\n    - If any value in the run context is blank, do not invent one. Record the blank field in the\n    notebook, set investigationComplete false, and name the missing field in rationale.\n\n    Then return your output fields:\n\n    - investigationComplete: true only if the notebook now names a cause, or you have exhausted your\n    vm_exec budget, or GitHub showed this failure predates the change under investigation and is already\n    tracked. Do not set it true merely because you ran out of ideas on the first pass — that is what\n    nextFocus is for.\n    - nextFocus: when investigationComplete is false, the single specific thing the next pass should do.\n    Empty when complete.\n    - rationale: why you set investigationComplete the way you did. Name the evidence that closed the\n    question, or the specific gap that keeps it open.",
+        "model": "anthropic.claude-sonnet-5",
+        "mode": "standard",
+        "temperature": 0.05,
+        "maxTokenPerResponse": 16384,
+        "maxIterations": 100,
+        "isConversational": false,
+        "guardrails": [],
+        "name": "e2e",
         "agentInputVariables": [
           {
             "id": "start__output__repoUrl",
@@ -167,21 +384,483 @@
         ],
         "agentOutputVariables": [
           {
+            "id": "investigationComplete",
+            "type": "boolean",
+            "required": true
+          },
+          {
+            "id": "nextFocus",
+            "type": "string",
+            "description": "What the next pass should focus on. Empty when investigation complete.",
+            "required": true
+          },
+          {
+            "id": "rationale",
+            "type": "string",
+            "description": "Why was the investigation marked as complete/not complete?",
+            "required": true
+          }
+        ],
+        "source": "e41af830-1e4b-4d6b-a7e0-5595f152ea88",
+        "modelMaxTokens": 128000
+      },
+      "outputs": {
+        "error": {
+          "type": "object",
+          "description": "Error information if the node fails",
+          "source": "=Error",
+          "var": "error",
+          "schema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "type": "object",
+            "required": [
+              "code",
+              "message",
+              "detail",
+              "category",
+              "status"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Error code as a string"
+              },
+              "message": {
+                "type": "string",
+                "description": "High-level error message"
+              },
+              "detail": {
+                "type": "string",
+                "description": "Detailed error description"
+              },
+              "category": {
+                "type": "string",
+                "description": "Error category"
+              },
+              "status": {
+                "type": "integer",
+                "description": "HTTP status code"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "id": "setupInstructions",
+      "type": "core.action.script",
+      "typeVersion": "1.1",
+      "display": {
+        "label": "Setup instructions",
+        "subLabel": "",
+        "icon": "code"
+      },
+      "inputs": {
+        "script": {
+          "type": "literal",
+          "expression": "return `$ErrorActionPreference = 'Stop'\n  $repo = 'C:\\\\vm-agent\\\\repo'\n  $bin  = 'C:\\\\vm-agent\\\\bin'\n  $branch = '${$vars.start.output.branch}'\n  $url = '${$vars.start.output.repoUrl}'\n  if ($env:GIT_TOKEN) { $url = $url -replace '^https://', \"https://x-access-token:$($env:GIT_TOKEN)@\" }\n  New-Item -ItemType Directory -Force -Path 'C:\\\\vm-agent' | Out-Null\n  New-Item -ItemType Directory -Force -Path $bin | Out-Null\n  $env:PATH = \"$bin;$env:PATH\"\n  if (Test-Path \"$repo\\\\.git\") {\n    Write-Output \"[setup] reusing clone at $repo\"\n    git -C $repo fetch --depth 50 origin $branch\n    if ($LASTEXITCODE -ne 0) { throw \"[setup] git fetch failed with $LASTEXITCODE\" }\n    git -C $repo reset --hard FETCH_HEAD\n    if ($LASTEXITCODE -ne 0) { throw \"[setup] git reset failed with $LASTEXITCODE\" }\n  } else {\n    Write-Output \"[setup] cloning $branch\"\n    git clone --depth 50 --branch $branch $url $repo\n    if ($LASTEXITCODE -ne 0) { throw \"[setup] git clone failed with $LASTEXITCODE\" }\n  }\n  Set-Location $repo\n  corepack enable --install-directory $bin pnpm\n  if (Test-Path \"$bin\\\\pnpm.cmd\") { Write-Output \"[setup] pnpm shim at $bin\\\\pnpm.cmd\" } else { Write-Output \"[setup] WARNING: no pnpm shim in $bin\" }\n  cmd.exe /c \"set PATH=$bin;%PATH% && corepack pnpm install --frozen-lockfile\"\n  if ($LASTEXITCODE -ne 0) { throw \"[setup] pnpm install failed with $LASTEXITCODE\" }\n  cmd.exe /c \"set PATH=$bin;%PATH% && corepack pnpm exec playwright install chromium\"\n  if ($LASTEXITCODE -ne 0) { throw \"[setup] playwright install failed with $LASTEXITCODE\" }\n  Write-Output \"[setup] head: $(git -C $repo rev-parse --short HEAD)\"\n  $pnpmVer = cmd.exe /c \"set PATH=$bin;%PATH% && pnpm --version\"\n  Write-Output \"[setup] pnpm: $pnpmVer\"\n  Write-Output \"[setup] done\"\n`",
+          "fieldType": "string"
+        }
+      },
+      "outputs": {
+        "output": {
+          "type": "any",
+          "description": "The return value of the script",
+          "source": "=result.response",
+          "var": "output"
+        },
+        "error": {
+          "type": "object",
+          "description": "Error information if the node fails",
+          "source": "=Error",
+          "var": "error",
+          "schema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "type": "object",
+            "required": [
+              "code",
+              "message",
+              "detail",
+              "category",
+              "status"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Error code as a string"
+              },
+              "message": {
+                "type": "string",
+                "description": "High-level error message"
+              },
+              "detail": {
+                "type": "string",
+                "description": "Detailed error description"
+              },
+              "category": {
+                "type": "string",
+                "description": "Error category"
+              },
+              "status": {
+                "type": "integer",
+                "description": "HTTP status code"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "id": "testRunInstructions",
+      "type": "core.action.script",
+      "typeVersion": "1.1",
+      "display": {
+        "label": "Test run instructions",
+        "subLabel": "",
+        "icon": "code"
+      },
+      "inputs": {
+        "script": {
+          "type": "literal",
+          "expression": "return `$ErrorActionPreference = 'Continue'\n  $repo = 'C:\\\\vm-agent\\\\repo'\n  $bin  = 'C:\\\\vm-agent\\\\bin'\n  Set-Location $repo\n  $cmd = '${$vars.start.output.testCommand}'\n  Write-Output \"[test] $cmd\"\n  cmd.exe /c \"set PATH=$bin;%PATH% && set CI=true && $cmd\"\n  $exit = $LASTEXITCODE\n\n  $stamp = Get-Date -UFormat \"%Y%m%d-%H%M%S\"\n  $art = \"C:\\\\vm-agent\\\\artifacts\\\\$stamp\"\n  New-Item -ItemType Directory -Force -Path $art | Out-Null\n  if (Test-Path \"$repo\\\\e2e\\\\test-results\") {\n    Compress-Archive -Path \"$repo\\\\e2e\\\\test-results\\\\*\" -DestinationPath \"$art\\\\test-results.zip\" -Force\n  }\n  if (Test-Path \"$repo\\\\e2e\\\\playwright-report\") {\n    Compress-Archive -Path \"$repo\\\\e2e\\\\playwright-report\\\\*\" -DestinationPath \"$art\\\\playwright-report.zip\" -Force\n  }\n  Write-Output \"[artifacts] $art\"\n  Get-ChildItem -Path \"$repo\\\\e2e\\\\test-results\" -Recurse -File -ErrorAction SilentlyContinue |\n    Where-Object { $_.Name -eq 'error-context.md' -or $_.Name -eq 'trace.zip' } |\n    ForEach-Object { Write-Output \"[artifact] $($_.FullName)\" }\n\n  exit $exit\n  `",
+          "fieldType": "string"
+        }
+      },
+      "outputs": {
+        "output": {
+          "type": "any",
+          "description": "The return value of the script",
+          "source": "=result.response",
+          "var": "output"
+        },
+        "error": {
+          "type": "object",
+          "description": "Error information if the node fails",
+          "source": "=Error",
+          "var": "error",
+          "schema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "type": "object",
+            "required": [
+              "code",
+              "message",
+              "detail",
+              "category",
+              "status"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Error code as a string"
+              },
+              "message": {
+                "type": "string",
+                "description": "High-level error message"
+              },
+              "detail": {
+                "type": "string",
+                "description": "Detailed error description"
+              },
+              "category": {
+                "type": "string",
+                "description": "Error category"
+              },
+              "status": {
+                "type": "integer",
+                "description": "HTTP status code"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "id": "decision1",
+      "type": "core.logic.decision",
+      "typeVersion": "1.3",
+      "display": {
+        "label": "Decision",
+        "subLabel": "",
+        "icon": "trending-up-down"
+      },
+      "inputs": {
+        "trueLabel": "True",
+        "falseLabel": "False",
+        "expression": {
+          "type": "jsExpression",
+          "expression": "$vars.iteration > $vars.start.output.maxIterations || $vars.investigator.output.investigationComplete",
+          "fieldType": "boolean"
+        }
+      }
+    },
+    {
+      "id": "investigationSummarizer",
+      "type": "uipath.agent.autonomous",
+      "typeVersion": "1.4",
+      "display": {
+        "label": "Investigation Summarizer",
+        "subLabel": "",
+        "shape": "rectangle",
+        "icon": "autonomous-agent"
+      },
+      "inputs": {
+        "systemPrompt": "You write the final report for an automated e2e test investigation. You have no tools.\nYou are given: the failing test command, the test run's exit code and output tail, the bucket path of the full log, and the investigator's notebook (its own record across passes).\n\nBase every claim on the notebook and the test output. Never invent a cause that the notebook does not support.\n\nSet classification to:\n  - regression: the notebook identifies a code change that breaks the test\n  - flake: timing/ordering dependent, passes on retry, no code cause\n  - infrastructure: the VM, licensing, environment or tooling caused it, not the product\n  - known-platform-issue: a known Studio Web / Orchestrator / solution failure\n  - inconclusive: the notebook does not establish a cause\n\nIf the notebook is missing or empty, set classification to inconclusive, explain that inunverified, and report what the raw test output alone shows.\n\nQuote decisive error lines in evidence, with file:line where the notebook has them, and list the bucket log paths. State plainly in unverified what remains unchecked. An honest gap is more useful than a confident guess.",
+        "userPrompt": "Test command: {{ $vars.start.output.testCommand }}\nRepository: {{ $vars.start.output.repoUrl }} @ {{ $vars.start.output.branch }}\nTest exit code: {{ $vars.runTest.output.ExitCode }}\nFull test log in bucket: {{ $vars.runTest.output.OutputBlobPath }}\nInvestigation passes used: {{ $vars.iteration }} of {{ $vars.start.output.maxIterations }}\n\nTest run output tail: {{ $vars.runTest.output.Stdout }}\n\nInvestigator notebook: {{ $vars.readNotes.output.Stdout }}\n\nWrite the final report. Base every claim on the notebook and the test output above, and fill every field of the output schema.",
+        "model": "anthropic.claude-opus-4-8",
+        "mode": "standard",
+        "agentInputVariables": [],
+        "agentOutputVariables": [
+          {
             "id": "reproduced",
-            "type": "boolean"
+            "type": "boolean",
+            "required": true
           },
           {
             "id": "hypothesis",
-            "type": "string"
+            "type": "string",
+            "required": true
           },
           {
             "id": "evidence",
-            "type": "string"
+            "type": "string",
+            "required": true
           }
         ],
-        "source": "e41af830-1e4b-4d6b-a7e0-5595f152ea88"
+        "source": "ee9f4167-4fc2-4b1b-a1a7-dfb48a9bfff4",
+        "temperature": 0,
+        "maxTokenPerResponse": 16384,
+        "maxIterations": 25,
+        "modelMaxTokens": 128000
       },
       "outputs": {
+        "error": {
+          "type": "object",
+          "description": "Error information if the node fails",
+          "source": "=Error",
+          "var": "error",
+          "schema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "type": "object",
+            "required": [
+              "code",
+              "message",
+              "detail",
+              "category",
+              "status"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Error code as a string"
+              },
+              "message": {
+                "type": "string",
+                "description": "High-level error message"
+              },
+              "detail": {
+                "type": "string",
+                "description": "Detailed error description"
+              },
+              "category": {
+                "type": "string",
+                "description": "Error category"
+              },
+              "status": {
+                "type": "integer",
+                "description": "HTTP status code"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "id": "readNotes",
+      "type": "uipath.core.rpa-workflow.ca36341d-ecec-4ba6-aa76-134d0afe4ba7",
+      "typeVersion": "1.0.0",
+      "display": {
+        "label": "Read notes",
+        "subLabel": "",
+        "icon": "rpa"
+      },
+      "inputs": {
+        "Script": {
+          "type": "jsExpression",
+          "expression": "$vars.readNotesInstructions.output",
+          "fieldType": "string"
+        },
+        "WorkDir": {
+          "type": "literal",
+          "expression": "C:\\vm-agent",
+          "fieldType": "string"
+        },
+        "RunId": {
+          "type": "jsExpression",
+          "expression": "$vars.start.output.runId + '/read'",
+          "fieldType": "string"
+        },
+        "TimeoutMinutes": {
+          "type": "literal",
+          "expression": "30",
+          "fieldType": "number"
+        }
+      },
+      "outputs": {
+        "output": {
+          "type": "object",
+          "source": "=this",
+          "var": "output",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "ExitCode": {
+                "type": "integer",
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "Stdout": {
+                "type": "string"
+              },
+              "OutputBlobPath": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "error": {
+          "type": "object",
+          "description": "Error information if the node fails",
+          "source": "=Error",
+          "var": "error",
+          "schema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "type": "object",
+            "required": [
+              "code",
+              "message",
+              "detail",
+              "category",
+              "status"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Error code as a string"
+              },
+              "message": {
+                "type": "string",
+                "description": "High-level error message"
+              },
+              "detail": {
+                "type": "string",
+                "description": "Detailed error description"
+              },
+              "category": {
+                "type": "string",
+                "description": "Error category"
+              },
+              "status": {
+                "type": "integer",
+                "description": "HTTP status code"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "id": "readNotesInstructions",
+      "type": "core.action.script",
+      "typeVersion": "1.1",
+      "display": {
+        "label": "Read notes instructions",
+        "subLabel": "",
+        "icon": "code"
+      },
+      "inputs": {
+        "script": {
+          "type": "literal",
+          "expression": "return `$notes = \"C:\\\\vm-agent\\\\notes\\\\${$vars.start.output.runId}\\\\NOTES.md\"\n  if (Test-Path $notes) { Get-Content $notes } else { Write-Output \"[notes] MISSING - no notebook was written\" }\n`",
+          "fieldType": "string"
+        }
+      },
+      "outputs": {
+        "output": {
+          "type": "any",
+          "description": "The return value of the script",
+          "source": "=result.response",
+          "var": "output"
+        },
+        "error": {
+          "type": "object",
+          "description": "Error information if the node fails",
+          "source": "=Error",
+          "var": "error",
+          "schema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "type": "object",
+            "required": [
+              "code",
+              "message",
+              "detail",
+              "category",
+              "status"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Error code as a string"
+              },
+              "message": {
+                "type": "string",
+                "description": "High-level error message"
+              },
+              "detail": {
+                "type": "string",
+                "description": "Detailed error description"
+              },
+              "category": {
+                "type": "string",
+                "description": "Error category"
+              },
+              "status": {
+                "type": "integer",
+                "description": "HTTP status code"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "id": "script1",
+      "type": "core.action.script",
+      "typeVersion": "1.1",
+      "display": {
+        "label": "Next Focus",
+        "subLabel": "",
+        "icon": "code"
+      },
+      "inputs": {
+        "script": {
+          "type": "literal",
+          "expression": "return $vars.investigator.output.nextFocus ?? ''",
+          "fieldType": "string"
+        }
+      },
+      "outputs": {
+        "output": {
+          "type": "any",
+          "description": "The return value of the script",
+          "source": "=result.response",
+          "var": "output"
+        },
         "error": {
           "type": "object",
           "description": "Error information if the node fails",
@@ -227,38 +906,94 @@
   ],
   "edges": [
     {
-      "id": "edge_start_output_setupVm_input",
-      "sourceNodeId": "start",
-      "sourcePort": "output",
-      "targetNodeId": "setupVm",
-      "targetPort": "input"
-    },
-    {
-      "id": "edge_setupVm_output_runTest_input",
-      "sourceNodeId": "setupVm",
-      "sourcePort": "output",
-      "targetNodeId": "runTest",
-      "targetPort": "input"
-    },
-    {
-      "id": "edge_runTest-output-uipath.agent.autonomous-1788367442169-input",
-      "sourceNodeId": "runTest",
-      "sourcePort": "output",
-      "targetNodeId": "autonomousAgent1",
-      "targetPort": "input"
-    },
-    {
       "id": "xy-edge__autonomousAgent1tool-vmExecToolinput",
-      "sourceNodeId": "autonomousAgent1",
+      "sourceNodeId": "investigator",
       "sourcePort": "tool",
       "targetNodeId": "vmExecTool",
       "targetPort": "input"
     },
     {
-      "id": "xy-edge__autonomousAgent1success-endinput",
-      "sourceNodeId": "autonomousAgent1",
+      "id": "edge_start-output-core.action.script-1788369234104-input",
+      "sourceNodeId": "start",
+      "sourcePort": "output",
+      "targetNodeId": "setupInstructions",
+      "targetPort": "input"
+    },
+    {
+      "id": "edge_core.action.script-1788369234104-success-setupVm-input",
+      "sourceNodeId": "setupInstructions",
+      "sourcePort": "success",
+      "targetNodeId": "setupVm",
+      "targetPort": "input"
+    },
+    {
+      "id": "edge_setupVm-output-core.action.script-1788369273375-input",
+      "sourceNodeId": "setupVm",
+      "sourcePort": "output",
+      "targetNodeId": "testRunInstructions",
+      "targetPort": "input"
+    },
+    {
+      "id": "edge_core.action.script-1788369273375-success-runTest-input",
+      "sourceNodeId": "testRunInstructions",
+      "sourcePort": "success",
+      "targetNodeId": "runTest",
+      "targetPort": "input"
+    },
+    {
+      "id": "xy-edge__runTestoutput-autonomousAgent1input",
+      "sourceNodeId": "runTest",
+      "sourcePort": "output",
+      "targetNodeId": "investigator",
+      "targetPort": "input"
+    },
+    {
+      "id": "edge_autonomousAgent1-success-core.logic.decision-1788376225914-input",
+      "sourceNodeId": "investigator",
+      "sourcePort": "success",
+      "targetNodeId": "decision1",
+      "targetPort": "input"
+    },
+    {
+      "id": "edge_uipath.agent.autonomous-1788376730089-success-end-input",
+      "sourceNodeId": "investigationSummarizer",
       "sourcePort": "success",
       "targetNodeId": "end",
+      "targetPort": "input"
+    },
+    {
+      "id": "edge_uipath.core.rpa-workflow.ca36341d-ecec-4ba6-aa76-134d0afe4ba7-1788377893011-output-investigationSummarizer-input",
+      "sourceNodeId": "readNotes",
+      "sourcePort": "output",
+      "targetNodeId": "investigationSummarizer",
+      "targetPort": "input"
+    },
+    {
+      "id": "edge_decision1-true-core.action.script-1788377935950-input",
+      "sourceNodeId": "decision1",
+      "sourcePort": "true",
+      "targetNodeId": "readNotesInstructions",
+      "targetPort": "input"
+    },
+    {
+      "id": "edge_core.action.script-1788377935950-success-vmExecVm1-input",
+      "sourceNodeId": "readNotesInstructions",
+      "sourcePort": "success",
+      "targetNodeId": "readNotes",
+      "targetPort": "input"
+    },
+    {
+      "id": "edge_decision1-false-core.action.script-1788383054190-input",
+      "sourceNodeId": "decision1",
+      "sourcePort": "false",
+      "targetNodeId": "script1",
+      "targetPort": "input"
+    },
+    {
+      "id": "edge_core.action.script-1788383054190-success-autonomousAgent1-input",
+      "sourceNodeId": "script1",
+      "sourcePort": "success",
+      "targetNodeId": "investigator",
       "targetPort": "input"
     }
   ],
@@ -325,7 +1060,7 @@
     {
       "nodeType": "uipath.core.rpa-workflow.ca36341d-ecec-4ba6-aa76-134d0afe4ba7",
       "version": "1.0.0",
-      "category": "rpa-workflow",
+      "category": "rpa-workflow.published",
       "runtimeConstraints": {
         "exclude": [
           "api-function"
@@ -375,7 +1110,6 @@
         "type": "bpmn:ServiceTask",
         "serviceType": "Orchestrator.StartJob",
         "version": "v2",
-        "section": "Published",
         "listingVersion": "1.0.0",
         "bindings": {
           "resource": "process",
@@ -392,6 +1126,11 @@
               "name": "folderPath",
               "propertyAttribute": "folderPath",
               "default": "e2e-investigator"
+            },
+            {
+              "name": "folderKey",
+              "propertyAttribute": "folderKey",
+              "default": "0b28296b-1f4a-4ea9-a3d5-8b0abaac1cf0"
             }
           ]
         },
@@ -540,7 +1279,7 @@
     {
       "nodeType": "uipath.agent.resource.tool.process.ca36341d-ecec-4ba6-aa76-134d0afe4ba7",
       "version": "1.0.0",
-      "category": "agent.tool.rpa",
+      "category": "agent.tool.rpa.published",
       "runtimeConstraints": {
         "exclude": [
           "api-function"
@@ -549,7 +1288,7 @@
       "tags": [
         "agent-tool"
       ],
-      "sortOrder": 560,
+      "sortOrder": 580,
       "description": "vm-exec bound in the VM-pool folder; referenced as an agent tool so calls run on the Windows robot VM",
       "display": {
         "label": "vm-exec-vm",
@@ -591,7 +1330,6 @@
         "type": "bpmn:ServiceTask",
         "serviceType": "Orchestrator.StartJob",
         "version": "v2",
-        "section": "Published",
         "listingVersion": "1.0.0",
         "bindings": {
           "resource": "process",
@@ -608,6 +1346,11 @@
               "name": "folderPath",
               "propertyAttribute": "folderPath",
               "default": "e2e-investigator"
+            },
+            {
+              "name": "folderKey",
+              "propertyAttribute": "folderKey",
+              "default": "0b28296b-1f4a-4ea9-a3d5-8b0abaac1cf0"
             }
           ]
         },
@@ -1189,10 +1932,294 @@
       "debug": {
         "runtime": "bpmnEngine"
       }
+    },
+    {
+      "nodeType": "core.action.script",
+      "version": "1.1",
+      "category": "data-operations",
+      "description": "Run custom JavaScript code",
+      "tags": [
+        "code",
+        "javascript",
+        "python"
+      ],
+      "sortOrder": 70,
+      "supportsErrorHandling": true,
+      "display": {
+        "label": "Script",
+        "icon": "code"
+      },
+      "handleConfiguration": [
+        {
+          "position": "left",
+          "handles": [
+            {
+              "id": "input",
+              "type": "target",
+              "handleType": "input"
+            }
+          ]
+        },
+        {
+          "position": "right",
+          "handles": [
+            {
+              "id": "success",
+              "type": "source",
+              "handleType": "output"
+            },
+            {
+              "id": "error",
+              "label": "Error",
+              "type": "source",
+              "handleType": "output",
+              "visible": "{inputs.errorHandlingEnabled}",
+              "constraints": {
+                "maxConnections": 1
+              }
+            }
+          ]
+        }
+      ],
+      "debug": {
+        "runtime": "clientScript"
+      },
+      "model": {
+        "type": "bpmn:ScriptTask"
+      },
+      "inputDefinition": {
+        "type": "object",
+        "properties": {
+          "script": {
+            "type": "string",
+            "minLength": 1,
+            "errorMessage": "Add a script function",
+            "validationSeverity": "warning"
+          }
+        },
+        "required": [
+          "script"
+        ]
+      },
+      "inputDefaults": {
+        "script": ""
+      },
+      "outputDefinition": {
+        "output": {
+          "type": "any",
+          "description": "The return value of the script",
+          "source": "=result.response",
+          "var": "output"
+        },
+        "error": {
+          "type": "object",
+          "description": "Error information if the node fails",
+          "source": "=Error",
+          "var": "error",
+          "schema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "type": "object",
+            "required": [
+              "code",
+              "message",
+              "detail",
+              "category",
+              "status"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Error code as a string"
+              },
+              "message": {
+                "type": "string",
+                "description": "High-level error message"
+              },
+              "detail": {
+                "type": "string",
+                "description": "Detailed error description"
+              },
+              "category": {
+                "type": "string",
+                "description": "Error category"
+              },
+              "status": {
+                "type": "integer",
+                "description": "HTTP status code"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "form": {
+        "id": "script-properties",
+        "title": "Script configuration",
+        "sections": [
+          {
+            "id": "script",
+            "title": "Script",
+            "collapsible": true,
+            "defaultExpanded": true,
+            "fields": [
+              {
+                "name": "inputs.script",
+                "type": "custom",
+                "component": "script-editor",
+                "componentProps": {
+                  "language": "javascript",
+                  "returnType": "any",
+                  "validationMode": "script",
+                  "minHeight": 200,
+                  "placeholder": " // Return any value\nreturn {\n  message: \"Web request response\",\n  data: $vars.httpRequest1.output\n};"
+                },
+                "label": "Code",
+                "description": "JavaScript expression that returns a result"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "nodeType": "core.logic.decision",
+      "version": "1.3",
+      "category": "control-flow",
+      "description": "Branch on a true or false condition",
+      "tags": [
+        "control-flow",
+        "if",
+        "loop",
+        "switch"
+      ],
+      "sortOrder": 61,
+      "display": {
+        "label": "Decision",
+        "icon": "trending-up-down"
+      },
+      "handleConfiguration": [
+        {
+          "position": "left",
+          "handles": [
+            {
+              "id": "input",
+              "type": "target",
+              "handleType": "input"
+            }
+          ],
+          "visible": true
+        },
+        {
+          "position": "right",
+          "handles": [
+            {
+              "id": "true",
+              "type": "source",
+              "handleType": "output",
+              "label": "{inputs.trueLabel}"
+            },
+            {
+              "id": "false",
+              "type": "source",
+              "handleType": "output",
+              "label": "{inputs.falseLabel}"
+            }
+          ],
+          "visible": true
+        }
+      ],
+      "debug": {
+        "runtime": "clientScript"
+      },
+      "model": {
+        "type": "bpmn:InclusiveGateway"
+      },
+      "inputDefinition": {
+        "type": "object",
+        "properties": {
+          "expression": {
+            "type": "string",
+            "minLength": 1,
+            "errorMessage": "Add a condition"
+          },
+          "trueLabel": {
+            "type": "string"
+          },
+          "falseLabel": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "expression"
+        ]
+      },
+      "outputDefinition": {
+        "matchedCase": {
+          "type": "string",
+          "description": "The label of the matched branch (true/false label)",
+          "var": "matchedCase"
+        },
+        "matchedCaseId": {
+          "type": "string",
+          "description": "The branch that was taken (true or false)",
+          "var": "matchedCaseId"
+        }
+      },
+      "inputDefaults": {
+        "trueLabel": "True",
+        "falseLabel": "False"
+      },
+      "form": {
+        "id": "decision-properties",
+        "title": "Decision configuration",
+        "sections": [
+          {
+            "id": "condition",
+            "title": "Condition",
+            "fields": [
+              {
+                "name": "inputs.expression",
+                "type": "custom",
+                "component": "code-editor",
+                "componentProps": {
+                  "singleLine": true,
+                  "mode": "expression",
+                  "toggleable": false,
+                  "language": "javascript",
+                  "returnType": "boolean",
+                  "validationMode": "expression",
+                  "showVariableButton": true,
+                  "placeholder": "$vars.httpRequest1.output.statusCode >= 200 && $vars.httpRequest1.output.statusCode < 300"
+                },
+                "label": "Condition",
+                "description": "The condition must be a JavaScript expression that evaluates to true or false."
+              },
+              {
+                "name": "inputs.trueLabel",
+                "type": "text",
+                "label": "True branch label",
+                "description": "This label appears on the true branch."
+              },
+              {
+                "name": "inputs.falseLabel",
+                "type": "text",
+                "label": "False branch label",
+                "description": "This label appears on the false branch."
+              }
+            ]
+          }
+        ]
+      }
     }
   ],
   "variables": {
     "globals": [
+      {
+        "id": "iteration",
+        "direction": "inout",
+        "type": "number",
+        "defaultValue": 1
+      },
       {
         "id": "repoUrl",
         "direction": "in",
@@ -1218,9 +2245,11 @@
         "triggerNodeId": "start"
       },
       {
-        "id": "reproduced",
-        "direction": "out",
-        "type": "boolean"
+        "id": "maxIterations",
+        "direction": "in",
+        "type": "number",
+        "defaultValue": 6,
+        "triggerNodeId": "start"
       },
       {
         "id": "hypothesis",
@@ -1231,6 +2260,11 @@
         "id": "evidence",
         "direction": "out",
         "type": "string"
+      },
+      {
+        "id": "reproduced",
+        "direction": "out",
+        "type": "boolean"
       }
     ],
     "nodes": [
@@ -1262,35 +2296,11 @@
         }
       },
       {
-        "id": "end.reproduced",
-        "type": "boolean",
-        "binding": {
-          "nodeId": "end",
-          "outputId": "reproduced"
-        }
-      },
-      {
-        "id": "end.hypothesis",
-        "type": "string",
-        "binding": {
-          "nodeId": "end",
-          "outputId": "hypothesis"
-        }
-      },
-      {
-        "id": "end.evidence",
-        "type": "string",
-        "binding": {
-          "nodeId": "end",
-          "outputId": "evidence"
-        }
-      },
-      {
         "id": "autonomousAgent1.output",
         "type": "object",
         "description": "Agent response",
         "binding": {
-          "nodeId": "autonomousAgent1",
+          "nodeId": "investigator",
           "outputId": "output"
         }
       },
@@ -1333,18 +2343,13 @@
         },
         "description": "Error information if the node fails",
         "binding": {
-          "nodeId": "autonomousAgent1",
+          "nodeId": "investigator",
           "outputId": "error"
         }
       },
       {
         "id": "setupVm.output",
         "type": "object",
-        "description": "Process output arguments (ExitCode, Stdout, OutputBlobPath)",
-        "binding": {
-          "nodeId": "setupVm",
-          "outputId": "output"
-        },
         "schema": {
           "type": "object",
           "properties": {
@@ -1360,16 +2365,16 @@
               "type": "string"
             }
           }
+        },
+        "description": "Process output arguments (ExitCode, Stdout, OutputBlobPath)",
+        "binding": {
+          "nodeId": "setupVm",
+          "outputId": "output"
         }
       },
       {
         "id": "runTest.output",
         "type": "object",
-        "description": "Process output arguments (ExitCode, Stdout, OutputBlobPath)",
-        "binding": {
-          "nodeId": "runTest",
-          "outputId": "output"
-        },
         "schema": {
           "type": "object",
           "properties": {
@@ -1385,9 +2390,685 @@
               "type": "string"
             }
           }
+        },
+        "description": "Process output arguments (ExitCode, Stdout, OutputBlobPath)",
+        "binding": {
+          "nodeId": "runTest",
+          "outputId": "output"
+        }
+      },
+      {
+        "id": "script1.output",
+        "type": "any",
+        "description": "The return value of the script",
+        "binding": {
+          "nodeId": "setupInstructions",
+          "outputId": "output"
+        }
+      },
+      {
+        "id": "script1.error",
+        "type": "object",
+        "schema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "required": [
+            "code",
+            "message",
+            "detail",
+            "category",
+            "status"
+          ],
+          "properties": {
+            "code": {
+              "type": "string",
+              "description": "Error code as a string"
+            },
+            "message": {
+              "type": "string",
+              "description": "High-level error message"
+            },
+            "detail": {
+              "type": "string",
+              "description": "Detailed error description"
+            },
+            "category": {
+              "type": "string",
+              "description": "Error category"
+            },
+            "status": {
+              "type": "integer",
+              "description": "HTTP status code"
+            }
+          },
+          "additionalProperties": false
+        },
+        "description": "Error information if the node fails",
+        "binding": {
+          "nodeId": "setupInstructions",
+          "outputId": "error"
+        }
+      },
+      {
+        "id": "setupInstructions.output",
+        "type": "any",
+        "description": "The return value of the script",
+        "binding": {
+          "nodeId": "setupInstructions",
+          "outputId": "output"
+        }
+      },
+      {
+        "id": "setupInstructions.error",
+        "type": "object",
+        "schema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "required": [
+            "code",
+            "message",
+            "detail",
+            "category",
+            "status"
+          ],
+          "properties": {
+            "code": {
+              "type": "string",
+              "description": "Error code as a string"
+            },
+            "message": {
+              "type": "string",
+              "description": "High-level error message"
+            },
+            "detail": {
+              "type": "string",
+              "description": "Detailed error description"
+            },
+            "category": {
+              "type": "string",
+              "description": "Error category"
+            },
+            "status": {
+              "type": "integer",
+              "description": "HTTP status code"
+            }
+          },
+          "additionalProperties": false
+        },
+        "description": "Error information if the node fails",
+        "binding": {
+          "nodeId": "setupInstructions",
+          "outputId": "error"
+        }
+      },
+      {
+        "id": "testRunInstructions.output",
+        "type": "any",
+        "description": "The return value of the script",
+        "binding": {
+          "nodeId": "testRunInstructions",
+          "outputId": "output"
+        }
+      },
+      {
+        "id": "testRunInstructions.error",
+        "type": "object",
+        "schema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "required": [
+            "code",
+            "message",
+            "detail",
+            "category",
+            "status"
+          ],
+          "properties": {
+            "code": {
+              "type": "string",
+              "description": "Error code as a string"
+            },
+            "message": {
+              "type": "string",
+              "description": "High-level error message"
+            },
+            "detail": {
+              "type": "string",
+              "description": "Detailed error description"
+            },
+            "category": {
+              "type": "string",
+              "description": "Error category"
+            },
+            "status": {
+              "type": "integer",
+              "description": "HTTP status code"
+            }
+          },
+          "additionalProperties": false
+        },
+        "description": "Error information if the node fails",
+        "binding": {
+          "nodeId": "testRunInstructions",
+          "outputId": "error"
+        }
+      },
+      {
+        "id": "decision1.matchedCase",
+        "type": "string",
+        "description": "The label of the matched branch (true/false label)",
+        "binding": {
+          "nodeId": "decision1",
+          "outputId": "matchedCase"
+        }
+      },
+      {
+        "id": "decision1.matchedCaseId",
+        "type": "string",
+        "description": "The branch that was taken (true or false)",
+        "binding": {
+          "nodeId": "decision1",
+          "outputId": "matchedCaseId"
+        }
+      },
+      {
+        "id": "autonomousAgent2.output",
+        "type": "object",
+        "description": "Agent response",
+        "binding": {
+          "nodeId": "investigationSummarizer",
+          "outputId": "output"
+        }
+      },
+      {
+        "id": "autonomousAgent2.error",
+        "type": "object",
+        "schema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "required": [
+            "code",
+            "message",
+            "detail",
+            "category",
+            "status"
+          ],
+          "properties": {
+            "code": {
+              "type": "string",
+              "description": "Error code as a string"
+            },
+            "message": {
+              "type": "string",
+              "description": "High-level error message"
+            },
+            "detail": {
+              "type": "string",
+              "description": "Detailed error description"
+            },
+            "category": {
+              "type": "string",
+              "description": "Error category"
+            },
+            "status": {
+              "type": "integer",
+              "description": "HTTP status code"
+            }
+          },
+          "additionalProperties": false
+        },
+        "description": "Error information if the node fails",
+        "binding": {
+          "nodeId": "investigationSummarizer",
+          "outputId": "error"
+        }
+      },
+      {
+        "id": "investigationSummarizer.output",
+        "type": "object",
+        "description": "Agent response",
+        "binding": {
+          "nodeId": "investigationSummarizer",
+          "outputId": "output"
+        }
+      },
+      {
+        "id": "investigationSummarizer.error",
+        "type": "object",
+        "schema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "required": [
+            "code",
+            "message",
+            "detail",
+            "category",
+            "status"
+          ],
+          "properties": {
+            "code": {
+              "type": "string",
+              "description": "Error code as a string"
+            },
+            "message": {
+              "type": "string",
+              "description": "High-level error message"
+            },
+            "detail": {
+              "type": "string",
+              "description": "Detailed error description"
+            },
+            "category": {
+              "type": "string",
+              "description": "Error category"
+            },
+            "status": {
+              "type": "integer",
+              "description": "HTTP status code"
+            }
+          },
+          "additionalProperties": false
+        },
+        "description": "Error information if the node fails",
+        "binding": {
+          "nodeId": "investigationSummarizer",
+          "outputId": "error"
+        }
+      },
+      {
+        "id": "end.hypothesis",
+        "type": "string",
+        "binding": {
+          "nodeId": "end",
+          "outputId": "hypothesis"
+        }
+      },
+      {
+        "id": "end.evidence",
+        "type": "string",
+        "binding": {
+          "nodeId": "end",
+          "outputId": "evidence"
+        }
+      },
+      {
+        "id": "end.reproduced",
+        "type": "string",
+        "binding": {
+          "nodeId": "end",
+          "outputId": "reproduced"
+        }
+      },
+      {
+        "id": "vmExecVm1.output",
+        "type": "object",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "ExitCode": {
+              "type": "integer",
+              "minimum": -2147483648,
+              "maximum": 2147483647
+            },
+            "Stdout": {
+              "type": "string"
+            },
+            "OutputBlobPath": {
+              "type": "string"
+            }
+          }
+        },
+        "binding": {
+          "nodeId": "readNotes",
+          "outputId": "output"
+        }
+      },
+      {
+        "id": "vmExecVm1.error",
+        "type": "object",
+        "schema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "required": [
+            "code",
+            "message",
+            "detail",
+            "category",
+            "status"
+          ],
+          "properties": {
+            "code": {
+              "type": "string",
+              "description": "Error code as a string"
+            },
+            "message": {
+              "type": "string",
+              "description": "High-level error message"
+            },
+            "detail": {
+              "type": "string",
+              "description": "Detailed error description"
+            },
+            "category": {
+              "type": "string",
+              "description": "Error category"
+            },
+            "status": {
+              "type": "integer",
+              "description": "HTTP status code"
+            }
+          },
+          "additionalProperties": false
+        },
+        "description": "Error information if the node fails",
+        "binding": {
+          "nodeId": "readNotes",
+          "outputId": "error"
+        }
+      },
+      {
+        "id": "readReport.output",
+        "type": "object",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "ExitCode": {
+              "type": "integer",
+              "minimum": -2147483648,
+              "maximum": 2147483647
+            },
+            "Stdout": {
+              "type": "string"
+            },
+            "OutputBlobPath": {
+              "type": "string"
+            }
+          }
+        },
+        "binding": {
+          "nodeId": "readNotes",
+          "outputId": "output"
+        }
+      },
+      {
+        "id": "readReport.error",
+        "type": "object",
+        "schema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "required": [
+            "code",
+            "message",
+            "detail",
+            "category",
+            "status"
+          ],
+          "properties": {
+            "code": {
+              "type": "string",
+              "description": "Error code as a string"
+            },
+            "message": {
+              "type": "string",
+              "description": "High-level error message"
+            },
+            "detail": {
+              "type": "string",
+              "description": "Detailed error description"
+            },
+            "category": {
+              "type": "string",
+              "description": "Error category"
+            },
+            "status": {
+              "type": "integer",
+              "description": "HTTP status code"
+            }
+          },
+          "additionalProperties": false
+        },
+        "description": "Error information if the node fails",
+        "binding": {
+          "nodeId": "readNotes",
+          "outputId": "error"
+        }
+      },
+      {
+        "id": "readReportInstructions.output",
+        "type": "any",
+        "description": "The return value of the script",
+        "binding": {
+          "nodeId": "readNotesInstructions",
+          "outputId": "output"
+        }
+      },
+      {
+        "id": "readReportInstructions.error",
+        "type": "object",
+        "schema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "required": [
+            "code",
+            "message",
+            "detail",
+            "category",
+            "status"
+          ],
+          "properties": {
+            "code": {
+              "type": "string",
+              "description": "Error code as a string"
+            },
+            "message": {
+              "type": "string",
+              "description": "High-level error message"
+            },
+            "detail": {
+              "type": "string",
+              "description": "Detailed error description"
+            },
+            "category": {
+              "type": "string",
+              "description": "Error category"
+            },
+            "status": {
+              "type": "integer",
+              "description": "HTTP status code"
+            }
+          },
+          "additionalProperties": false
+        },
+        "description": "Error information if the node fails",
+        "binding": {
+          "nodeId": "readNotesInstructions",
+          "outputId": "error"
+        }
+      },
+      {
+        "id": "readNotesInstructions.output",
+        "type": "any",
+        "description": "The return value of the script",
+        "binding": {
+          "nodeId": "readNotesInstructions",
+          "outputId": "output"
+        }
+      },
+      {
+        "id": "readNotesInstructions.error",
+        "type": "object",
+        "schema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "required": [
+            "code",
+            "message",
+            "detail",
+            "category",
+            "status"
+          ],
+          "properties": {
+            "code": {
+              "type": "string",
+              "description": "Error code as a string"
+            },
+            "message": {
+              "type": "string",
+              "description": "High-level error message"
+            },
+            "detail": {
+              "type": "string",
+              "description": "Detailed error description"
+            },
+            "category": {
+              "type": "string",
+              "description": "Error category"
+            },
+            "status": {
+              "type": "integer",
+              "description": "HTTP status code"
+            }
+          },
+          "additionalProperties": false
+        },
+        "description": "Error information if the node fails",
+        "binding": {
+          "nodeId": "readNotesInstructions",
+          "outputId": "error"
+        }
+      },
+      {
+        "id": "readNotes.output",
+        "type": "object",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "ExitCode": {
+              "type": "integer",
+              "minimum": -2147483648,
+              "maximum": 2147483647
+            },
+            "Stdout": {
+              "type": "string"
+            },
+            "OutputBlobPath": {
+              "type": "string"
+            }
+          }
+        },
+        "binding": {
+          "nodeId": "readNotes",
+          "outputId": "output"
+        }
+      },
+      {
+        "id": "readNotes.error",
+        "type": "object",
+        "schema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "required": [
+            "code",
+            "message",
+            "detail",
+            "category",
+            "status"
+          ],
+          "properties": {
+            "code": {
+              "type": "string",
+              "description": "Error code as a string"
+            },
+            "message": {
+              "type": "string",
+              "description": "High-level error message"
+            },
+            "detail": {
+              "type": "string",
+              "description": "Detailed error description"
+            },
+            "category": {
+              "type": "string",
+              "description": "Error category"
+            },
+            "status": {
+              "type": "integer",
+              "description": "HTTP status code"
+            }
+          },
+          "additionalProperties": false
+        },
+        "description": "Error information if the node fails",
+        "binding": {
+          "nodeId": "readNotes",
+          "outputId": "error"
+        }
+      },
+      {
+        "id": "investigator.output",
+        "type": "object",
+        "description": "Agent response",
+        "binding": {
+          "nodeId": "investigator",
+          "outputId": "output"
+        }
+      },
+      {
+        "id": "investigator.error",
+        "type": "object",
+        "schema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "required": [
+            "code",
+            "message",
+            "detail",
+            "category",
+            "status"
+          ],
+          "properties": {
+            "code": {
+              "type": "string",
+              "description": "Error code as a string"
+            },
+            "message": {
+              "type": "string",
+              "description": "High-level error message"
+            },
+            "detail": {
+              "type": "string",
+              "description": "Detailed error description"
+            },
+            "category": {
+              "type": "string",
+              "description": "Error category"
+            },
+            "status": {
+              "type": "integer",
+              "description": "HTTP status code"
+            }
+          },
+          "additionalProperties": false
+        },
+        "description": "Error information if the node fails",
+        "binding": {
+          "nodeId": "investigator",
+          "outputId": "error"
         }
       }
-    ]
+    ],
+    "variableUpdates": {
+      "investigator": [
+        {
+          "variableId": "iteration",
+          "expression": {
+            "type": "jsExpression",
+            "expression": "$vars.iteration + 1",
+            "fieldType": "string"
+          }
+        }
+      ]
+    }
   },
   "bindings": [
     {
@@ -1409,13 +3090,23 @@
       "default": "e2e-investigator",
       "propertyAttribute": "folderPath",
       "resourceSubType": "Process"
+    },
+    {
+      "id": "bFSZOddFk",
+      "name": "folderKey",
+      "type": "string",
+      "resource": "process",
+      "resourceKey": "e2e-investigator.vm-exec-vm",
+      "default": "0b28296b-1f4a-4ea9-a3d5-8b0abaac1cf0",
+      "propertyAttribute": "folderKey",
+      "resourceSubType": "Process"
     }
   ],
   "layout": {
     "nodes": {
       "start": {
         "position": {
-          "x": 256,
+          "x": 112,
           "y": 144
         },
         "size": {
@@ -1426,7 +3117,7 @@
       },
       "setupVm": {
         "position": {
-          "x": 448,
+          "x": 496,
           "y": 144
         },
         "size": {
@@ -1437,7 +3128,7 @@
       },
       "runTest": {
         "position": {
-          "x": 640,
+          "x": 880,
           "y": 144
         },
         "size": {
@@ -1448,8 +3139,8 @@
       },
       "vmExecTool": {
         "position": {
-          "x": 976,
-          "y": 240
+          "x": 1152,
+          "y": 336
         },
         "size": {
           "width": 96,
@@ -1459,7 +3150,29 @@
       },
       "end": {
         "position": {
-          "x": 1216,
+          "x": 2512,
+          "y": 128
+        },
+        "size": {
+          "width": 96,
+          "height": 96
+        },
+        "collapsed": false
+      },
+      "investigator": {
+        "position": {
+          "x": 1072,
+          "y": 144
+        },
+        "size": {
+          "width": 288,
+          "height": 96
+        },
+        "collapsed": false
+      },
+      "setupInstructions": {
+        "position": {
+          "x": 304,
           "y": 144
         },
         "size": {
@@ -1468,16 +3181,101 @@
         },
         "collapsed": false
       },
-      "autonomousAgent1": {
+      "testRunInstructions": {
         "position": {
-          "x": 832,
-          "y": 48
+          "x": 688,
+          "y": 144
+        },
+        "size": {
+          "width": 96,
+          "height": 96
+        },
+        "collapsed": false
+      },
+      "decision1": {
+        "position": {
+          "x": 1520,
+          "y": 144
+        },
+        "size": {
+          "width": 96,
+          "height": 96
+        },
+        "collapsed": false
+      },
+      "investigationSummarizer": {
+        "position": {
+          "x": 2112,
+          "y": 128
         },
         "size": {
           "width": 288,
           "height": 96
         },
         "collapsed": false
+      },
+      "readNotes": {
+        "position": {
+          "x": 1904,
+          "y": 128
+        },
+        "size": {
+          "width": 96,
+          "height": 96
+        },
+        "collapsed": false
+      },
+      "readNotesInstructions": {
+        "position": {
+          "x": 1728,
+          "y": 128
+        },
+        "size": {
+          "width": 96,
+          "height": 96
+        },
+        "collapsed": false
+      },
+      "script1": {
+        "position": {
+          "x": 1296,
+          "y": -160
+        },
+        "size": {
+          "width": 96,
+          "height": 96
+        },
+        "collapsed": false
+      }
+    },
+    "edges": {
+      "edge_decision1-false-core.action.script-1788383054190-input": {
+        "waypoints": [
+          {
+            "id": "wp-831f33cb-8926-4940-ad02-cec93cdec778",
+            "x": 1648,
+            "y": 207.99981496801925
+          },
+          {
+            "id": "wp-a581aed4-eb1f-4d73-8ac6-281273aaffaa",
+            "x": 1648,
+            "y": -112
+          }
+        ]
+      },
+      "edge_core.action.script-1788383054190-success-autonomousAgent1-input": {
+        "waypoints": [
+          {
+            "id": "wp-951c3dfa-d464-4be0-9b15-2ed4471967f3",
+            "x": 1008,
+            "y": -112
+          },
+          {
+            "id": "wp-55e40054-4435-4399-8f0c-79cdb97fefbf",
+            "x": 1008,
+            "y": 191.99995932695148
+          }
+        ]
       }
     }
   }
