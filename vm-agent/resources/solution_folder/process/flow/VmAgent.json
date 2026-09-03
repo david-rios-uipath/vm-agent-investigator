@@ -45,6 +45,10 @@
         "bindingType": "process",
         "bindingKey": "vm-exec-vm",
         "bindingValues": {
+          "folderKey": {
+            "defaultValue": "0b28296b-1f4a-4ea9-a3d5-8b0abaac1cf0",
+            "isExpression": false
+          },
           "name": {
             "defaultValue": "vm-exec-vm",
             "isExpression": false
