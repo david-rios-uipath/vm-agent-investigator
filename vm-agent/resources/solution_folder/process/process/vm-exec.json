@@ -14,7 +14,6 @@
       }
     ],
     "runtimeDependencies": [],
-    "files": [],
     "folders": [
       {
         "fullyQualifiedName": "solution_folder"
@@ -40,6 +39,7 @@
       "packageName": "vm-agent.7.process.vm-exec"
     },
     "locks": [],
-    "key": "209d4dde-a982-4fc5-a498-4f818f667453"
+    "key": "209d4dde-a982-4fc5-a498-4f818f667453",
+    "files": []
   }
 }

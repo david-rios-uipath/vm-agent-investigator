@@ -31,7 +31,6 @@
         "resourceKind": "Process"
       }
     ],
-    "files": [],
     "folders": [
       {
         "fullyQualifiedName": "solution_folder"
@@ -52,6 +51,7 @@
       "packageName": "vm-agent.7.flow.VmAgent"
     },
     "locks": [],
-    "key": "4a7879cf-7494-4ada-9e83-ea487a4b55cb"
+    "key": "4a7879cf-7494-4ada-9e83-ea487a4b55cb",
+    "files": []
   }
 }

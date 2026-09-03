@@ -8,7 +8,6 @@
     "isOverridable": true,
     "dependencies": [],
     "runtimeDependencies": [],
-    "files": [],
     "folders": [
       {
         "fullyQualifiedName": "solution_folder"
@@ -17,13 +16,13 @@
     "spec": {
       "connectorName": "Slack",
       "name": "david.rios",
-      "description": null,
       "authenticationType": "AuthenticateAfterDeployment",
       "connectorVersion": "2.14.8",
       "connectorKey": "uipath-salesforce-slack",
       "pollingInterval": 5
     },
     "locks": [],
-    "key": "ccf82d4b-3c2a-492f-bf8f-939b565366a2"
+    "key": "ccf82d4b-3c2a-492f-bf8f-939b565366a2",
+    "files": []
   }
 }

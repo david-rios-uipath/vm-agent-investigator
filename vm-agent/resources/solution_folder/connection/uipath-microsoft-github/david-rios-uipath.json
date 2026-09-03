@@ -8,7 +8,6 @@
     "isOverridable": true,
     "dependencies": [],
     "runtimeDependencies": [],
-    "files": [],
     "folders": [
       {
         "fullyQualifiedName": "solution_folder"
@@ -17,13 +16,13 @@
     "spec": {
       "connectorName": "GitHub",
       "name": "david-rios-uipath",
-      "description": null,
       "authenticationType": "AuthenticateAfterDeployment",
       "connectorVersion": "2.6.14",
       "connectorKey": "uipath-microsoft-github",
       "pollingInterval": 5
     },
     "locks": [],
-    "key": "3e9ae2b7-85a6-4271-8c23-5a620eed56e3"
+    "key": "3e9ae2b7-85a6-4271-8c23-5a620eed56e3",
+    "files": []
   }
 }
