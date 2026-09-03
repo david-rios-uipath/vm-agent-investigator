@@ -8,8 +8,8 @@
     "isOverridable": true,
     "dependencies": [
       {
-        "name": "vm-exec_1",
-        "kind": "Package"
+        "kind": "Package",
+        "name": "vm-exec_1"
       }
     ],
     "runtimeDependencies": [],
@@ -27,13 +27,13 @@
       "description": "vm-exec bound in the VM-pool folder; referenced as an agent tool so calls run on the Windows robot VM",
       "package": {
         "name": "vm-exec_1",
-        "key": "vm-exec:1.0.0"
+        "key": "vm-exec:1.0.3"
       },
       "packageName": "vm-exec",
-      "packageVersion": "1.0.0",
+      "packageVersion": "1.0.3",
       "entryPointUniqueId": "1a255c41-e3ed-49e9-8bfa-c26893a50753",
       "entryPointName": "Main.xaml",
-      "inputArgumentsSchemaV2": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"Script\": {\n      \"type\": \"string\"\n    },\n    \"WorkDir\": {\n      \"type\": \"string\"\n    },\n    \"RunId\": {\n      \"type\": \"string\",\n      \"x-default-expression\": \"\\\"manual\\\"\",\n      \"default\": \"manual\"\n    },\n    \"TimeoutMinutes\": {\n      \"type\": \"integer\",\n      \"minimum\": -2147483648,\n      \"maximum\": 2147483647,\n      \"x-default-expression\": \"30\",\n      \"default\": 30\n    }\n  },\n  \"required\": []\n}",
+      "inputArgumentsSchemaV2": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"Script\": {\n      \"type\": \"string\"\n    },\n    \"WorkDir\": {\n      \"type\": \"string\",\n      \"x-default-expression\": \"\\\"C:\\\\vm-agent\\\"\",\n      \"default\": \"C:\\\\vm-agent\"\n    },\n    \"RunId\": {\n      \"type\": \"string\",\n      \"x-default-expression\": \"\\\"manual\\\"\",\n      \"default\": \"manual\"\n    },\n    \"TimeoutMinutes\": {\n      \"type\": \"integer\",\n      \"minimum\": -2147483648,\n      \"maximum\": 2147483647,\n      \"x-default-expression\": \"30\",\n      \"default\": 30\n    },\n    \"MaxOutputChars\": {\n      \"type\": \"integer\",\n      \"minimum\": -2147483648,\n      \"maximum\": 2147483647,\n      \"x-default-expression\": \"8000\",\n      \"default\": 8000\n    }\n  },\n  \"required\": []\n}",
       "outputArgumentsSchemaV2": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"ExitCode\": {\n      \"type\": \"integer\",\n      \"minimum\": -2147483648,\n      \"maximum\": 2147483647\n    },\n    \"Stdout\": {\n      \"type\": \"string\"\n    },\n    \"OutputBlobPath\": {\n      \"type\": \"string\"\n    }\n  }\n}",
       "hiddenForAttendedUser": false,
       "alwaysRunning": false,
@@ -43,7 +43,7 @@
       "retentionPeriod": 30,
       "staleRetentionAction": "Delete",
       "staleRetentionPeriod": 180,
-      "entryPoints": "[{\"UniqueId\":\"1a255c41-e3ed-49e9-8bfa-c26893a50753\",\"Path\":\"Main.xaml\",\"DisplayName\":null,\"InputArguments\":\"{\\n  \\\"type\\\": \\\"object\\\",\\n  \\\"properties\\\": {\\n    \\\"Script\\\": {\\n      \\\"type\\\": \\\"string\\\"\\n    },\\n    \\\"WorkDir\\\": {\\n      \\\"type\\\": \\\"string\\\"\\n    },\\n    \\\"RunId\\\": {\\n      \\\"type\\\": \\\"string\\\",\\n      \\\"x-default-expression\\\": \\\"\\\\\\\"manual\\\\\\\"\\\",\\n      \\\"default\\\": \\\"manual\\\"\\n    },\\n    \\\"TimeoutMinutes\\\": {\\n      \\\"type\\\": \\\"integer\\\",\\n      \\\"minimum\\\": -2147483648,\\n      \\\"maximum\\\": 2147483647,\\n      \\\"x-default-expression\\\": \\\"30\\\",\\n      \\\"default\\\": 30\\n    }\\n  },\\n  \\\"required\\\": []\\n}\",\"OutputArguments\":\"{\\n  \\\"type\\\": \\\"object\\\",\\n  \\\"properties\\\": {\\n    \\\"ExitCode\\\": {\\n      \\\"type\\\": \\\"integer\\\",\\n      \\\"minimum\\\": -2147483648,\\n      \\\"maximum\\\": 2147483647\\n    },\\n    \\\"Stdout\\\": {\\n      \\\"type\\\": \\\"string\\\"\\n    },\\n    \\\"OutputBlobPath\\\": {\\n      \\\"type\\\": \\\"string\\\"\\n    }\\n  }\\n}\",\"Type\":1,\"TargetRuntime\":null,\"ContentRoot\":null,\"DataVariation\":null,\"Id\":986526}]",
+      "entryPoints": "[{\"UniqueId\":\"1a255c41-e3ed-49e9-8bfa-c26893a50753\",\"Path\":\"Main.xaml\",\"DisplayName\":null,\"InputArguments\":\"{\\n  \\\"type\\\": \\\"object\\\",\\n  \\\"properties\\\": {\\n    \\\"Script\\\": {\\n      \\\"type\\\": \\\"string\\\"\\n    },\\n    \\\"WorkDir\\\": {\\n      \\\"type\\\": \\\"string\\\",\\n      \\\"x-default-expression\\\": \\\"\\\\\\\"C:\\\\\\\\vm-agent\\\\\\\"\\\",\\n      \\\"default\\\": \\\"C:\\\\\\\\vm-agent\\\"\\n    },\\n    \\\"RunId\\\": {\\n      \\\"type\\\": \\\"string\\\",\\n      \\\"x-default-expression\\\": \\\"\\\\\\\"manual\\\\\\\"\\\",\\n      \\\"default\\\": \\\"manual\\\"\\n    },\\n    \\\"TimeoutMinutes\\\": {\\n      \\\"type\\\": \\\"integer\\\",\\n      \\\"minimum\\\": -2147483648,\\n      \\\"maximum\\\": 2147483647,\\n      \\\"x-default-expression\\\": \\\"30\\\",\\n      \\\"default\\\": 30\\n    },\\n    \\\"MaxOutputChars\\\": {\\n      \\\"type\\\": \\\"integer\\\",\\n      \\\"minimum\\\": -2147483648,\\n      \\\"maximum\\\": 2147483647,\\n      \\\"x-default-expression\\\": \\\"8000\\\",\\n      \\\"default\\\": 8000\\n    }\\n  },\\n  \\\"required\\\": []\\n}\",\"OutputArguments\":\"{\\n  \\\"type\\\": \\\"object\\\",\\n  \\\"properties\\\": {\\n    \\\"ExitCode\\\": {\\n      \\\"type\\\": \\\"integer\\\",\\n      \\\"minimum\\\": -2147483648,\\n      \\\"maximum\\\": 2147483647\\n    },\\n    \\\"Stdout\\\": {\\n      \\\"type\\\": \\\"string\\\"\\n    },\\n    \\\"OutputBlobPath\\\": {\\n      \\\"type\\\": \\\"string\\\"\\n    }\\n  }\\n}\",\"Type\":1,\"TargetRuntime\":null,\"ContentRoot\":null,\"DataVariation\":null,\"Id\":987333}]",
       "tags": []
     },
     "locks": [],
