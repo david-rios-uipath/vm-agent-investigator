@@ -50,8 +50,8 @@
   },
   "settings": {},
   "properties": {
-    "folderPath": "solution_folder",
-    "processName": "vm-exec",
+    "folderPath": "e2e-investigator",
+    "processName": "vm-exec-vm",
     "exampleCalls": []
   },
   "guardrail": {

@@ -6081,5 +6081,27 @@
         ]
       }
     }
-  }
+  },
+  "bindings": [
+    {
+      "id": "bVmExecName",
+      "name": "name",
+      "type": "string",
+      "resource": "process",
+      "resourceKey": "vm-exec",
+      "default": "vm-exec",
+      "propertyAttribute": "name",
+      "resourceSubType": "Process"
+    },
+    {
+      "id": "bVmExecFolderPath",
+      "name": "folderPath",
+      "type": "string",
+      "resource": "process",
+      "resourceKey": "vm-exec",
+      "default": "solution_folder",
+      "propertyAttribute": "folderPath",
+      "resourceSubType": "Process"
+    }
+  ]
 }
