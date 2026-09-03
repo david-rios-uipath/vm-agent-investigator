@@ -16,45 +16,14 @@
     "runtimeDependencies": [
       {
         "bindingType": "process",
-        "bindingKey": "e2e-investigator.vm-exec-vm",
+        "bindingKey": "vm-exec",
         "bindingValues": {
-          "folderKey": {
-            "defaultValue": "0b28296b-1f4a-4ea9-a3d5-8b0abaac1cf0",
-            "isExpression": false
-          },
           "folderPath": {
-            "defaultValue": "e2e-investigator",
+            "defaultValue": "solution_folder",
             "isExpression": false
           },
           "name": {
-            "defaultValue": "vm-exec-vm",
-            "isExpression": false
-          }
-        },
-        "bindingMetadata": {
-          "activityName": "Set up VM (clone + install)",
-          "bindingsVersion": "2.2",
-          "solutionsSupport": "true"
-        },
-        "resourceKind": "Process",
-        "resourceKey": "ca36341d-ecec-4ba6-aa76-134d0afe4ba7",
-        "resourceName": "vm-exec-vm",
-        "folderKey": "0b28296b-1f4a-4ea9-a3d5-8b0abaac1cf0"
-      },
-      {
-        "bindingType": "process",
-        "bindingKey": "vm-exec-vm",
-        "bindingValues": {
-          "folderKey": {
-            "defaultValue": "0b28296b-1f4a-4ea9-a3d5-8b0abaac1cf0",
-            "isExpression": false
-          },
-          "name": {
-            "defaultValue": "vm-exec-vm",
-            "isExpression": false
-          },
-          "folderPath": {
-            "defaultValue": "e2e-investigator",
+            "defaultValue": "vm-exec",
             "isExpression": false
           }
         },
@@ -62,10 +31,7 @@
           "bindingsVersion": "2.2",
           "solutionsSupport": "true"
         },
-        "resourceKind": "Process",
-        "resourceKey": "ca36341d-ecec-4ba6-aa76-134d0afe4ba7",
-        "resourceName": "vm-exec-vm",
-        "folderKey": "0b28296b-1f4a-4ea9-a3d5-8b0abaac1cf0"
+        "resourceKind": "Process"
       }
     ],
     "folders": [

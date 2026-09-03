@@ -2,7 +2,7 @@
   "$resourceType": "tool",
   "name": "vm_exec",
   "description": "Run a PowerShell script on the Windows robot VM and get its output. The VM is a persistent Windows Server with git, node, corepack/pnpm and rg (ripgrep) on PATH; the repo is at C:\\vm-agent\\repo. Returns the exit code, the last 8000 chars of merged stdout+stderr, and the bucket path of the complete log. WorkDir, RunId and a 3-minute timeout are fixed by the flow. Each call costs 45-75 seconds of fixed overhead regardless of script length, so batch: one call should run every command a step needs, with Write-Output '### <label>' separators. Output is capped at 8000 chars, so filter (rg -n, Select-String, Select-Object -First N, Get-Content -TotalCount N) instead of dumping whole files.",
-  "location": "external",
+  "location": "solution",
   "type": "process",
   "inputSchema": {
     "type": "object",
@@ -50,15 +50,15 @@
   },
   "settings": {},
   "properties": {
-    "folderPath": "e2e-investigator",
-    "processName": "vm-exec-vm",
+    "folderPath": "solution_folder",
+    "processName": "vm-exec",
     "exampleCalls": []
   },
   "guardrail": {
     "policies": []
   },
   "id": "6adb473b-ece0-4b66-b468-fda51bbc7df1",
-  "referenceKey": "ca36341d-ecec-4ba6-aa76-134d0afe4ba7",
+  "referenceKey": "209d4dde-a982-4fc5-a498-4f818f667453",
   "isEnabled": true,
   "argumentProperties": {
     "$['WorkDir']": {
