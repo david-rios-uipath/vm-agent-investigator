@@ -1,7 +1,7 @@
 {
   "$resourceType": "tool",
   "name": "vm_exec",
-  "description": "Run a PowerShell script on the Windows robot VM and get its output. The VM is a persistent Windows Server with git, node, and corepack/pnpm on PATH. Use it to clone a repo, install dependencies, run a Playwright spec, and inspect files or logs. Returns the exit code, the last 32000 chars of merged stdout+stderr, and the bucket path of the complete log.",
+  "description": "Run a PowerShell script on the Windows robot VM and get its output. The VM is a persistent Windows Server with git, node, and corepack/pnpm on PATH. Use it to clone a repo, install dependencies, run a Playwright spec, and inspect files or logs. Returns the exit code, the last 32000 chars of merged stdout+stderr, and the bucket path of the complete log. Each call costs about 40 seconds of fixed overhead regardless of script length, so batch: one call should run every command a step needs, with Write-Output '### <label>' separators between them.",
   "location": "solution",
   "type": "process",
   "inputSchema": {
@@ -9,7 +9,7 @@
     "properties": {
       "Script": {
         "type": "string",
-        "description": "PowerShell script to run on the VM. Multiple lines allowed. Runs with powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass."
+        "description": "PowerShell script to run on the VM. Multiple lines allowed. Runs with powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass. Batch several commands per script (with Write-Output '### <label>' separators and $ErrorActionPreference = 'Continue'); one command per call wastes the ~40 s fixed cost of each call."
       },
       "WorkDir": {
         "type": "string",
