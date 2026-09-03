@@ -57,7 +57,7 @@
   "guardrail": {
     "policies": []
   },
-  "id": "29664e8a-bd00-4e62-889b-cc98493010d4",
+  "id": "6adb473b-ece0-4b66-b468-fda51bbc7df1",
   "referenceKey": "ca36341d-ecec-4ba6-aa76-134d0afe4ba7",
   "isEnabled": true,
   "argumentProperties": {
@@ -68,7 +68,7 @@
     },
     "$['RunId']": {
       "variant": "argument",
-      "argumentPath": "$['deriveRunId__output']",
+      "argumentPath": "$['start__output__runId']",
       "isSensitive": false
     },
     "$['TimeoutMinutes']": {
@@ -77,5 +77,5 @@
       "isSensitive": false
     }
   },
-  "canvasNodeId": "vmExecTool"
+  "canvasNodeId": "vmExecToolFixer"
 }

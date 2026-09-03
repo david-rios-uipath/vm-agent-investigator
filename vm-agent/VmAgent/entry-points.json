@@ -21,10 +21,6 @@
             "type": "string",
             "title": "testCommand"
           },
-          "runId": {
-            "type": "string",
-            "title": "runId"
-          },
           "maxIterations": {
             "type": "number",
             "title": "maxIterations",

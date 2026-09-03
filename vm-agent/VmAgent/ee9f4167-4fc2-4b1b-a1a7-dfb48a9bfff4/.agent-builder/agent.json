@@ -23,11 +23,11 @@
         "type": "string",
         "description": "Bound from $vars.start.output.branch"
       },
-      "runTest__output__ExitCode": {
+      "testEvidence__output__exitCode": {
         "type": "integer",
         "description": "Bound from $vars.runTest.output.ExitCode"
       },
-      "runTest__output__OutputBlobPath": {
+      "testEvidence__output__blobPath": {
         "type": "string",
         "description": "Bound from $vars.runTest.output.OutputBlobPath"
       },
@@ -39,7 +39,7 @@
         "type": "number",
         "description": "Bound from $vars.start.output.maxIterations"
       },
-      "runTest__output__Stdout": {
+      "testEvidence__output__stdout": {
         "type": "string",
         "description": "Bound from $vars.runTest.output.Stdout"
       },
@@ -88,7 +88,7 @@
     },
     {
       "role": "user",
-      "content": "Test command: {{input.start__output__testCommand}}\nRepository: {{input.start__output__repoUrl}} @ {{input.start__output__branch}}\nTest exit code: {{input.runTest__output__ExitCode}}\nFull test log in bucket: {{input.runTest__output__OutputBlobPath}}\nInvestigation passes used: {{input.iteration}} of {{input.start__output__maxIterations}}\n\nTest run output tail: {{input.runTest__output__Stdout}}\n\nInvestigator notebook: {{input.readNotes__output__Stdout}}\n\nWrite the final report. Base every claim on the notebook and the test output above, and fill every field of the output schema.",
+      "content": "Test command: {{input.start__output__testCommand}}\nRepository: {{input.start__output__repoUrl}} @ {{input.start__output__branch}}\nTest exit code: {{input.testEvidence__output__exitCode}}\nFull test log in bucket: {{input.testEvidence__output__blobPath}}\nInvestigation passes used: {{input.iteration}} of {{input.start__output__maxIterations}}\n\nTest run output tail: {{input.testEvidence__output__stdout}}\n\nInvestigator notebook: {{input.readNotes__output__Stdout}}\n\nWrite the final report. Base every claim on the notebook and the test output above, and fill every field of the output schema.",
       "contentTokens": [
         {
           "type": "simpleText",
@@ -120,7 +120,7 @@
         },
         {
           "type": "variable",
-          "rawString": "input.runTest__output__ExitCode"
+          "rawString": "input.testEvidence__output__exitCode"
         },
         {
           "type": "simpleText",
@@ -128,7 +128,7 @@
         },
         {
           "type": "variable",
-          "rawString": "input.runTest__output__OutputBlobPath"
+          "rawString": "input.testEvidence__output__blobPath"
         },
         {
           "type": "simpleText",
@@ -152,7 +152,7 @@
         },
         {
           "type": "variable",
-          "rawString": "input.runTest__output__Stdout"
+          "rawString": "input.testEvidence__output__stdout"
         },
         {
           "type": "simpleText",
