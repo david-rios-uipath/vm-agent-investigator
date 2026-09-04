@@ -73,14 +73,21 @@ the flow's `bindings` array. Packed output now contains both `bindings_v2.json` 
 (verified before deploying). Deployed as `1.0.14` to `Shared/vm-agent 11`; smoke job
 `67953871-b6fc-445e-afdc-89b7a9fb5ae5` started 00:32:03 UTC with `/tmp/job-input-smoke.json`.
 
-Read-out: `uip or jobs list --folder-path "Shared/vm-agent 11"` → the agent child (second job)
-should stay `Running` while new `vm-exec-vm` jobs appear in `e2e-investigator`. If it faults,
-`uip or jobs get <child>` for `ErrorCode`/`Info`.
+**CONFIRMED 00:34 UTC.** Agent child `71ab58fb` started 00:34:12, went `Suspended` (the normal
+serverless suspend while a tool job runs), and a new `vm-exec-vm` job was created in
+`e2e-investigator` at 00:34:22 and completed `Successful` at 00:34:34 — the agent's first
+tool call reached the Windows VM. Nine failed deploy cycles were all this one dropped binding.
 
-Still open if 1.0.14 also fails: the declaration differences above (`resourceType`,
-`isSolutionResource`, `resourceKey` stripping). Those can be patched inside the zip before
-`publish` as a further A/B. Also file a CLI bug either way: `uip solution pack` does not
-reproduce Studio Web's `bindings_v2.json` for inline-agent tool bindings.
+The declaration differences (`resourceType`, `isSolutionResource`, `resourceKey` stripping)
+turned out not to matter for resolution. Still worth a CLI bug report: `uip solution pack`
+does not reproduce Studio Web's `bindings_v2.json` for inline-agent tool bindings; repro is
+the published `1.0.0` zip vs a local pack of `/tmp/cloud8/…` (or of this repo at `dec75c0`).
+
+Next for a fresh agent: let job `67953871` finish (smoke run, `maxIterations: 2`), read the
+investigator output, then start a **full** run with `/tmp/job-input.json` against
+`debug-execution.spec.ts` — that is the original goal. Remove the single-folder leftovers in
+`Shared/vm-agent 11` (machine template `685f30b9`, placeholder assets) and uninstall
+`vm-agent-priv` from the personal workspace when convenient.
 
 The section below is the plan as written before this result; the deploy loop and cleanup notes
 still apply. Cleanup progress: `Shared/vm-agent 8` finally uninstalled — it had two `Running`
