@@ -1,6 +1,6 @@
 # vm-agent — handoff
 
-Last updated 2026-09-04 ~16:00 UTC. Written for an agent or human with no prior context.
+Last updated 2026-09-04 ~17:15 UTC. Written for an agent or human with no prior context.
 Read this file, then `FINDINGS-uip.md` (CLI/platform traps — several will bite you).
 
 ## What this is
@@ -15,19 +15,21 @@ summarize without human intervention.
 
 ## Current state
 
-- **Deployment:** `Shared/vm-agent 11` @ **1.0.22**, package identity `vm-agent 8`.
-- **Working:** trigger → setup → ci-history → classify → investigator (with real `vm_exec`
-  tool calls on the VM) → fixer → patch → **verify applies the patch and runs the real test**.
-- **Verify mechanism validated 16:00 UTC** with `./probe-verify.sh` (see below): patch
-  normalised (`64 69 66 66` = clean UTF-8), `git apply` clean, and the real Playwright test ran
-  for 4m43s with the corrected `--config`. So the loop's plumbing is done.
-- **Not yet proven end to end:** a verify that returns `FIX_VERIFIED=true`, and therefore the
-  summarizer producing the final report. The blocker is now *fix content*, not plumbing — see
-  "The fix the agent proposes cannot pass" below.
-- **Live run when this was written:** `5d99ea9b-9954-4cca-a982-5a59365bce1f` (started 14:34:51
-  UTC on 1.0.22). It reached fix attempt 1 verify at 15:20 — patch normalisation worked, test
-  ran, then failed on a bad `--project` (see next section). It was left running; it will burn
-  through 3 fix attempts and stop.
+- **Deployment:** `Shared/vm-agent 11` @ **1.0.23**, package identity `vm-agent 8`.
+  1.0.24 (studio-local verify) is committed but **not yet released**.
+- **The loop closed end to end on 1.0.23**, instance `f282004c-f256-4100-97a2-80390ae1ba17`,
+  16:22-16:57 UTC: trigger -> smoke setup -> resume -> fixer -> verify `FIX_VERIFIED=true`
+  -> openPr -> summarizer -> end, 35 minutes. The verify ran the real spec: `1 passed (3.4m)`.
+- The fixer's patch retargets the two broken locators at `debug-execution.spec.ts:84,87` to
+  match the new aria-label directly:
+  `getByRole('button', { name: /^Copy path for \$vars\.\w+\.output\.name$/ })`.
+- **openPr did not publish anything.** It branched and committed on the VM, then
+  `gh pr create` returned no URL (`PR_URL=`, `[pr] git commit failed`). No
+  `e2e-investigator/*` branch exists on the remote and no PR was opened. Unfixed.
+- **Fast iteration works now:** `smokeOnly` stubs setup + ci-history, and the new
+  `resumeRunId` trigger input reuses an existing notebook on the VM and skips the
+  investigator entirely (`decisionResume` routes `testEvidence -> readNotes`).
+  `inputs/debug-execution-fixer.json` drives that path.
 
 ## Do this next
 
@@ -85,10 +87,12 @@ Do **not** wait 30-60 minutes for a full flow run to test a change to the fix/ve
 ./probe-verify.sh <runId> "<alternate test command>"
 ```
 
-It calls `e2e-investigator/vm-exec-vm` directly with the same PowerShell that
-`verifyFixInstructions` generates, against a `fix.patch` a previous fixer already wrote on the
-VM, and prints the patch's first bytes, the `git apply` result and the test tail. ~5 minutes,
-no pack/publish/deploy, no agents, no LLM cost. Find a runId with:
+It calls `e2e-investigator/vm-exec-vm` directly with the PowerShell that
+`verifyFixInstructions` generates - **rendered from `VmAgent.flow` with node, not a copy**, so
+the probe cannot drift from what the flow runs - against a `fix.patch` a previous fixer already
+wrote on the VM. Prints the patch's first bytes, the `git apply` result, the studio dev server
+port and the test tail. ~10 minutes now that it boots the studio bundle; no pack/publish/deploy,
+no agents, no LLM cost. Find a runId with:
 
 ```bash
 uip or bucket-files list be6369c7-02a4-4b80-957b-e95d06177692 --folder-path "e2e-investigator" --output json
@@ -98,31 +102,41 @@ uip or bucket-files list be6369c7-02a4-4b80-957b-e95d06177692 --folder-path "e2e
 Same trick generalises: any single flow step whose script you want to test can be run straight
 through `vm-exec-vm` this way.
 
-## The fix the agent proposes cannot pass
+## Verify now runs against a local studio bundle (1.0.24, unreleased)
 
-Probe result 2026-09-04 16:00 UTC, patch applied and test run properly:
+The earlier conclusion in this file - "no locator fix can ever return FIX_VERIFIED=true
+because the test dies at line 46" - was **wrong**. Line 46 (the debug-run "Successful"
+badge) is the identity-429 flake, not a hard blocker: the 16:22 run sailed past it and the
+locator fix at 84/87 made the spec pass. The apollo-react finding the investigator made four
+runs ago was correct and is now verified by a real test run.
 
-```
-1) debug-execution.spec.ts:17 › start a debug session and wait for completion
-   Error: expect(getByText('Successful')).toBeVisible() failed   ← line 46, 60s timeout
-```
+What changed in 1.0.24:
 
-The patch retargets the locators at **lines 84/87**; the test dies at **line 46**, the
-debug-run-completion badge. The apollo-react `aria-label` finding is real but downstream — the
-test never reaches those lines. So no locator fix can ever return `FIX_VERIFIED=true` while the
-debug run itself fails to reach "Successful".
+- `studio-alpha` loads the flow MFE from **alpha's deployed bundle**, so a patch to product
+  source under `packages/` or `apps/` would apply cleanly, run, and change nothing. Verify now
+  rewrites `--project studio-alpha` to `--project studio-local`, which keeps the alpha backend
+  but points the `remoteflow` Module Federation remote at a locally served bundle
+  (`e2e/fixtures/base-test.ts:213`, via `SW_MFE_OVERRIDES` in localStorage).
+- Verify boots `corepack pnpm run dev:studio` (rsbuild, ~1m11s cold) before the test, probes
+  3000/3001 for `remoteEntry.js`, pins the winner via `E2E_STUDIO_PORT`, and `taskkill /T /F`s
+  the tree afterwards. `TimeoutMinutes` raised 15 -> 30.
+- The fixer's system prompt no longer forbids product source; it forbids dependency bumps,
+  lockfiles and generated files instead.
 
-What that means for the next iteration:
-- With the old broken verify, the fixer only ever saw `git apply --check failed`, so it kept
-  re-emitting the same patch. It now receives the **real test output** in
-  `verifyFix__output__Stdout`, so it has a chance to notice the failing line is not the one it
-  patched. Worth watching whether it self-corrects, and worth a prompt line telling it
-  explicitly: *if verify fails at a different line than your patch targets, your patch is
-  irrelevant to the primary failure — go back to investigating.*
-- The primary failure (badge never appears) is the identity-429/shared-account story, or a
-  genuine product bug in the debug run. Neither is fixable by editing the spec, so the honest
-  outcome for this test may be "no fix, report the cause" — which the flow supports
-  (`patchWritten: false`).
+Two traps found while building this, both now encoded in the script:
+
+- **`cmd.exe /c "set VAR=value && ..."` puts the trailing space in the value.**
+  `E2E_STUDIO_PORT` became `"3000 "`, Playwright fetched `http://localhost:3000 /remoteEntry.js`
+  and threw; `E2E_SKIP_WEBSERVER` became `"1 "` and never matched `!== '1'`. Quote the whole
+  assignment - `set ""VAR=value""` (doubled, because the string is already inside a
+  double-quoted PowerShell string; a backtick escape would collide with the JS template
+  literal that generates it).
+- **rsbuild answers `/remoteEntry.js` with the SPA index.html fallback while still building.**
+  A bare 200 is not readiness - the probe also requires the body not to start with `<`,
+  otherwise the test starts mid-build against a remote that is not there yet.
+
+Probed green at 17:10 UTC: `### studio MFE serving on port 3000`, `1 passed (1.7m)`,
+`FIX_VERIFIED=true`, 4m23s total.
 
 ## What the agent has actually found (the product answer)
 
@@ -164,6 +178,10 @@ searched GitHub and found none.
 | **patch written as UTF-16 by PowerShell `>`, so `git apply` never applied it** | `2d91e20` |
 | `pack` nondeterministically drops the binding → retry loop in `release.sh` | `3685e89` |
 | `testCommand` missing `--config e2e/playwright.config.ts` | `097b75e` |
+| `smokeOnly` never declared in `variables.globals`, so the stubs never fired | `4e24810` |
+| verify ran `studio-alpha` (deployed bundle), so product fixes were unverifiable | (1.0.24) |
+| `set VAR=v &&` in cmd.exe put a trailing space in `E2E_STUDIO_PORT` / `E2E_SKIP_WEBSERVER` | (1.0.24) |
+| rsbuild's index.html fallback made `/remoteEntry.js` look ready mid-build | (1.0.24) |
 
 Also added: `ciHistory` scans every sampled night's job log for environment signatures and keeps
 per-night excerpts, so the agent gets the cross-night pattern as evidence instead of spending
@@ -183,8 +201,15 @@ replacement.
 
 ## Open items / cleanup owed
 
-- `smokeOnly` may not be wired to the trigger input correctly — the one smoke run still did a
-  real clone and ci-history. Verify before relying on it for fast loops.
+- ~~`smokeOnly` may not be wired~~ — fixed in `4e24810`; it was missing from
+  `variables.globals`. Confirmed working (setup + ci-history stubbed, `classifyFailure` reached
+  in ~4 min).
+- **`openPr` never publishes.** It commits on the VM and then `gh pr create` returns no URL.
+  Next thing to fix if the flow should actually raise PRs; harmless until then.
+- **Editing `VmAgent.flow` regenerates the nested `agent.json` and the tool `resource.json`**,
+  and silently reverts hand-made fixes in them (the rg-not-on-PATH hint and the fixer tool's
+  `RunId` binding both came back). That is the "kept reverting" in `ea140a8`. Check
+  `git diff` on those two files after every flow edit.
 - `rg` is not on PATH in the agent's `vm_exec` sessions (setup only prepends
   `C:\vm-agent\bin` for its own session). The tool description now says so; better would be
   fixing the PATH or installing rg machine-wide.
