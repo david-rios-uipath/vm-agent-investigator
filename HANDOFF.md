@@ -83,6 +83,43 @@ turned out not to matter for resolution. Still worth a CLI bug report: `uip solu
 does not reproduce Studio Web's `bindings_v2.json` for inline-agent tool bindings; repro is
 the published `1.0.0` zip vs a local pack of `/tmp/cloud8/…` (or of this repo at `dec75c0`).
 
+## UPDATE 14:35 UTC — the fixer's patch never applied: PowerShell UTF-16; fixed in 1.0.22
+
+Run `6d77027a` (1.0.21) reached the **fix/verify loop** for the first time, and found a
+different, sharper cause than earlier runs: the `@uipath/apollo-react` bump to 6.38.0
+(commit `3df679ace`) made `JsonTree`'s `NodeKey.js` set `aria-label="Copy path for {path}"` on
+every row button, which overrides the accessible name and breaks
+`getByRole('button', { name: 'output'|'name', exact: true })` at
+`debug-execution.spec.ts:84,87`. It proved the window with `git merge-base --is-ancestor`
+(bump is *not* an ancestor of the identity-429 night `c7369f5`, *is* an ancestor of the nights
+showing this locator failure) and explicitly separated it from the 429 noise.
+
+Its patch (retarget both locators to `.filter({ hasText: /^output$/ })`) was never tested:
+
+| attempt | verify job | duration | result |
+|---|---|---|---|
+| 1 | `ba1b18b4` 13:49:25 | 9 s | `git apply --check: No valid patches in input` |
+| 2 | `35bc6c2f` 14:23:13 | 5 s | identical failure, byte-identical patch |
+
+Cause: the fixer writes `git -C C:\vm-agent\repo diff > $patchPath`, and **PowerShell 5.1's
+`>` emits UTF-16LE** (`ff fe 64 00 …`). `Get-Content` printed it fine, so the log looked
+perfect; `git apply` could not parse it. Reproduced locally byte-for-byte.
+
+Fixed and deployed as **1.0.22** (`2d91e20`, `ea140a8`, `3685e89`):
+- `verifyFixInstructions` logs the patch's first 8 bytes and normalises it (UTF-16 → UTF-8
+  no-BOM, strip BOM, CRLF → LF, ensure trailing newline) before `git apply`
+- fixer tool `RunId` was bound to `$['start__output__runId']`, a trigger input that no longer
+  exists — its bucket logs went to `manual/` and once to a folder literally named
+  `input.start__output__runId`; rebound to `$['deriveRunId__output']`
+- `release.sh` retries `pack` until the packaged bindings keep the agent tool binding
+- rg-not-on-PATH hint restored in both tool descriptions (it had reverted again — cause was my
+  own uncommitted-edit + `git checkout -- vm-agent/` in release.sh, not the CLI; `validate` was
+  tested and does *not* revert these files)
+
+Full run on 1.0.22: `5d99ea9b-9954-4cca-a982-5a59365bce1f`, started 14:34:51 UTC. Watch for
+`### patch first bytes` in the verify step's output — if it reports UTF-16 and then the
+Playwright test actually runs (expect minutes, not seconds), the loop is finally end-to-end.
+
 ## UPDATE 12:58 UTC — 1.0.20 ran clean through the fixer; summarizer fault was a second spelling
 
 Run `3bc47073` (1.0.20): investigator 2 passes / **21 successful `vm_exec` calls**, verdict

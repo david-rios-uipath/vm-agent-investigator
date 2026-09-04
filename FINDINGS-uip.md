@@ -86,6 +86,21 @@ Each item was observed directly, not inferred. `uip` was `1.201.0-preview.131`.
   then `AGENT_RUNTIME.ROUTING_ERROR 'vm_exec' is not a registered tool`). Neither `validate` nor
   `resources refresh` reproduced the deletion in isolation. `release.sh` asserts the packaged
   investigator `agent.json` lists `vm_exec`.
+- **`pack` nondeterministically drops the agent tool binding** even when the flow source has it
+  (confirmed: `release.sh` re-added it, committed, packed — and the packaged `bindings_v2.json`
+  still came out with only the qualified key; the next pack of the identical tree was fine). The
+  pack log's `Skipping binding resolution for node X: Manifest is missing
+  model.bindings.values.folderPath` warnings suggest it sometimes rebuilds bindings from node
+  manifests instead of the flow's `bindings` array. `release.sh` retries the pack up to 5 times
+  until the packaged bindings are right.
+- **PowerShell 5.1 `>` redirection writes UTF-16LE.** `git diff > patch.file` on the VM produced
+  a patch beginning `ff fe 64 00 …`; `Get-Content` displayed it correctly (BOM detection) but
+  `git apply --check` failed with `error: No valid patches in input (allow with "--allow-empty")`
+  — twice, on byte-identical patches, killing the fixer's verification in 5-9 s before Playwright
+  ever ran. Reproduced locally byte-for-byte. `verifyFixInstructions` now logs the patch's first
+  8 bytes in hex and re-encodes UTF-16 → UTF-8 no-BOM, CRLF → LF, trailing newline guaranteed.
+  Note PowerShell has no `\r\n` escape (it uses backticks, which collide with the flow's JS
+  template literal) — build those characters with `[char]13` / `[char]10`.
 - **`pack` output is not deterministic.** One `release.sh` run had the binding assert fire on a
   correct tree; two probe packs of the same tree seconds later were correct. Always gate publish
   on inspecting the produced zip, never on the source.
