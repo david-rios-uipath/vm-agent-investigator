@@ -83,6 +83,28 @@ turned out not to matter for resolution. Still worth a CLI bug report: `uip solu
 does not reproduce Studio Web's `bindings_v2.json` for inline-agent tool bindings; repro is
 the published `1.0.0` zip vs a local pack of `/tmp/cloud8/…` (or of this repo at `dec75c0`).
 
+## UPDATE 01:50 UTC — full run d99c4204 result, fixer fix, use `release.sh` from now on
+
+Full run `d99c4204` (1.0.16) worked end to end for the investigator: **3 passes, 34 `vm_exec`
+calls, all successful**, verdict confirmed and strengthened with the new per-night env signals —
+`debug-execution.spec.ts:17` fails from identity-service 429 rate limiting of the single shared
+alpha studio account used by all 5 parallel shards (`playwright-action.yml:183-185`), not a code
+regression; `cleanup400` is shard-wide teardown noise. Notebook:
+`reports/2026-09-04-run-d99c4204-notes.md`. It then faulted in the **fixer**:
+`AGENT_RUNTIME.OUTPUT_VALIDATION_ERROR — confidence: Field required` (the model wrote
+`confidence` inline instead of as a field). Fixed by making `confidence` optional in the fixer's
+`agent.json` and `entry-points.json` (`89c8587`). Also told the agent in the tool description
+that `rg` lives in `C:\vm-agent\bin` and is not on PATH.
+
+1.0.17 shipped **without the agent tool binding again** (caught by the assert, but the shell
+chain did not stop — fixed). 1.0.18 verified good and deployed; full run
+`378e5f5f-3183-4566-987e-b0657832d370` started 01:45:15 UTC.
+
+**Use `./release.sh <version> [input.json]` for every release from now on.** It re-adds the
+binding, packs, discards pack's source rewrites, asserts on the packaged `bindings_v2.json`,
+publishes, stops jobs, uninstalls/redeploys `vm-agent 11`, and starts a job. Inputs are checked
+in under `inputs/`.
+
 ## UPDATE 01:15 UTC — smoke result, two more fixes, full run in flight (1.0.16)
 
 Smoke run `67953871` (1.0.14): investigator made 16 successful `vm_exec` calls and reached a
