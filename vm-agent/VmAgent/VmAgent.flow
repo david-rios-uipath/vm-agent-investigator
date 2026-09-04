@@ -741,7 +741,7 @@
       },
       "inputs": {
         "systemPrompt": "You write the final report for an automated e2e test investigation. You have no tools.\nYou are given: the failing test command, the test run's exit code and output tail, the bucket path of the full log, and the investigator's notebook (its own record across passes).\n\nBase every claim on the notebook and the test output. Never invent a cause that the notebook does not support.\n\nSet classification to:\n  - regression: the notebook identifies a code change that breaks the test\n  - flake: timing/ordering dependent, passes on retry, no code cause\n  - infrastructure: the VM, licensing, environment or tooling caused it, not the product\n  - known-platform-issue: a known Studio Web / Orchestrator / solution failure\n  - inconclusive: the notebook does not establish a cause\n\nIf the notebook is missing or empty, set classification to inconclusive, explain that inunverified, and report what the raw test output alone shows.\n\nQuote decisive error lines in evidence, with file:line where the notebook has them, and list the bucket log paths. State plainly in unverified what remains unchecked. An honest gap is more useful than a confident guess.",
-        "userPrompt": "Test command: {{ $vars.start.output.testCommand }}\nRepository: {{ $vars.start.output.repoUrl }} @ {{ $vars.start.output.branch }}\nTest exit code: {{ $vars.testEvidence.output.exitCode }}\nFull test log in bucket: {{ $vars.testEvidence.output.blobPath }}\nInvestigation passes used: {{ $vars.iteration }} of {{ $vars.start.output.maxIterations }}\n\nTest run output tail: {{ $vars.testEvidence.output.stdout }}\n\nInvestigator notebook: {{ $vars.readNotes.output.Stdout }}\n\nFix attempt (may be empty if no fix was attempted): {{ $vars.fixer.output.fixSummary }} (confidence {{ $vars.fixer.output.confidence }})\nVerification output (may be empty if no patch was verified): {{ $vars.verifyFix.output.Stdout }}\nPR step output (may be empty if no PR was opened): {{ $vars.openPr.output.Stdout }}\n\nWrite the final report. Base every claim on the notebook and the test output above, and fill every field of the output schema.\n\nSet patch to the diff verbatim from the `### patch` section of the verification output, or empty if there is none. Set fixVerified to true only if the verification output contains `FIX_VERIFIED=true`; otherwise false. Set prUrl to the value after `PR_URL=` in the PR step output if present, else the empty string.",
+        "userPrompt": "Test command: {{ $vars.start.output.testCommand }}\nRepository: {{ $vars.start.output.repoUrl }} @ {{ $vars.start.output.branch }}\nTest exit code: {{ $vars.testEvidence.output.exitCode }}\nFull test log in bucket: {{ $vars.testEvidence.output.blobPath }}\nInvestigation passes used: {{ $vars.iteration }} of {{ $vars.start.output.maxIterations }}\n\nTest run output tail: {{ $vars.testEvidence.output.stdout }}\n\nInvestigator notebook: {{ $vars.readNotes.output.Stdout }}\n\nFix attempt (may be empty if no fix was attempted): {{ $vars.fixer.output.fixSummary }} (confidence {{ $vars.fixer.output.confidence }})\nVerification output (may be empty if no patch was verified): {{ (($vars.verifyFix.output || {}).Stdout || '') }}\nPR step output (may be empty if no PR was opened): {{ (($vars.openPr.output || {}).Stdout || '') }}\n\nWrite the final report. Base every claim on the notebook and the test output above, and fill every field of the output schema.\n\nSet patch to the diff verbatim from the `### patch` section of the verification output, or empty if there is none. Set fixVerified to true only if the verification output contains `FIX_VERIFIED=true`; otherwise false. Set prUrl to the value after `PR_URL=` in the PR step output if present, else the empty string.",
         "model": "anthropic.claude-opus-4-8",
         "mode": "standard",
         "temperature": 0,
@@ -5461,26 +5461,6 @@
       "resourceKey": "e2e-investigator.vm-exec-vm",
       "default": "0b28296b-1f4a-4ea9-a3d5-8b0abaac1cf0",
       "propertyAttribute": "folderKey",
-      "resourceSubType": "Process"
-    },
-    {
-      "id": "bVmExecToolName",
-      "name": "name",
-      "type": "string",
-      "resource": "process",
-      "resourceKey": "vm-exec-vm",
-      "default": "vm-exec-vm",
-      "propertyAttribute": "name",
-      "resourceSubType": "Process"
-    },
-    {
-      "id": "bVmExecToolFolderPath",
-      "name": "folderPath",
-      "type": "string",
-      "resource": "process",
-      "resourceKey": "vm-exec-vm",
-      "default": "e2e-investigator",
-      "propertyAttribute": "folderPath",
       "resourceSubType": "Process"
     }
   ],

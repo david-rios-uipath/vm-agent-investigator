@@ -53,13 +53,13 @@
       "fixer__output__confidence": {
         "description": "Bound from $vars.fixer.output.confidence"
       },
-      "verifyFix__output__Stdout": {
-        "type": "string",
-        "description": "Bound from $vars.verifyFix.output.Stdout"
+      "verifyFix__output": {
+        "type": "object",
+        "description": "Bound from $vars.verifyFix.output"
       },
-      "openPr__output__Stdout": {
-        "type": "string",
-        "description": "Bound from $vars.openPr.output.Stdout"
+      "openPr__output": {
+        "type": "object",
+        "description": "Bound from $vars.openPr.output"
       }
     }
   },
@@ -117,7 +117,7 @@
     },
     {
       "role": "user",
-      "content": "Test command: {{input.start__output__testCommand}}\nRepository: {{input.start__output__repoUrl}} @ {{input.start__output__branch}}\nTest exit code: {{input.testEvidence__output__exitCode}}\nFull test log in bucket: {{input.testEvidence__output__blobPath}}\nInvestigation passes used: {{input.iteration}} of {{input.start__output__maxIterations}}\n\nTest run output tail: {{input.testEvidence__output__stdout}}\n\nInvestigator notebook: {{input.readNotes__output__Stdout}}\n\nFix attempt (may be empty if no fix was attempted): {{input.fixer__output__fixSummary}} (confidence {{input.fixer__output__confidence}})\nVerification output (may be empty if no patch was verified): {{input.verifyFix__output__Stdout}}\nPR step output (may be empty if no PR was opened): {{input.openPr__output__Stdout}}\n\nWrite the final report. Base every claim on the notebook and the test output above, and fill every field of the output schema.\n\nSet patch to the diff verbatim from the `### patch` section of the verification output, or empty if there is none. Set fixVerified to true only if the verification output contains `FIX_VERIFIED=true`; otherwise false. Set prUrl to the value after `PR_URL=` in the PR step output if present, else the empty string.",
+      "content": "Test command: {{input.start__output__testCommand}}\nRepository: {{input.start__output__repoUrl}} @ {{input.start__output__branch}}\nTest exit code: {{input.testEvidence__output__exitCode}}\nFull test log in bucket: {{input.testEvidence__output__blobPath}}\nInvestigation passes used: {{input.iteration}} of {{input.start__output__maxIterations}}\n\nTest run output tail: {{input.testEvidence__output__stdout}}\n\nInvestigator notebook: {{input.readNotes__output__Stdout}}\n\nFix attempt (may be empty if no fix was attempted): {{input.fixer__output__fixSummary}} (confidence {{input.fixer__output__confidence}})\nVerification output (may be empty if no patch was verified): {{ (($agent.verifyFix__output || {}).Stdout || '') }}\nPR step output (may be empty if no PR was opened): {{ (($agent.openPr__output || {}).Stdout || '') }}\n\nWrite the final report. Base every claim on the notebook and the test output above, and fill every field of the output schema.\n\nSet patch to the diff verbatim from the `### patch` section of the verification output, or empty if there is none. Set fixVerified to true only if the verification output contains `FIX_VERIFIED=true`; otherwise false. Set prUrl to the value after `PR_URL=` in the PR step output if present, else the empty string.",
       "contentTokens": [
         {
           "type": "simpleText",
@@ -209,23 +209,7 @@
         },
         {
           "type": "simpleText",
-          "rawString": ")\nVerification output (may be empty if no patch was verified): "
-        },
-        {
-          "type": "variable",
-          "rawString": "input.verifyFix__output__Stdout"
-        },
-        {
-          "type": "simpleText",
-          "rawString": "\nPR step output (may be empty if no PR was opened): "
-        },
-        {
-          "type": "variable",
-          "rawString": "input.openPr__output__Stdout"
-        },
-        {
-          "type": "simpleText",
-          "rawString": "\n\nWrite the final report. Base every claim on the notebook and the test output above, and fill every field of the output schema.\n\nSet patch to the diff verbatim from the `### patch` section of the verification output, or empty if there is none. Set fixVerified to true only if the verification output contains `FIX_VERIFIED=true`; otherwise false. Set prUrl to the value after `PR_URL=` in the PR step output if present, else the empty string."
+          "rawString": ")\nVerification output (may be empty if no patch was verified): {{ (($agent.verifyFix__output || {}).Stdout || '') }}\nPR step output (may be empty if no PR was opened): {{ (($agent.openPr__output || {}).Stdout || '') }}\n\nWrite the final report. Base every claim on the notebook and the test output above, and fill every field of the output schema.\n\nSet patch to the diff verbatim from the `### patch` section of the verification output, or empty if there is none. Set fixVerified to true only if the verification output contains `FIX_VERIFIED=true`; otherwise false. Set prUrl to the value after `PR_URL=` in the PR step output if present, else the empty string."
         }
       ]
     }
