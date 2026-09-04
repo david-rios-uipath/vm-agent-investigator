@@ -1,7 +1,7 @@
 {
   "repoUrl": "https://github.com/UiPath/flow-workbench",
   "branch": "develop",
-  "testCommand": "corepack pnpm exec playwright test e2e/specs/debug/debug-execution.spec.ts --project studio-alpha",
+  "testCommand": "corepack pnpm exec playwright test --config e2e/playwright.config.ts e2e/specs/debug/debug-execution.spec.ts --project studio-alpha",
   "maxIterations": 2,
   "smokeOnly": true
 }
