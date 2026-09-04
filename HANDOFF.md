@@ -1,312 +1,152 @@
-# Handoff — why does the agent's `vm_exec` tool 404 in locally packed deployments?
+# vm-agent — handoff
 
-Written 2026-09-04 ~00:10 UTC for an agent with fresh context. Read this whole file before running anything.
+Last updated 2026-09-04 ~16:00 UTC. Written for an agent or human with no prior context.
+Read this file, then `FINDINGS-uip.md` (CLI/platform traps — several will bite you).
 
-## Goal
+## What this is
 
-Get a deployed `VmAgent` flow (not a Studio Web debug run) to complete an investigation of
-`e2e/specs/debug/debug-execution.spec.ts` in `UiPath/flow-workbench`, with the inline agent
-successfully calling its `vm_exec` tool. Everything else — cleanup, private folders, faster
-loops — is secondary.
+`~/code/vm-agent-investigator` builds a UiPath Maestro Flow (`VmAgent`) that investigates a
+failing Playwright e2e test in `UiPath/flow-workbench`. Three inline agents — investigator,
+fixer, summarizer — drive a Windows robot VM through one RPA tool (`vm_exec`, a PowerShell
+runner). See `PLAN.md` for the original design and run economics.
 
-## What is known to work
+**Goal:** a deployed (not Studio-Web-debug) run that goes start → investigate → fix → verify →
+summarize without human intervention.
 
-A deployed run **did** succeed this morning:
+## Current state
 
-- Folder `Shared/vm-agent 8`, package `vm-agent.7.flow.VmAgent:1.0.0`, instance `364f9617`.
-- 04:59–06:21 UTC, 0 incidents, investigator made **25 `vm_exec` tool calls**, correct root cause.
-- Report: `reports/2026-09-03-run-364f9617.md`.
-- That package was published by **Studio Web** from solution `vm-agent 8` (SolutionId
-  `6c998cb3-078b-4c80-dfce-08df093139b4`) and deployed with `deploy.sh` + `deploy-config.json`.
-- Its wiring is cross-folder: flow runs in `Shared/vm-agent 8`, `vm-exec-vm` lives in
-  `e2e-investigator` (the only folder with the Windows VM pool). Tool resource has
-  `location: "solution"`, `referenceKey: ca36341d-…`, `properties.folderPath: e2e-investigator`,
-  `processName: vm-exec-vm`. Flow `bindings` keyed `e2e-investigator.vm-exec-vm`.
-- A pristine copy of that solution is downloaded at
-  `/tmp/cloud8/6c998cb3-078b-4c80-dfce-08df093139b4/` (re-download with
-  `uip solution download 6c998cb3-078b-4c80-dfce-08df093139b4 -d /tmp/cloud8 --extract` if gone).
+- **Deployment:** `Shared/vm-agent 11` @ **1.0.22**, package identity `vm-agent 8`.
+- **Working:** trigger → setup → ci-history → classify → investigator (with real `vm_exec`
+  tool calls on the VM) → fixer → patch → **verify applies the patch and runs the real test**.
+- **Not yet proven end to end:** a verify that returns `FIX_VERIFIED=true`, and therefore the
+  summarizer producing the final report. Every fault so far has been a flow/environment bug,
+  not an agent-quality problem.
+- **Live run when this was written:** `5d99ea9b-9954-4cca-a982-5a59365bce1f` (started 14:34:51
+  UTC on 1.0.22). It reached fix attempt 1 verify at 15:20 — patch normalisation worked, test
+  ran, then failed on a bad `--project` (see next section). It was left running; it will burn
+  through 3 fix attempts and stop.
 
-## What fails
+## Do this next
 
-Every package built from this repo with `uip solution pack` (versions 1.0.2 through 1.0.12)
-fails identically: the flow's RPA nodes call `e2e-investigator/vm-exec-vm` successfully, then
-the investigator agent's first tool call faults:
+1. **Release 1.0.23 with the fixed test command** (already committed, `097b75e`): the
+   `testCommand` in `inputs/*.json` was missing `--config e2e/playwright.config.ts`, so
+   verify's Playwright run died with `Project(s) "studio-alpha" not found. Available projects: ""`.
 
-```
-AGENT_RUNTIME.HTTP_ERROR — Failed to execute tool 'vm_exec'
-404 Could not start process for tool 'vm_exec': an item required to start the job was not
-found. Server message: The job's associated process could not be found
-```
+   ```bash
+   cd ~/code/vm-agent-investigator
+   ./release.sh 1.0.23 inputs/debug-execution.json
+   ```
+   `release.sh` does everything: re-add the fragile binding, pack (with retry), assert the
+   package is good, publish, stop running jobs, uninstall+redeploy the same folder, start the
+   job. **Never hand-run the pack step** — see FINDINGS.
 
-Things that were tried and did **not** fix it (all reverted in commit `dec75c0`):
-`location: "external"`, adding `folderKey` to the tool binding, adding an `id` to the tool
-binding, re-importing `vm-exec-vm` as a remote resource, and moving to a single folder
-(which fixes resolution but the process then runs on serverless Linux, not the VM).
+2. **Watch the verify step**, which is the current frontier:
+   ```bash
+   # parent + agent children
+   uip or jobs list --folder-path "Shared/vm-agent 11" --output json
+   # every vm_exec tool call lands here
+   uip or jobs list --folder-path "e2e-investigator" --output json
+   # a verify job's output contains '### patch first bytes' and FIX_VERIFIED=
+   uip or jobs get <job-key> --output json
+   ```
+   Success looks like: `### patch was UTF-16 … re-encoding`, no `git apply` error, a test run
+   lasting **minutes**, then `FIX_VERIFIED=true`. A verify finishing in <20 s means it never
+   ran the test.
 
-Verified equal between the working 1.0.0 source and the failing 1.0.2 package: tool
-`resource.json`, flow `bindings`, `bindings_v2.json`, and the flow declaration's
-`runtimeDependencies` (`resourceKey`/`resourceName`/`folderKey` all present).
+3. **If it faults**, get the real reason from Maestro, not Orchestrator (the parent job stays
+   `Running` after the instance has faulted):
+   ```bash
+   FK=$(uip or folders list --all --name "vm-agent 11" --output json | \
+     python3 -c "import sys,json;t=sys.stdin.read();i=t.find('{');d=json.loads(t[i:]);print(next(x['Key'] for x in d['Data'] if x['Path']=='Shared/vm-agent 11'))")
+   uip maestro flow instance get       <parent-job-key> -f $FK --output json   # LatestRunStatus, Cursors
+   uip maestro flow instance incidents <parent-job-key> -f $FK --output json   # the actual error
+   ```
+   The folder key changes on every redeploy, so always re-resolve it.
 
-## UPDATE 00:35 UTC — root cause found, fix deployed as 1.0.14
+4. **Save the notebook** from any completed investigation into `reports/`:
+   ```bash
+   uip or bucket-files list be6369c7-02a4-4b80-957b-e95d06177692 \
+     --folder-path "e2e-investigator" --prefix "debug-execution-<runid>" --output json
+   uip or bucket-files download be6369c7-02a4-4b80-957b-e95d06177692 "<...>/read/<...>.log" \
+     --folder-path "e2e-investigator" --destination reports/<date>-run-<key>-notes.md
+   ```
 
-The A/B answered it. `1.0.13` (unmodified cloud source packed with `uip solution pack`) did
-**not** 404, but the agent hung for 15 min with zero tool-call jobs and died with
-`Serverless.Runtime.JobExecutionTimeout`. Either way the agent never reached the VM.
+## What the agent has actually found (the product answer)
 
-Diffing the Studio-Web-published `1.0.0` zip (`uip solution packages download "vm-agent 8" 1.0.0
--d /tmp/pub100`) against the locally packed `1.0.13` of the same source:
+Two distinct failure modes on `e2e/specs/debug/debug-execution.spec.ts`, established
+independently across four runs with 16-34 successful `vm_exec` calls each:
 
-| artifact | published 1.0.0 | `uip solution pack` |
-|---|---|---|
-| flow nupkg `content/bindings_v2.json` | `e2e-investigator.vm-exec-vm` **and** bare `vm-exec-vm` | only `e2e-investigator.vm-exec-vm` |
-| declaration `runtimeDependencies` | both keys, each with `resourceKey`/`resourceName`, `resourceType`, `isSolutionResource: true` | both keys, no `resourceType`/`isSolutionResource`; `resourceKey`/`resourceName` stripped when the flow's `bindings` array was hand-edited |
-| everything else (tool `resource.json`, `agent.json`, `.flow` nodes) | identical | identical |
+1. **Identity-service 429 flakiness** (runs `67953871`, `d99c4204`, `3bc47073`). All 5 parallel
+   shards authenticate the *same* shared alpha studio account (`playwright-action.yml:183-185`),
+   so identity rate-limits. Env-signal counts across 8 nights: `identity429` 12 and 6 on the two
+   failed nights vs 2-4 on passing nights; `cleanup400` (14-16) only on failed nights, and it is
+   shard-wide teardown noise from `StudioProjectsManager.deleteSolution`, not a cause.
+2. **An apollo-react regression** (run `6d77027a`, the deeper one). The bump to 6.38.0
+   (`3df679ace`) made `JsonTree`'s `NodeKey.js` set `aria-label="Copy path for {path}"` on every
+   row button; that overrides the accessible name and breaks
+   `getByRole('button', { name: 'output'|'name', exact: true })` at
+   `debug-execution.spec.ts:84,87`. Proven with `git merge-base --is-ancestor`: the bump is
+   *not* an ancestor of the 429 night `c7369f5`, *is* an ancestor of the nights showing this
+   locator failure. Its proposed patch retargets both locators to
+   `.filter({ hasText: /^output$/ })`.
 
-`pack` regenerates `bindings_v2.json` from the flow's top-level `bindings` array, which only
-listed the qualified key, so the agent tool's bare binding was dropped from every locally
-built package. The morning's working agent job carried two `ResourceOverwrites`
-(`process.e2e-investigator.vm-exec-vm`, `process.vm-exec-vm`); every failing job carried only
-the first. The agent runtime looks up its tool by the bare key.
+Notebooks: `reports/2026-09-04-run-d99c4204-notes.md` (fullest), `…-3bc47073-notes.md`,
+`…-67953871-notes.md`, plus `reports/2026-09-03-run-364f9617.md` (a critique of the first
+successful run, worth reading for how the agent behaves).
 
-**Fix (commit `16fec0f`):** added `resourceKey: "vm-exec-vm"` `name` + `folderPath` entries to
-the flow's `bindings` array. Packed output now contains both `bindings_v2.json` entries
-(verified before deploying). Deployed as `1.0.14` to `Shared/vm-agent 11`; smoke job
-`67953871-b6fc-445e-afdc-89b7a9fb5ae5` started 00:32:03 UTC with `/tmp/job-input-smoke.json`.
+Neither finding has been filed anywhere. Item 2 is a real, actionable e2e fix if someone wants
+to take it; item 1 is an infra problem (shared account) with no tracked issue — the agent
+searched GitHub and found none.
 
-**CONFIRMED 00:34 UTC.** Agent child `71ab58fb` started 00:34:12, went `Suspended` (the normal
-serverless suspend while a tool job runs), and a new `vm-exec-vm` job was created in
-`e2e-investigator` at 00:34:22 and completed `Successful` at 00:34:34 — the agent's first
-tool call reached the Windows VM. Nine failed deploy cycles were all this one dropped binding.
+## Bugs fixed in this session (all committed)
 
-The declaration differences (`resourceType`, `isSolutionResource`, `resourceKey` stripping)
-turned out not to matter for resolution. Still worth a CLI bug report: `uip solution pack`
-does not reproduce Studio Web's `bindings_v2.json` for inline-agent tool bindings; repro is
-the published `1.0.0` zip vs a local pack of `/tmp/cloud8/…` (or of this repo at `dec75c0`).
+| what | commit |
+|---|---|
+| agent tool 404: `pack` drops the bare `vm-exec-vm` binding from `bindings_v2.json` | `16fec0f` |
+| `rg --version \| Select-Object -First 1` zeroed `$LASTEXITCODE`, aborting setup at 13 s | `b36ec3f` |
+| tool `resource.json` files deleted → agents shipped with no tools | `12de81a` |
+| summarizer null-deref on `verifyFix.output.Stdout`, two spellings | `baa6a52`, `9c55db7` |
+| fixer's `confidence` required but written inline by the model | `89c8587` |
+| fixer tool `RunId` bound to a nonexistent trigger input → logs in `manual/` | `ea140a8` |
+| **patch written as UTF-16 by PowerShell `>`, so `git apply` never applied it** | `2d91e20` |
+| `pack` nondeterministically drops the binding → retry loop in `release.sh` | `3685e89` |
+| `testCommand` missing `--config e2e/playwright.config.ts` | `097b75e` |
 
-## UPDATE 14:35 UTC — the fixer's patch never applied: PowerShell UTF-16; fixed in 1.0.22
+Also added: `ciHistory` scans every sampled night's job log for environment signatures and keeps
+per-night excerpts, so the agent gets the cross-night pattern as evidence instead of spending
+tool calls on it (`6aa25de`); a `smokeOnly` trigger input that stubs setup and ci-history for
+~2-minute iterations (`1131f28`, though it did not appear to take effect in the one run that
+used it — unverified).
 
-Run `6d77027a` (1.0.21) reached the **fix/verify loop** for the first time, and found a
-different, sharper cause than earlier runs: the `@uipath/apollo-react` bump to 6.38.0
-(commit `3df679ace`) made `JsonTree`'s `NodeKey.js` set `aria-label="Copy path for {path}"` on
-every row button, which overrides the accessible name and breaks
-`getByRole('button', { name: 'output'|'name', exact: true })` at
-`debug-execution.spec.ts:84,87`. It proved the window with `git merge-base --is-ancestor`
-(bump is *not* an ancestor of the identity-429 night `c7369f5`, *is* an ancestor of the nights
-showing this locator failure) and explicitly separated it from the 429 noise.
+## Known-good baseline, if things go sideways
 
-Its patch (retarget both locators to `.filter({ hasText: /^output$/ })`) was never tested:
+Package `vm-agent 8` **1.0.0**, published by Studio Web from solution
+`6c998cb3-078b-4c80-dfce-08df093139b4`, ran clean on 2026-09-03 04:59-06:21 UTC (instance
+`364f9617`, 25 tool calls, 0 incidents). Download it for comparison:
+`uip solution packages download "vm-agent 8" 1.0.0 -d /tmp/pub100`, or the solution source with
+`uip solution download 6c998cb3-078b-4c80-dfce-08df093139b4 -d /tmp/cloud8 --extract`.
+That flow is smaller (13 nodes, no fixer, no ci-history) — useful as a diff target, not as a
+replacement.
 
-| attempt | verify job | duration | result |
-|---|---|---|---|
-| 1 | `ba1b18b4` 13:49:25 | 9 s | `git apply --check: No valid patches in input` |
-| 2 | `35bc6c2f` 14:23:13 | 5 s | identical failure, byte-identical patch |
+## Open items / cleanup owed
 
-Cause: the fixer writes `git -C C:\vm-agent\repo diff > $patchPath`, and **PowerShell 5.1's
-`>` emits UTF-16LE** (`ff fe 64 00 …`). `Get-Content` printed it fine, so the log looked
-perfect; `git apply` could not parse it. Reproduced locally byte-for-byte.
+- `smokeOnly` may not be wired to the trigger input correctly — the one smoke run still did a
+  real clone and ci-history. Verify before relying on it for fast loops.
+- `rg` is not on PATH in the agent's `vm_exec` sessions (setup only prepends
+  `C:\vm-agent\bin` for its own session). The tool description now says so; better would be
+  fixing the PATH or installing rg machine-wide.
+- The `Shared/vm-agent 11` folder is recreated on every redeploy, which drops machine
+  assignments and hand-made assets. The three placeholder credential assets
+  (`GH_TOKEN`/`SLACK_TOKEN`/`SLACK_COOKIE`) and the VM machine template assignment from the
+  abandoned single-folder experiment may or may not still be there; they are harmless.
+- `vm-agent-priv` deployment in the personal workspace — dead end, uninstall it.
+- Nine Studio Web solutions `vm-agent` … `vm-agent 9` exist; David declined bulk deletion.
+- Two CLI bugs worth filing: `pack` not reproducing Studio Web's `bindings_v2.json` for
+  inline-agent tool bindings (repro: published 1.0.0 zip vs local pack of the same source), and
+  `deploy upgrade` wedging a deployment into `VersionChange / Draft` permanently.
 
-Fixed and deployed as **1.0.22** (`2d91e20`, `ea140a8`, `3685e89`):
-- `verifyFixInstructions` logs the patch's first 8 bytes and normalises it (UTF-16 → UTF-8
-  no-BOM, strip BOM, CRLF → LF, ensure trailing newline) before `git apply`
-- fixer tool `RunId` was bound to `$['start__output__runId']`, a trigger input that no longer
-  exists — its bucket logs went to `manual/` and once to a folder literally named
-  `input.start__output__runId`; rebound to `$['deriveRunId__output']`
-- `release.sh` retries `pack` until the packaged bindings keep the agent tool binding
-- rg-not-on-PATH hint restored in both tool descriptions (it had reverted again — cause was my
-  own uncommitted-edit + `git checkout -- vm-agent/` in release.sh, not the CLI; `validate` was
-  tested and does *not* revert these files)
+## History
 
-Full run on 1.0.22: `5d99ea9b-9954-4cca-a982-5a59365bce1f`, started 14:34:51 UTC. Watch for
-`### patch first bytes` in the verify step's output — if it reports UTF-16 and then the
-Playwright test actually runs (expect minutes, not seconds), the loop is finally end-to-end.
-
-## UPDATE 12:58 UTC — 1.0.20 ran clean through the fixer; summarizer fault was a second spelling
-
-Run `3bc47073` (1.0.20): investigator 2 passes / **21 successful `vm_exec` calls**, verdict
-`investigationComplete: true` (same conclusion — shared-alpha environment flake: identity 429s,
-cleanup 400s, slow editor mounts; `git log 6e672a6..c7369f5 -- e2e/pages e2e/fixtures
-e2e/specs/debug` is empty). Fixer ran and passed validation this time (optional `confidence`
-works). Then `investigationSummarizer` faulted **again** with `400300 … =js:vars.verifyFix.output.Stdout`.
-The earlier null-safety patch only matched the `$vars.…` jsExpression spelling; the summarizer's
-agent input bindings use the `=js:vars.…` string form. Fixed in `9c55db7` (both spellings,
-regex `(\$?vars)\.(verifyFix|openPr)\.output\.Stdout`; 0 unguarded refs remain). Notebook:
-`reports/2026-09-04-run-3bc47073-notes.md`.
-
-`release.sh 1.0.21` re-added the bare bindings (so something before it — `validate` this
-time — had stripped them again; it *is* nondeterministic), passed both asserts, published and
-deployed. The script was cut off by a tool timeout before `jobs start`; job started by hand:
-`6d77027a-5f6a-4c8a-8f87-4a891710ef8d` at 12:56:40 UTC with `inputs/debug-execution.json`.
-If this one completes, it is the first end-to-end deployed run producing the summarizer report.
-
-## UPDATE 01:55 UTC — 1.0.17–1.0.19 shipped agents with NO tools; 1.0.20 in flight
-
-Runs 1.0.18 (`378e5f5f`) and 1.0.19 (`23264d3b`) failed a new way: the investigator returned
-placeholder output in 27 s with zero tool calls, then its retry faulted
-`AGENT_RUNTIME.ROUTING_ERROR — The agent attempted to route to 'vm_exec', which is not a
-registered tool`. The packaged investigator `agent.json` had `resources: []`. Cause: commit
-`89c8587` **deleted both tool `resource.json` files** (`VmAgent/<agent>/resources/<id>/resource.json`,
-81 lines each). Something in that edit→validate→commit sequence removed them; tested afterwards,
-neither `uip maestro flow validate` nor `uip solution resources refresh` deletes them in
-isolation, so the culprit is still unidentified. Restored from `e1ceece` in `12de81a`.
-
-`release.sh` now asserts **both** that the packaged `bindings_v2.json` contains `vm-exec-vm` and
-that the packaged investigator `agent.json` lists the `vm_exec` tool. The first 1.0.20 attempt
-was refused by the binding assert even though the source was correct; two probe packs of the
-same tree (HEAD and `e1ceece`) immediately after were both correct, so `pack` output is not
-fully deterministic — the assert is load-bearing, never bypass it.
-
-1.0.20 published and deployed to `Shared/vm-agent 11`; full run
-`3bc47073-c356-4ba3-9649-f82cb6aa8ea8` started 01:53:22 UTC. Same expected path as before;
-this is the first build since 1.0.16 that has the tool binding, the tool, the null-safe
-summarizer and the optional fixer `confidence` all together.
-
-## UPDATE 01:50 UTC — full run d99c4204 result, fixer fix, use `release.sh` from now on
-
-Full run `d99c4204` (1.0.16) worked end to end for the investigator: **3 passes, 34 `vm_exec`
-calls, all successful**, verdict confirmed and strengthened with the new per-night env signals —
-`debug-execution.spec.ts:17` fails from identity-service 429 rate limiting of the single shared
-alpha studio account used by all 5 parallel shards (`playwright-action.yml:183-185`), not a code
-regression; `cleanup400` is shard-wide teardown noise. Notebook:
-`reports/2026-09-04-run-d99c4204-notes.md`. It then faulted in the **fixer**:
-`AGENT_RUNTIME.OUTPUT_VALIDATION_ERROR — confidence: Field required` (the model wrote
-`confidence` inline instead of as a field). Fixed by making `confidence` optional in the fixer's
-`agent.json` and `entry-points.json` (`89c8587`). Also told the agent in the tool description
-that `rg` lives in `C:\vm-agent\bin` and is not on PATH.
-
-1.0.17 shipped **without the agent tool binding again** (caught by the assert, but the shell
-chain did not stop — fixed). 1.0.18 verified good and deployed; full run
-`378e5f5f-3183-4566-987e-b0657832d370` started 01:45:15 UTC.
-
-**Use `./release.sh <version> [input.json]` for every release from now on.** It re-adds the
-binding, packs, discards pack's source rewrites, asserts on the packaged `bindings_v2.json`,
-publishes, stops jobs, uninstalls/redeploys `vm-agent 11`, and starts a job. Inputs are checked
-in under `inputs/`.
-
-## UPDATE 01:15 UTC — smoke result, two more fixes, full run in flight (1.0.16)
-
-Smoke run `67953871` (1.0.14): investigator made 16 successful `vm_exec` calls and reached a
-verdict — infra flakiness (identity-service 429s on the shared studio-alpha account), not a code
-regression; notebook saved at `reports/2026-09-04-run-67953871-notes.md`. The flow then faulted
-in `investigationSummarizer`: `400300 … =js:vars.verifyFix.output.Stdout — Cannot read property
-'Stdout' of null` (verifyFix never ran because no fix was written).
-
-Shipped in **1.0.16** (commits `baa6a52`, `6aa25de`, `e1ceece`):
-- null-safe `$vars.verifyFix/openPr.output.Stdout` in summarizer, fixer, decisionVerify, decisionPr
-- `ciHistory` now scans every sampled night's job log for environment signals (identity 429,
-  cleanup 400, editor-load failure, network) and keeps an 800-char failure excerpt per failing
-  night; `classifyFailure` passes the `runs` table through; `testEvidence.ciHistory` folds the
-  other nights in so the agent gets the cross-check without extra tool calls
-- the bare `vm-exec-vm` binding re-added — see the trap below
-
-**Trap that bit twice:** `uip solution pack` rewrites `VmAgent.flow` in the source tree and
-strips the bare `vm-exec-vm` bindings (also touches `agent.json` files and the flow
-declaration). 1.0.15 shipped broken because a later commit captured the stripped flow. The pack
-step must be: pack → `git status` → `git checkout -- vm-agent/` → assert `vm-exec-vm` in the
-nupkg's `content/bindings_v2.json` → publish.
-
-**Full run in flight:** job `d99c4204-4f63-4847-ac27-15f9a958f130`, `Shared/vm-agent 11` @1.0.16,
-started 01:12:11 UTC with `/tmp/job-input.json` (no smoke flag). Expect setup ~1.5 min,
-ci-history ~1 min (longer now: it downloads every failing night's log), then — since history
-should classify `flaky` — no `runTest`, investigator, fixer, summarizer. Read `OutputArguments`
-on the parent when it finishes; if it faults, `uip maestro flow instance incidents <jobKey> -f
-<folderKey>` (folder key changes on every redeploy: `uip or folders list --all --name "vm-agent 11"`).
-
-Open items:
-- `smokeOnly: true` did **not** take effect in the 1.0.14 smoke run (setup ran the real clone,
-  82 s; ci-history real, 30 s). `$vars.start.output.smokeOnly` is probably not populated from
-  the job input; unverified.
-- `rg` is not on PATH in the agent's `vm_exec` sessions (setup only prepends `C:\vm-agent\bin`
-  for its own session; the agent fell back to `Select-String`). Fix in the tool description or
-  have setup install rg somewhere already on the robot's PATH.
-- Cleanup: single-folder leftovers in `Shared/vm-agent 11` (machine template `685f30b9`,
-  placeholder assets — recreated folder may have dropped them already), `vm-agent-priv` in the
-  personal workspace.
-
-The section below is the plan as written before this result; the deploy loop and cleanup notes
-still apply. Cleanup progress: `Shared/vm-agent 8` finally uninstalled — it had two `Running`
-flow jobs from 04:35/04:41 UTC on 09-03 blocking it (`jobs stop` both, then uninstall
-succeeded).
-
-## The experiment in flight (superseded — kept for context)
-
-`1.0.13` = the **unmodified** cloud solution packed locally
-(`cd /tmp/cloud8/6c99…/ && uip solution pack . /tmp/cloudpkg -n "vm-agent 8" -v 1.0.13`),
-published to the tenant feed, deployed to `Shared/vm-agent 11`, job `bc434d4a-789d-4685-b3f4-6aa4182300d8`
-started 00:07:38 UTC with `/tmp/job-input.json` (full run, no smoke flag — expect ~12 min before
-the agent's first tool call).
-
-### Step 1 — read the A/B result
-
-```bash
-cd ~/code/vm-agent-investigator
-uip or jobs list --folder-path "Shared/vm-agent 11" --output json   # parent + child jobs
-uip or jobs get <child-job-key> --output json                       # Info / ErrorCode on a Faulted child
-uip or jobs list --folder-path "e2e-investigator" --output json      # vm-exec-vm jobs = tool calls landing
-```
-
-Signal: after `setupVm` (~2 min) and `runTest` (~10 min), do new `vm-exec-vm` jobs keep
-appearing in `e2e-investigator` **while the agent child job stays Running**? That is the agent
-calling its tool.
-
-### Step 2 — branch on the result
-
-**1.0.13 works** → `uip solution pack` is fine; the breakage is in content added since the
-cloud copy. Bisect on the local flow, keeping `smokeOnly: true` in the job input for ~2-min
-cycles. Order of suspicion:
-
-1. Remove the Fixer agent (`vm-agent/VmAgent/86439ed0-…/`, nodes `fixer`, `vmExecToolFixer`,
-   `decisionFix`, `verifyFix*`, `bumpFixAttempts`, `decisionPr`, `openPr*`) — the working
-   flow has one agent tool node; the local flow has two pointing at the same process.
-2. Remove the CI-history gate (`ciHistory*`, `classifyFailure`, `decisionRepro`, `testEvidence`).
-3. `vm-agent/vm-exec/Main.xaml` / `project.json` changes (local project lacks the
-   `MaxOutputChars` argument that the deployed 1.0.3 process has).
-
-**1.0.13 fails** → `uip solution pack` does not reproduce what Studio Web publishes. That is a
-CLI bug. File it with: the two solution zips, the 404 text above, the job's
-`ResourceOverwrites` (only `process.e2e-investigator.vm-exec-vm` is present), and the fact
-that RPA nodes resolve while the agent tool does not. Workaround meanwhile: iterate in Studio
-Web and publish from there, or `uip solution upload --force` to `vm-agent 9`
-(SolutionId `ed157df9…`, which is what the local `.uipx` maps to) and publish from the UI.
-
-## Repo state
-
-- `HEAD` = `dec75c0`: working cross-folder wiring restored + Fixer registered in
-  `entry-points.json` + tonight's keepers (`rg` guard fix `b36ec3f`, CI-history gate
-  `d502723`, `smokeOnly` flag from `1131f28`).
-- One uncommitted change: `vm-agent/resources/solution_folder/process/flow/VmAgent.json` lost
-  `resourceKey`/`resourceName`/`folderKey` on both bindings. `uip solution pack` rewrote it
-  during the 1.0.12 pack. **Discard it** (`git checkout -- <file>`) — the committed version
-  matches the working cloud copy.
-- Job inputs: `/tmp/job-input.json` (full) and `/tmp/job-input-smoke.json` (`smokeOnly: true`,
-  `maxIterations: 2`). Recreate from the `repoUrl`/`branch`/`testCommand` fields in
-  `PLAN.md` if `/tmp` was cleared. Consider checking them into `inputs/`.
-
-## Deploy/iterate loop that works (same folder every time)
-
-```bash
-cd ~/code/vm-agent-investigator
-uip solution pack vm-agent /tmp/vm-agent-pkg -n "vm-agent 8" -v 1.0.<N> --repository-commit $(git rev-parse HEAD)
-uip solution publish "/tmp/vm-agent-pkg/vm-agent 8_1.0.<N>.zip"
-# stop any Running job in the folder first, or uninstall fails with "Validation failed."
-uip or jobs stop <job-key>
-uip solution deploy uninstall "vm-agent 11" --yes
-uip solution deploy run -n "vm-agent 11" --package-name "vm-agent 8" --package-version 1.0.<N> \
-  --folder-name "vm-agent 11" --parent-folder-path "Shared" --config-file deploy-config.json --timeout 600
-uip or processes list --folder-path "Shared/vm-agent 11" --output json   # get the VmAgent process key
-uip or jobs start <VmAgent-key> --folder-path "Shared/vm-agent 11" --input-arguments "$(cat /tmp/job-input-smoke.json)"
-```
-
-Do **not** use `deploy upgrade` (wedges into `VersionChange / Draft`) or
-`processes update-version` (404: inner nupkg not in the process feed).
-
-## Cleanup still owed
-
-- `Shared/vm-agent 8` deployment `1f230647` — `Uninstall` fails with `Validation failed.`
-  even with no running job. Not resolved. Stale 1.0.0 processes still there.
-- `Shared/vm-agent 11` has leftovers from the single-folder experiment: the VM machine template
-  `685f30b9` assigned, and placeholder credential assets `GH_TOKEN`/`SLACK_TOKEN`/`SLACK_COOKIE`.
-  Harmless for cross-folder runs; remove when settled.
-- Personal-workspace deployment `vm-agent-priv` (1.0.3) — dead end, uninstall it.
-- 9 Studio Web solutions `vm-agent` … `vm-agent 9` — David declined bulk deletion; leave.
-
-See `FINDINGS-uip.md` for every CLI/Studio Web behavior learned tonight.
+The blow-by-blow of this session (including several wrong turns worth not repeating — nine
+deploy cycles spent "fixing" a configuration that was already correct) is in
+`/tmp/HANDOFF-old.md` if it still exists, and in the git log from `d502723` onward.
