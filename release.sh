@@ -33,9 +33,23 @@ if ! git diff --quiet -- vm-agent/VmAgent/VmAgent.flow; then
 fi
 
 mkdir -p "$OUT"
-uip solution pack vm-agent "$OUT" -n "$PKG" -v "$VERSION" --repository-commit "$(git rev-parse HEAD)" >/dev/null
-git checkout -- vm-agent/   # pack rewrites source files; discard
 ZIP="$OUT/${PKG}_${VERSION}.zip"
+# `pack` is nondeterministic: it sometimes rebuilds bindings_v2.json from node manifests and
+# drops the agent tool's bare binding (see FINDINGS-uip.md). Retry until the package is good.
+for attempt in 1 2 3 4 5; do
+  rm -f "$ZIP"
+  uip solution pack vm-agent "$OUT" -n "$PKG" -v "$VERSION" --repository-commit "$(git rev-parse HEAD)" >/dev/null
+  git checkout -- vm-agent/   # pack rewrites source files; discard
+  if python3 -c "
+import sys,zipfile,io,json
+z=zipfile.ZipFile(sys.argv[1]); p=[x for x in z.namelist() if 'flow.VmAgent' in x and x.endswith('.nupkg')][0]
+keys=[r.get('key') for r in json.loads(zipfile.ZipFile(io.BytesIO(z.read(p))).read('content/bindings_v2.json'))['resources']]
+sys.exit(0 if 'vm-exec-vm' in keys else 1)" "$ZIP"; then
+    echo "pack attempt $attempt: bindings OK"; break
+  fi
+  echo "pack attempt $attempt: agent tool binding dropped, retrying"
+  [ "$attempt" = "5" ] && { echo "pack never produced the binding in 5 tries - aborting"; exit 1; }
+done
 python3 - "$ZIP" <<'PY'
 import sys,zipfile,io,json
 z=zipfile.ZipFile(sys.argv[1]); p=[x for x in z.namelist() if 'flow.VmAgent' in x and x.endswith('.nupkg')][0]
