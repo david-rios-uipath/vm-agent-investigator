@@ -1,6 +1,6 @@
 # vm-agent — handoff
 
-Last updated 2026-09-04 ~17:15 UTC. Written for an agent or human with no prior context.
+Last updated 2026-09-04 ~17:40 UTC. Written for an agent or human with no prior context.
 Read this file, then `FINDINGS-uip.md` (CLI/platform traps — several will bite you).
 
 ## What this is
@@ -15,8 +15,13 @@ summarize without human intervention.
 
 ## Current state
 
-- **Deployment:** `Shared/vm-agent 11` @ **1.0.23**, package identity `vm-agent 8`.
-  1.0.24 (studio-local verify) is committed but **not yet released**.
+- **Deployment:** `Shared/vm-agent 11` @ **1.0.24**, package identity `vm-agent 8`.
+- **1.0.24 ran the whole loop including the PR, in 17 minutes** - instance
+  `62b22f65-ae3f-4c80-89f2-d295eb59f104`, 17:16-17:33 UTC: smoke setup -> resume -> fixer
+  (11 min) -> studio-local verify `1 passed (1.9m)` -> **draft PR
+  https://github.com/UiPath/flow-workbench/pull/3687** (branch
+  `e2e-investigator/debug-execution-20260904-143456`, commit `ca8ff4928`, 1 file +2/-2)
+  -> summarizer -> end. The `GH_TOKEN` asset does have push scope on the repo.
 - **The loop closed end to end on 1.0.23**, instance `f282004c-f256-4100-97a2-80390ae1ba17`,
   16:22-16:57 UTC: trigger -> smoke setup -> resume -> fixer -> verify `FIX_VERIFIED=true`
   -> openPr -> summarizer -> end, 35 minutes. The verify ran the real spec: `1 passed (3.4m)`.
@@ -210,11 +215,12 @@ replacement.
 - ~~`smokeOnly` may not be wired~~ — fixed in `4e24810`; it was missing from
   `variables.globals`. Confirmed working (setup + ci-history stubbed, `classifyFailure` reached
   in ~4 min).
-- `openPr` push + `gh pr create` are **still unproven end to end** - the exit-code bug meant
-  they have never once executed. The first 1.0.24 run that verifies a fix will be the first
-  real attempt to push to `UiPath/flow-workbench` and open a draft PR. Whether the folder's
-  `GH_TOKEN` asset has write scope on that repo is untested (it demonstrably works for reads -
-  ci-history uses it).
+- `openPr` works end to end as of 1.0.24 (PR #3687). Note it **pushes to a shared repo**, so
+  every verified fix from now on creates a real draft PR and a real remote branch. The branch
+  name is `e2e-investigator/<runId>`, and `resumeRunId` reuses a runId - so re-running the
+  same runId force-pushes over the previous branch rather than opening a second PR.
+- The PR title is derived from `fixSummary` and truncated to a word boundary. #3687 was
+  opened before that fix and reads `... (lines 84 an (automated investigator)`.
 - **Editing `VmAgent.flow` regenerates the nested `agent.json` and the tool `resource.json`**,
   and silently reverts hand-made fixes in them (the rg-not-on-PATH hint and the fixer tool's
   `RunId` binding both came back). That is the "kept reverting" in `ea140a8`. Check
