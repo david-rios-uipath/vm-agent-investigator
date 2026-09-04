@@ -667,7 +667,7 @@
       "inputs": {
         "script": {
           "type": "literal",
-          "expression": "// The VM gets the phase logic from this repo, not from the flow: a runner change is a git\n// push, not a solution release. `runnerRef` selects the ref to run.\nconst s = (v) => String(v ?? '').replace(/'/g, \"''\");\nconst runId = s($vars.deriveRunId.output);\nconst ref = s($vars.start.output.runnerRef || 'main');\nconst args = [\n  \"-Phase repro\",\n  `-RunId '${runId}'`,\n  `-RepoUrl '${s($vars.start.output.repoUrl)}'`,\n  `-Branch '${s($vars.start.output.branch)}'`,\n  `-TestCommand '${s($vars.start.output.testCommand)}'`,\n  $vars.start.output.smokeOnly ? \"-SmokeOnly\" : \"\",\n].join(' ');\nreturn `$ErrorActionPreference = 'Continue'\n$runner = 'C:\\\\vm-agent\\\\runner'\n$url = '${s($vars.start.output.runnerRepoUrl)}'\nif (-not $url) { Write-Output '[bootstrap] runnerRepoUrl is empty; nothing to clone'; exit 1 }\nif ($env:GIT_TOKEN) { $url = $url -replace '^https://', \"https://x-access-token:$($env:GIT_TOKEN)@\" }\nif (-not (Test-Path \"$runner\\\\.git\")) {\n  git clone --depth 1 $url $runner\n  if ($LASTEXITCODE -ne 0) { Write-Output '[bootstrap] clone of the runner repo failed'; exit 1 }\n}\ngit -C $runner remote set-url origin $url\ngit -C $runner fetch --depth 1 origin ${ref}\nif ($LASTEXITCODE -ne 0) { Write-Output '[bootstrap] fetch of the runner repo failed'; exit 1 }\ngit -C $runner checkout -q FETCH_HEAD\ngit -C $runner remote set-url origin '${s($vars.start.output.runnerRepoUrl)}'\nWrite-Output \"[bootstrap] runner at $(git -C $runner rev-parse --short HEAD)\"\n& \"$runner\\\\vm\\\\run-phase.ps1\" ${args}\nexit $LASTEXITCODE\n`",
+          "expression": "// The VM gets the phase logic from this repo, not from the flow: a runner change is a git\n// push, not a solution release. `runnerRef` selects the ref to run.\nconst s = (v) => String(v ?? '').replace(/'/g, \"''\");\nconst runId = s($vars.deriveRunId.output);\nconst ref = s($vars.start.output.runnerRef || 'master');\nconst args = [\n  \"-Phase repro\",\n  `-RunId '${runId}'`,\n  `-RepoUrl '${s($vars.start.output.repoUrl)}'`,\n  `-Branch '${s($vars.start.output.branch)}'`,\n  `-TestCommand '${s($vars.start.output.testCommand)}'`,\n  $vars.start.output.smokeOnly ? \"-SmokeOnly\" : \"\",\n].join(' ');\nreturn `$ErrorActionPreference = 'Continue'\n$runner = 'C:\\\\vm-agent\\\\runner'\n$url = '${s($vars.start.output.runnerRepoUrl)}'\nif (-not $url) { Write-Output '[bootstrap] runnerRepoUrl is empty; nothing to clone'; exit 1 }\nif ($env:GIT_TOKEN) { $url = $url -replace '^https://', \"https://x-access-token:$($env:GIT_TOKEN)@\" }\nif (-not (Test-Path \"$runner\\\\.git\")) {\n  git clone --depth 1 $url $runner\n  if ($LASTEXITCODE -ne 0) { Write-Output '[bootstrap] clone of the runner repo failed'; exit 1 }\n}\ngit -C $runner remote set-url origin $url\ngit -C $runner fetch --depth 1 origin ${ref}\nif ($LASTEXITCODE -ne 0) { Write-Output '[bootstrap] fetch of the runner repo failed'; exit 1 }\ngit -C $runner checkout -q FETCH_HEAD\ngit -C $runner remote set-url origin '${s($vars.start.output.runnerRepoUrl)}'\nWrite-Output \"[bootstrap] runner at $(git -C $runner rev-parse --short HEAD)\"\n& \"$runner\\\\vm\\\\run-phase.ps1\" ${args}\nexit $LASTEXITCODE\n`",
           "fieldType": "string"
         }
       },
@@ -898,7 +898,7 @@
       "inputs": {
         "script": {
           "type": "literal",
-          "expression": "// The VM gets the phase logic from this repo, not from the flow: a runner change is a git\n// push, not a solution release. `runnerRef` selects the ref to run.\nconst s = (v) => String(v ?? '').replace(/'/g, \"''\");\nconst runId = s($vars.deriveRunId.output);\nconst ref = s($vars.start.output.runnerRef || 'main');\nconst args = [\n  \"-Phase investigate\",\n  `-RunId '${runId}'`,\n  `-RepoUrl '${s($vars.start.output.repoUrl)}'`,\n  `-Branch '${s($vars.start.output.branch)}'`,\n  `-TestCommand '${s($vars.start.output.testCommand)}'`,\n\n].join(' ');\nreturn `$ErrorActionPreference = 'Continue'\n$runner = 'C:\\\\vm-agent\\\\runner'\n$url = '${s($vars.start.output.runnerRepoUrl)}'\nif (-not $url) { Write-Output '[bootstrap] runnerRepoUrl is empty; nothing to clone'; exit 1 }\nif ($env:GIT_TOKEN) { $url = $url -replace '^https://', \"https://x-access-token:$($env:GIT_TOKEN)@\" }\nif (-not (Test-Path \"$runner\\\\.git\")) {\n  git clone --depth 1 $url $runner\n  if ($LASTEXITCODE -ne 0) { Write-Output '[bootstrap] clone of the runner repo failed'; exit 1 }\n}\ngit -C $runner remote set-url origin $url\ngit -C $runner fetch --depth 1 origin ${ref}\nif ($LASTEXITCODE -ne 0) { Write-Output '[bootstrap] fetch of the runner repo failed'; exit 1 }\ngit -C $runner checkout -q FETCH_HEAD\ngit -C $runner remote set-url origin '${s($vars.start.output.runnerRepoUrl)}'\nWrite-Output \"[bootstrap] runner at $(git -C $runner rev-parse --short HEAD)\"\n& \"$runner\\\\vm\\\\run-phase.ps1\" ${args}\nexit $LASTEXITCODE\n`",
+          "expression": "// The VM gets the phase logic from this repo, not from the flow: a runner change is a git\n// push, not a solution release. `runnerRef` selects the ref to run.\nconst s = (v) => String(v ?? '').replace(/'/g, \"''\");\nconst runId = s($vars.deriveRunId.output);\nconst ref = s($vars.start.output.runnerRef || 'master');\nconst args = [\n  \"-Phase investigate\",\n  `-RunId '${runId}'`,\n  `-RepoUrl '${s($vars.start.output.repoUrl)}'`,\n  `-Branch '${s($vars.start.output.branch)}'`,\n  `-TestCommand '${s($vars.start.output.testCommand)}'`,\n\n].join(' ');\nreturn `$ErrorActionPreference = 'Continue'\n$runner = 'C:\\\\vm-agent\\\\runner'\n$url = '${s($vars.start.output.runnerRepoUrl)}'\nif (-not $url) { Write-Output '[bootstrap] runnerRepoUrl is empty; nothing to clone'; exit 1 }\nif ($env:GIT_TOKEN) { $url = $url -replace '^https://', \"https://x-access-token:$($env:GIT_TOKEN)@\" }\nif (-not (Test-Path \"$runner\\\\.git\")) {\n  git clone --depth 1 $url $runner\n  if ($LASTEXITCODE -ne 0) { Write-Output '[bootstrap] clone of the runner repo failed'; exit 1 }\n}\ngit -C $runner remote set-url origin $url\ngit -C $runner fetch --depth 1 origin ${ref}\nif ($LASTEXITCODE -ne 0) { Write-Output '[bootstrap] fetch of the runner repo failed'; exit 1 }\ngit -C $runner checkout -q FETCH_HEAD\ngit -C $runner remote set-url origin '${s($vars.start.output.runnerRepoUrl)}'\nWrite-Output \"[bootstrap] runner at $(git -C $runner rev-parse --short HEAD)\"\n& \"$runner\\\\vm\\\\run-phase.ps1\" ${args}\nexit $LASTEXITCODE\n`",
           "fieldType": "string"
         }
       },
@@ -1129,7 +1129,7 @@
       "inputs": {
         "script": {
           "type": "literal",
-          "expression": "// The VM gets the phase logic from this repo, not from the flow: a runner change is a git\n// push, not a solution release. `runnerRef` selects the ref to run.\nconst s = (v) => String(v ?? '').replace(/'/g, \"''\");\nconst runId = s($vars.deriveRunId.output);\nconst ref = s($vars.start.output.runnerRef || 'main');\nconst args = [\n  \"-Phase fix\",\n  `-RunId '${runId}'`,\n  `-RepoUrl '${s($vars.start.output.repoUrl)}'`,\n  `-Branch '${s($vars.start.output.branch)}'`,\n  `-TestCommand '${s($vars.start.output.testCommand)}'`,\n  `-FixAttempt ${$vars.fixAttempts}`,\n  `-MaxFixAttempts ${$vars.start.output.maxFixAttempts}`,\n].join(' ');\nreturn `$ErrorActionPreference = 'Continue'\n$runner = 'C:\\\\vm-agent\\\\runner'\n$url = '${s($vars.start.output.runnerRepoUrl)}'\nif (-not $url) { Write-Output '[bootstrap] runnerRepoUrl is empty; nothing to clone'; exit 1 }\nif ($env:GIT_TOKEN) { $url = $url -replace '^https://', \"https://x-access-token:$($env:GIT_TOKEN)@\" }\nif (-not (Test-Path \"$runner\\\\.git\")) {\n  git clone --depth 1 $url $runner\n  if ($LASTEXITCODE -ne 0) { Write-Output '[bootstrap] clone of the runner repo failed'; exit 1 }\n}\ngit -C $runner remote set-url origin $url\ngit -C $runner fetch --depth 1 origin ${ref}\nif ($LASTEXITCODE -ne 0) { Write-Output '[bootstrap] fetch of the runner repo failed'; exit 1 }\ngit -C $runner checkout -q FETCH_HEAD\ngit -C $runner remote set-url origin '${s($vars.start.output.runnerRepoUrl)}'\nWrite-Output \"[bootstrap] runner at $(git -C $runner rev-parse --short HEAD)\"\n& \"$runner\\\\vm\\\\run-phase.ps1\" ${args}\nexit $LASTEXITCODE\n`",
+          "expression": "// The VM gets the phase logic from this repo, not from the flow: a runner change is a git\n// push, not a solution release. `runnerRef` selects the ref to run.\nconst s = (v) => String(v ?? '').replace(/'/g, \"''\");\nconst runId = s($vars.deriveRunId.output);\nconst ref = s($vars.start.output.runnerRef || 'master');\nconst args = [\n  \"-Phase fix\",\n  `-RunId '${runId}'`,\n  `-RepoUrl '${s($vars.start.output.repoUrl)}'`,\n  `-Branch '${s($vars.start.output.branch)}'`,\n  `-TestCommand '${s($vars.start.output.testCommand)}'`,\n  `-FixAttempt ${$vars.fixAttempts}`,\n  `-MaxFixAttempts ${$vars.start.output.maxFixAttempts}`,\n].join(' ');\nreturn `$ErrorActionPreference = 'Continue'\n$runner = 'C:\\\\vm-agent\\\\runner'\n$url = '${s($vars.start.output.runnerRepoUrl)}'\nif (-not $url) { Write-Output '[bootstrap] runnerRepoUrl is empty; nothing to clone'; exit 1 }\nif ($env:GIT_TOKEN) { $url = $url -replace '^https://', \"https://x-access-token:$($env:GIT_TOKEN)@\" }\nif (-not (Test-Path \"$runner\\\\.git\")) {\n  git clone --depth 1 $url $runner\n  if ($LASTEXITCODE -ne 0) { Write-Output '[bootstrap] clone of the runner repo failed'; exit 1 }\n}\ngit -C $runner remote set-url origin $url\ngit -C $runner fetch --depth 1 origin ${ref}\nif ($LASTEXITCODE -ne 0) { Write-Output '[bootstrap] fetch of the runner repo failed'; exit 1 }\ngit -C $runner checkout -q FETCH_HEAD\ngit -C $runner remote set-url origin '${s($vars.start.output.runnerRepoUrl)}'\nWrite-Output \"[bootstrap] runner at $(git -C $runner rev-parse --short HEAD)\"\n& \"$runner\\\\vm\\\\run-phase.ps1\" ${args}\nexit $LASTEXITCODE\n`",
           "fieldType": "string"
         }
       },
@@ -1360,7 +1360,7 @@
       "inputs": {
         "script": {
           "type": "literal",
-          "expression": "// The VM gets the phase logic from this repo, not from the flow: a runner change is a git\n// push, not a solution release. `runnerRef` selects the ref to run.\nconst s = (v) => String(v ?? '').replace(/'/g, \"''\");\nconst runId = s($vars.deriveRunId.output);\nconst ref = s($vars.start.output.runnerRef || 'main');\nconst args = [\n  \"-Phase pr\",\n  `-RunId '${runId}'`,\n  `-RepoUrl '${s($vars.start.output.repoUrl)}'`,\n  `-Branch '${s($vars.start.output.branch)}'`,\n  `-TestCommand '${s($vars.start.output.testCommand)}'`,\n\n].join(' ');\nreturn `$ErrorActionPreference = 'Continue'\n$runner = 'C:\\\\vm-agent\\\\runner'\n$url = '${s($vars.start.output.runnerRepoUrl)}'\nif (-not $url) { Write-Output '[bootstrap] runnerRepoUrl is empty; nothing to clone'; exit 1 }\nif ($env:GIT_TOKEN) { $url = $url -replace '^https://', \"https://x-access-token:$($env:GIT_TOKEN)@\" }\nif (-not (Test-Path \"$runner\\\\.git\")) {\n  git clone --depth 1 $url $runner\n  if ($LASTEXITCODE -ne 0) { Write-Output '[bootstrap] clone of the runner repo failed'; exit 1 }\n}\ngit -C $runner remote set-url origin $url\ngit -C $runner fetch --depth 1 origin ${ref}\nif ($LASTEXITCODE -ne 0) { Write-Output '[bootstrap] fetch of the runner repo failed'; exit 1 }\ngit -C $runner checkout -q FETCH_HEAD\ngit -C $runner remote set-url origin '${s($vars.start.output.runnerRepoUrl)}'\nWrite-Output \"[bootstrap] runner at $(git -C $runner rev-parse --short HEAD)\"\n& \"$runner\\\\vm\\\\run-phase.ps1\" ${args}\nexit $LASTEXITCODE\n`",
+          "expression": "// The VM gets the phase logic from this repo, not from the flow: a runner change is a git\n// push, not a solution release. `runnerRef` selects the ref to run.\nconst s = (v) => String(v ?? '').replace(/'/g, \"''\");\nconst runId = s($vars.deriveRunId.output);\nconst ref = s($vars.start.output.runnerRef || 'master');\nconst args = [\n  \"-Phase pr\",\n  `-RunId '${runId}'`,\n  `-RepoUrl '${s($vars.start.output.repoUrl)}'`,\n  `-Branch '${s($vars.start.output.branch)}'`,\n  `-TestCommand '${s($vars.start.output.testCommand)}'`,\n\n].join(' ');\nreturn `$ErrorActionPreference = 'Continue'\n$runner = 'C:\\\\vm-agent\\\\runner'\n$url = '${s($vars.start.output.runnerRepoUrl)}'\nif (-not $url) { Write-Output '[bootstrap] runnerRepoUrl is empty; nothing to clone'; exit 1 }\nif ($env:GIT_TOKEN) { $url = $url -replace '^https://', \"https://x-access-token:$($env:GIT_TOKEN)@\" }\nif (-not (Test-Path \"$runner\\\\.git\")) {\n  git clone --depth 1 $url $runner\n  if ($LASTEXITCODE -ne 0) { Write-Output '[bootstrap] clone of the runner repo failed'; exit 1 }\n}\ngit -C $runner remote set-url origin $url\ngit -C $runner fetch --depth 1 origin ${ref}\nif ($LASTEXITCODE -ne 0) { Write-Output '[bootstrap] fetch of the runner repo failed'; exit 1 }\ngit -C $runner checkout -q FETCH_HEAD\ngit -C $runner remote set-url origin '${s($vars.start.output.runnerRepoUrl)}'\nWrite-Output \"[bootstrap] runner at $(git -C $runner rev-parse --short HEAD)\"\n& \"$runner\\\\vm\\\\run-phase.ps1\" ${args}\nexit $LASTEXITCODE\n`",
           "fieldType": "string"
         }
       },
@@ -2932,14 +2932,14 @@
         "id": "runnerRepoUrl",
         "direction": "in",
         "type": "string",
-        "defaultValue": "",
+        "defaultValue": "https://github.com/david-rios-uipath/vm-agent-investigator",
         "triggerNodeId": "start"
       },
       {
         "id": "runnerRef",
         "direction": "in",
         "type": "string",
-        "defaultValue": "main",
+        "defaultValue": "master",
         "triggerNodeId": "start"
       }
     ],
@@ -4130,8 +4130,8 @@
       },
       "end": {
         "position": {
-          "x": 5300,
-          "y": 144
+          "x": 3168,
+          "y": -368
         },
         "size": {
           "width": 96,
@@ -4152,8 +4152,8 @@
       },
       "investigationSummarizer": {
         "position": {
-          "x": 4940,
-          "y": 144
+          "x": 2784,
+          "y": -368
         },
         "size": {
           "width": 288,
@@ -4163,8 +4163,8 @@
       },
       "decisionVerify": {
         "position": {
-          "x": 3640,
-          "y": 144
+          "x": 1824,
+          "y": -176
         },
         "size": {
           "width": 96,
@@ -4174,8 +4174,8 @@
       },
       "bumpFixAttempts": {
         "position": {
-          "x": 3380,
-          "y": 380
+          "x": 2016,
+          "y": -160
         },
         "size": {
           "width": 96,
@@ -4185,8 +4185,8 @@
       },
       "decisionPr": {
         "position": {
-          "x": 3900,
-          "y": 144
+          "x": 2016,
+          "y": -352
         },
         "size": {
           "width": 96,
@@ -4196,8 +4196,8 @@
       },
       "endSetupFailed": {
         "position": {
-          "x": 2600,
-          "y": -160
+          "x": 2208,
+          "y": 336
         },
         "size": {
           "width": 96,
@@ -4207,8 +4207,8 @@
       },
       "endNotReproduced": {
         "position": {
-          "x": 1560,
-          "y": 380
+          "x": 1440,
+          "y": 320
         },
         "size": {
           "width": 96,
@@ -4218,7 +4218,7 @@
       },
       "decisionRepro": {
         "position": {
-          "x": 1560,
+          "x": 1248,
           "y": 144
         },
         "size": {
@@ -4229,7 +4229,7 @@
       },
       "decisionResume": {
         "position": {
-          "x": 300,
+          "x": 288,
           "y": 144
         },
         "size": {
@@ -4251,8 +4251,8 @@
       },
       "sticky-2": {
         "position": {
-          "x": 1780,
-          "y": -60
+          "x": 1728,
+          "y": 784
         },
         "size": {
           "width": 820,
@@ -4284,8 +4284,8 @@
       },
       "bootstrapRepro": {
         "position": {
-          "x": 520,
-          "y": 144
+          "x": 480,
+          "y": 160
         },
         "size": {
           "width": 96,
@@ -4295,8 +4295,8 @@
       },
       "repro": {
         "position": {
-          "x": 780,
-          "y": 144
+          "x": 672,
+          "y": 160
         },
         "size": {
           "width": 96,
@@ -4306,8 +4306,8 @@
       },
       "parseStatusRepro": {
         "position": {
-          "x": 1040,
-          "y": 144
+          "x": 864,
+          "y": 160
         },
         "size": {
           "width": 96,
@@ -4317,8 +4317,8 @@
       },
       "bootstrapInvestigate": {
         "position": {
-          "x": 1820,
-          "y": 144
+          "x": 1440,
+          "y": 128
         },
         "size": {
           "width": 96,
@@ -4328,8 +4328,8 @@
       },
       "investigate": {
         "position": {
-          "x": 2080,
-          "y": 144
+          "x": 1632,
+          "y": 128
         },
         "size": {
           "width": 96,
@@ -4339,8 +4339,8 @@
       },
       "parseStatusInvestigate": {
         "position": {
-          "x": 2340,
-          "y": 144
+          "x": 1824,
+          "y": 128
         },
         "size": {
           "width": 96,
@@ -4350,8 +4350,8 @@
       },
       "bootstrapFix": {
         "position": {
-          "x": 2860,
-          "y": 144
+          "x": 2208,
+          "y": -16
         },
         "size": {
           "width": 96,
@@ -4361,8 +4361,8 @@
       },
       "fixVerify": {
         "position": {
-          "x": 3120,
-          "y": 144
+          "x": 2400,
+          "y": -16
         },
         "size": {
           "width": 96,
@@ -4372,8 +4372,8 @@
       },
       "parseStatusFix": {
         "position": {
-          "x": 3380,
-          "y": 144
+          "x": 2592,
+          "y": -16
         },
         "size": {
           "width": 96,
@@ -4383,8 +4383,8 @@
       },
       "bootstrapPr": {
         "position": {
-          "x": 4160,
-          "y": 144
+          "x": 2208,
+          "y": -368
         },
         "size": {
           "width": 96,
@@ -4394,8 +4394,8 @@
       },
       "openPr": {
         "position": {
-          "x": 4420,
-          "y": 144
+          "x": 2400,
+          "y": -368
         },
         "size": {
           "width": 96,
@@ -4405,8 +4405,8 @@
       },
       "parseStatusPr": {
         "position": {
-          "x": 4680,
-          "y": 144
+          "x": 2592,
+          "y": -368
         },
         "size": {
           "width": 96,
@@ -4416,8 +4416,8 @@
       },
       "decisionReproRan": {
         "position": {
-          "x": 1300,
-          "y": 144
+          "x": 1056,
+          "y": 160
         },
         "size": {
           "width": 96,
@@ -4427,14 +4427,172 @@
       },
       "decisionInvestigated": {
         "position": {
-          "x": 2600,
-          "y": 144
+          "x": 2016,
+          "y": 128
         },
         "size": {
           "width": 96,
           "height": 96
         },
         "collapsed": false
+      }
+    },
+    "edges": {
+      "edge_decisionResume_true_bootstrapFix_input": {
+        "routedWaypoints": [
+          {
+            "id": "edge_decisionResume_true_bootstrapFix_input-r0",
+            "x": 432,
+            "y": 176
+          },
+          {
+            "id": "edge_decisionResume_true_bootstrapFix_input-r1",
+            "x": 432,
+            "y": 32
+          }
+        ]
+      },
+      "edge_decisionReproRan_false_endSetupFailed_input": {
+        "routedWaypoints": [
+          {
+            "id": "edge_decisionReproRan_false_endSetupFailed_input-r0",
+            "x": 1200,
+            "y": 224
+          },
+          {
+            "id": "edge_decisionReproRan_false_endSetupFailed_input-r1",
+            "x": 1200,
+            "y": 512
+          },
+          {
+            "id": "edge_decisionReproRan_false_endSetupFailed_input-r2",
+            "x": 2160,
+            "y": 512
+          },
+          {
+            "id": "edge_decisionReproRan_false_endSetupFailed_input-r3",
+            "x": 2160,
+            "y": 384
+          }
+        ]
+      },
+      "edge_decisionRepro_false_endNotReproduced_input": {
+        "routedWaypoints": [
+          {
+            "id": "edge_decisionRepro_false_endNotReproduced_input-r0",
+            "x": 1392,
+            "y": 208
+          },
+          {
+            "id": "edge_decisionRepro_false_endNotReproduced_input-r1",
+            "x": 1392,
+            "y": 368
+          }
+        ]
+      },
+      "edge_decisionInvestigated_true_bootstrapFix_input": {
+        "routedWaypoints": [
+          {
+            "id": "edge_decisionInvestigated_true_bootstrapFix_input-r0",
+            "x": 2160,
+            "y": 160
+          },
+          {
+            "id": "edge_decisionInvestigated_true_bootstrapFix_input-r1",
+            "x": 2160,
+            "y": 32
+          }
+        ]
+      },
+      "edge_decisionInvestigated_false_endSetupFailed_input": {
+        "routedWaypoints": [
+          {
+            "id": "edge_decisionInvestigated_false_endSetupFailed_input-r0",
+            "x": 2160,
+            "y": 192
+          },
+          {
+            "id": "edge_decisionInvestigated_false_endSetupFailed_input-r1",
+            "x": 2160,
+            "y": 384
+          }
+        ]
+      },
+      "edge_parseStatusFix_success_decisionVerify_input": {
+        "routedWaypoints": [
+          {
+            "id": "edge_parseStatusFix_success_decisionVerify_input-r0",
+            "x": 2736,
+            "y": 32
+          },
+          {
+            "id": "edge_parseStatusFix_success_decisionVerify_input-r1",
+            "x": 2736,
+            "y": 528
+          },
+          {
+            "id": "edge_parseStatusFix_success_decisionVerify_input-r2",
+            "x": 1776,
+            "y": 528
+          },
+          {
+            "id": "edge_parseStatusFix_success_decisionVerify_input-r3",
+            "x": 1776,
+            "y": -128
+          }
+        ]
+      },
+      "edge_decisionVerify_true_decisionPr_input": {
+        "routedWaypoints": [
+          {
+            "id": "edge_decisionVerify_true_decisionPr_input-r0",
+            "x": 1968,
+            "y": -144
+          },
+          {
+            "id": "edge_decisionVerify_true_decisionPr_input-r1",
+            "x": 1968,
+            "y": -304
+          }
+        ]
+      },
+      "edge_bumpFixAttempts_success_bootstrapFix_input": {
+        "routedWaypoints": [
+          {
+            "id": "edge_bumpFixAttempts_success_bootstrapFix_input-r0",
+            "x": 2160,
+            "y": -112
+          },
+          {
+            "id": "edge_bumpFixAttempts_success_bootstrapFix_input-r1",
+            "x": 2160,
+            "y": 32
+          }
+        ]
+      },
+      "edge_decisionPr_false_investigationSummarizer_input": {
+        "routedWaypoints": [
+          {
+            "id": "edge_decisionPr_false_investigationSummarizer_input-r0",
+            "x": 2160,
+            "y": -288
+          },
+          {
+            "id": "edge_decisionPr_false_investigationSummarizer_input-r1",
+            "x": 2160,
+            "y": -176
+          },
+          {
+            "id": "edge_decisionPr_false_investigationSummarizer_input-r2",
+            "x": 2736,
+            "y": -176
+          },
+          {
+            "id": "edge_decisionPr_false_investigationSummarizer_input-r3",
+            "x": 2736,
+            "y": -320
+          }
+        ]
       }
     }
   }

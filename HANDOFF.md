@@ -43,7 +43,7 @@ Flow shape now: `start -> deriveRunId -> decisionResume -> bootstrap<Phase> -> <
 git push, not a solution release. Each phase prints one `STATUS_JSON=<json>` line as its last
 line of stdout and `parseStatus*` parses only that; its absence routes to `endSetupFailed`.
 
-New trigger inputs: `maxFixAttempts` (3), `runnerRepoUrl`, `runnerRef` (`main`). `maxIterations`
+New trigger inputs: `maxFixAttempts` (3), `runnerRepoUrl`, `runnerRef` (`master`). `maxIterations`
 and the `iteration` global are gone with the investigator loop.
 
 `vm-exec` (`vm-agent/vm-exec/Main.xaml`) gained: an `ANTHROPIC_API_KEY` Credential asset,
@@ -70,9 +70,11 @@ of the design's read-only set.
 
 Nothing here has run. In particular:
 
-- **This repo has no git remote,** so `runnerRepoUrl` has no real value yet and the bootstrap
-  cannot clone. `inputs/*.json` carry a placeholder. Push the repo somewhere the VM's
-  `GIT_TOKEN` can read, then set that URL.
+- The runner repo is `https://github.com/david-rios-uipath/vm-agent-investigator` (public,
+  branch **`master`** — `runnerRef` defaults to `master`, not `main`). It is public so the VM
+  needs no token to clone it, but `GIT_TOKEN` has never actually fetched it from the VM.
+  **Every runner edit must be pushed before a phase job runs it**; the bootstrap fetches the
+  ref, it does not read your working tree.
 - `claude -p` has never been run on a Windows robot account. `Ensure-Tools` installs it with
   `npm install -g --prefix C:\vm-agent\node-global` and pins `CLAUDE_CONFIG_DIR` to
   `C:\vm-agent\claude-home`, on the assumption `%USERPROFILE%` is not dependable there.

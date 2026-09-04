@@ -39,12 +39,12 @@
           "runnerRepoUrl": {
             "type": "string",
             "title": "runnerRepoUrl",
-            "default": ""
+            "default": "https://github.com/david-rios-uipath/vm-agent-investigator"
           },
           "runnerRef": {
             "type": "string",
             "title": "runnerRef",
-            "default": "main"
+            "default": "master"
           }
         }
       },
