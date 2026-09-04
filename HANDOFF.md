@@ -18,9 +18,12 @@ summarize without human intervention.
 - **Deployment:** `Shared/vm-agent 11` @ **1.0.22**, package identity `vm-agent 8`.
 - **Working:** trigger → setup → ci-history → classify → investigator (with real `vm_exec`
   tool calls on the VM) → fixer → patch → **verify applies the patch and runs the real test**.
+- **Verify mechanism validated 16:00 UTC** with `./probe-verify.sh` (see below): patch
+  normalised (`64 69 66 66` = clean UTF-8), `git apply` clean, and the real Playwright test ran
+  for 4m43s with the corrected `--config`. So the loop's plumbing is done.
 - **Not yet proven end to end:** a verify that returns `FIX_VERIFIED=true`, and therefore the
-  summarizer producing the final report. Every fault so far has been a flow/environment bug,
-  not an agent-quality problem.
+  summarizer producing the final report. The blocker is now *fix content*, not plumbing — see
+  "The fix the agent proposes cannot pass" below.
 - **Live run when this was written:** `5d99ea9b-9954-4cca-a982-5a59365bce1f` (started 14:34:51
   UTC on 1.0.22). It reached fix attempt 1 verify at 15:20 — patch normalisation worked, test
   ran, then failed on a bad `--project` (see next section). It was left running; it will burn
@@ -36,6 +39,8 @@ summarize without human intervention.
    cd ~/code/vm-agent-investigator
    ./release.sh 1.0.23 inputs/debug-execution.json
    ```
+   Before spending a full run, consider `./probe-verify.sh <runId>` (see below) — it validates
+   the verify step in ~5 minutes.
    `release.sh` does everything: re-add the fragile binding, pack (with retry), assert the
    package is good, publish, stop running jobs, uninstall+redeploy the same folder, start the
    job. **Never hand-run the pack step** — see FINDINGS.
@@ -70,6 +75,54 @@ summarize without human intervention.
    uip or bucket-files download be6369c7-02a4-4b80-957b-e95d06177692 "<...>/read/<...>.log" \
      --folder-path "e2e-investigator" --destination reports/<date>-run-<key>-notes.md
    ```
+
+## Fast validation: `./probe-verify.sh`
+
+Do **not** wait 30-60 minutes for a full flow run to test a change to the fix/verify step:
+
+```bash
+./probe-verify.sh debug-execution-20260904-143456          # runId folder on the VM
+./probe-verify.sh <runId> "<alternate test command>"
+```
+
+It calls `e2e-investigator/vm-exec-vm` directly with the same PowerShell that
+`verifyFixInstructions` generates, against a `fix.patch` a previous fixer already wrote on the
+VM, and prints the patch's first bytes, the `git apply` result and the test tail. ~5 minutes,
+no pack/publish/deploy, no agents, no LLM cost. Find a runId with:
+
+```bash
+uip or bucket-files list be6369c7-02a4-4b80-957b-e95d06177692 --folder-path "e2e-investigator" --output json
+# or read $patch out of any past verify job's Stdout
+```
+
+Same trick generalises: any single flow step whose script you want to test can be run straight
+through `vm-exec-vm` this way.
+
+## The fix the agent proposes cannot pass
+
+Probe result 2026-09-04 16:00 UTC, patch applied and test run properly:
+
+```
+1) debug-execution.spec.ts:17 › start a debug session and wait for completion
+   Error: expect(getByText('Successful')).toBeVisible() failed   ← line 46, 60s timeout
+```
+
+The patch retargets the locators at **lines 84/87**; the test dies at **line 46**, the
+debug-run-completion badge. The apollo-react `aria-label` finding is real but downstream — the
+test never reaches those lines. So no locator fix can ever return `FIX_VERIFIED=true` while the
+debug run itself fails to reach "Successful".
+
+What that means for the next iteration:
+- With the old broken verify, the fixer only ever saw `git apply --check failed`, so it kept
+  re-emitting the same patch. It now receives the **real test output** in
+  `verifyFix__output__Stdout`, so it has a chance to notice the failing line is not the one it
+  patched. Worth watching whether it self-corrects, and worth a prompt line telling it
+  explicitly: *if verify fails at a different line than your patch targets, your patch is
+  irrelevant to the primary failure — go back to investigating.*
+- The primary failure (badge never appears) is the identity-429/shared-account story, or a
+  genuine product bug in the debug run. Neither is fixable by editing the spec, so the honest
+  outcome for this test may be "no fix, report the cause" — which the flow supports
+  (`patchWritten: false`).
 
 ## What the agent has actually found (the product answer)
 
