@@ -47,7 +47,47 @@ Verified equal between the working 1.0.0 source and the failing 1.0.2 package: t
 `resource.json`, flow `bindings`, `bindings_v2.json`, and the flow declaration's
 `runtimeDependencies` (`resourceKey`/`resourceName`/`folderKey` all present).
 
-## The experiment in flight
+## UPDATE 00:35 UTC — root cause found, fix deployed as 1.0.14
+
+The A/B answered it. `1.0.13` (unmodified cloud source packed with `uip solution pack`) did
+**not** 404, but the agent hung for 15 min with zero tool-call jobs and died with
+`Serverless.Runtime.JobExecutionTimeout`. Either way the agent never reached the VM.
+
+Diffing the Studio-Web-published `1.0.0` zip (`uip solution packages download "vm-agent 8" 1.0.0
+-d /tmp/pub100`) against the locally packed `1.0.13` of the same source:
+
+| artifact | published 1.0.0 | `uip solution pack` |
+|---|---|---|
+| flow nupkg `content/bindings_v2.json` | `e2e-investigator.vm-exec-vm` **and** bare `vm-exec-vm` | only `e2e-investigator.vm-exec-vm` |
+| declaration `runtimeDependencies` | both keys, each with `resourceKey`/`resourceName`, `resourceType`, `isSolutionResource: true` | both keys, no `resourceType`/`isSolutionResource`; `resourceKey`/`resourceName` stripped when the flow's `bindings` array was hand-edited |
+| everything else (tool `resource.json`, `agent.json`, `.flow` nodes) | identical | identical |
+
+`pack` regenerates `bindings_v2.json` from the flow's top-level `bindings` array, which only
+listed the qualified key, so the agent tool's bare binding was dropped from every locally
+built package. The morning's working agent job carried two `ResourceOverwrites`
+(`process.e2e-investigator.vm-exec-vm`, `process.vm-exec-vm`); every failing job carried only
+the first. The agent runtime looks up its tool by the bare key.
+
+**Fix (commit `16fec0f`):** added `resourceKey: "vm-exec-vm"` `name` + `folderPath` entries to
+the flow's `bindings` array. Packed output now contains both `bindings_v2.json` entries
+(verified before deploying). Deployed as `1.0.14` to `Shared/vm-agent 11`; smoke job
+`67953871-b6fc-445e-afdc-89b7a9fb5ae5` started 00:32:03 UTC with `/tmp/job-input-smoke.json`.
+
+Read-out: `uip or jobs list --folder-path "Shared/vm-agent 11"` → the agent child (second job)
+should stay `Running` while new `vm-exec-vm` jobs appear in `e2e-investigator`. If it faults,
+`uip or jobs get <child>` for `ErrorCode`/`Info`.
+
+Still open if 1.0.14 also fails: the declaration differences above (`resourceType`,
+`isSolutionResource`, `resourceKey` stripping). Those can be patched inside the zip before
+`publish` as a further A/B. Also file a CLI bug either way: `uip solution pack` does not
+reproduce Studio Web's `bindings_v2.json` for inline-agent tool bindings.
+
+The section below is the plan as written before this result; the deploy loop and cleanup notes
+still apply. Cleanup progress: `Shared/vm-agent 8` finally uninstalled — it had two `Running`
+flow jobs from 04:35/04:41 UTC on 09-03 blocking it (`jobs stop` both, then uninstall
+succeeded).
+
+## The experiment in flight (superseded — kept for context)
 
 `1.0.13` = the **unmodified** cloud solution packed locally
 (`cd /tmp/cloud8/6c99…/ && uip solution pack . /tmp/cloudpkg -n "vm-agent 8" -v 1.0.13`),

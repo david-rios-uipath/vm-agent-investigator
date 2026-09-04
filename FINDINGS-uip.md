@@ -50,6 +50,28 @@ Each item was observed directly, not inferred. `uip` was `1.201.0-preview.131`.
   (like `e2e-investigator`) with only the VM template behave as expected. Neither
   `processes update` nor the `rpa-workflow` node definition exposes a runtime-type setting.
 
+## The one that mattered: `uip solution pack` drops inline-agent tool bindings
+
+- Studio Web's published flow nupkg ships `content/bindings_v2.json` with one entry per binding
+  key the flow uses — for this flow both `e2e-investigator.vm-exec-vm` (RPA nodes) and bare
+  `vm-exec-vm` (the inline agent's process tool). `uip solution pack` regenerates that file from
+  the flow's top-level `bindings` array, and Studio Web only writes the RPA nodes' key there, so
+  locally packed flows lose the agent tool binding. Symptom at runtime: the agent child job's
+  `ResourceOverwrites` has only `process.e2e-investigator.vm-exec-vm`, and the first tool call
+  fails (`404 The job's associated process could not be found`) or hangs to
+  `Serverless.Runtime.JobExecutionTimeout`. RPA nodes are unaffected.
+- Fix that survives packing: add `name` + `folderPath` bindings with `resourceKey` = the bare
+  process name (`vm-exec-vm`) to the flow's `bindings` array. Verify with a throwaway pack and
+  read `content/bindings_v2.json` out of the nupkg before deploying.
+- `uip solution packages download "<name>" <version> -d <dir>` fetches a published solution zip
+  (version is positional, not `--version`). Published zips use a single `resources.json` +
+  `configurations/default/configuration.json`; locally packed zips use per-resource files under
+  `resources/solution_folder/`. The published declaration also carries `resourceType` and
+  `bindingMetadata.isSolutionResource: true` on each binding, which `pack` does not emit.
+- `deploy uninstall` "Validation failed." on `Shared/vm-agent 8` was two flow jobs left
+  `Running` for 20 h in that folder (`jobs list` shows them; `jobs stop k1 k2` accepts several
+  keys). Always list jobs in a folder before concluding an uninstall is wedged.
+
 ## Solution resources
 
 - `uip solution resources add --source remote --kind Process --name X --folder-path F` writes a
