@@ -83,6 +83,24 @@ turned out not to matter for resolution. Still worth a CLI bug report: `uip solu
 does not reproduce Studio Web's `bindings_v2.json` for inline-agent tool bindings; repro is
 the published `1.0.0` zip vs a local pack of `/tmp/cloud8/…` (or of this repo at `dec75c0`).
 
+## UPDATE 12:58 UTC — 1.0.20 ran clean through the fixer; summarizer fault was a second spelling
+
+Run `3bc47073` (1.0.20): investigator 2 passes / **21 successful `vm_exec` calls**, verdict
+`investigationComplete: true` (same conclusion — shared-alpha environment flake: identity 429s,
+cleanup 400s, slow editor mounts; `git log 6e672a6..c7369f5 -- e2e/pages e2e/fixtures
+e2e/specs/debug` is empty). Fixer ran and passed validation this time (optional `confidence`
+works). Then `investigationSummarizer` faulted **again** with `400300 … =js:vars.verifyFix.output.Stdout`.
+The earlier null-safety patch only matched the `$vars.…` jsExpression spelling; the summarizer's
+agent input bindings use the `=js:vars.…` string form. Fixed in `9c55db7` (both spellings,
+regex `(\$?vars)\.(verifyFix|openPr)\.output\.Stdout`; 0 unguarded refs remain). Notebook:
+`reports/2026-09-04-run-3bc47073-notes.md`.
+
+`release.sh 1.0.21` re-added the bare bindings (so something before it — `validate` this
+time — had stripped them again; it *is* nondeterministic), passed both asserts, published and
+deployed. The script was cut off by a tool timeout before `jobs start`; job started by hand:
+`6d77027a-5f6a-4c8a-8f87-4a891710ef8d` at 12:56:40 UTC with `inputs/debug-execution.json`.
+If this one completes, it is the first end-to-end deployed run producing the summarizer report.
+
 ## UPDATE 01:55 UTC — 1.0.17–1.0.19 shipped agents with NO tools; 1.0.20 in flight
 
 Runs 1.0.18 (`378e5f5f`) and 1.0.19 (`23264d3b`) failed a new way: the investigator returned
