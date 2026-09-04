@@ -24,7 +24,7 @@
       "jobRecording": "Disabled",
       "remoteControlAccess": "None",
       "name": "vm-exec-vm",
-      "description": "vm-exec bound in the VM-pool folder; referenced as an agent tool so calls run on the Windows robot VM",
+      "description": "vm-exec bound in the VM-pool folder; every phase job runs through it on the Windows robot VM",
       "package": {
         "name": "vm-exec_1",
         "key": "vm-exec:1.0.0"

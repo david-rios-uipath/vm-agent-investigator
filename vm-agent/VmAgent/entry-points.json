@@ -21,10 +21,10 @@
             "type": "string",
             "title": "testCommand"
           },
-          "maxIterations": {
+          "maxFixAttempts": {
             "type": "number",
-            "title": "maxIterations",
-            "default": 6
+            "title": "maxFixAttempts",
+            "default": 3
           },
           "smokeOnly": {
             "type": "boolean",
@@ -35,6 +35,16 @@
             "type": "string",
             "title": "resumeRunId",
             "default": ""
+          },
+          "runnerRepoUrl": {
+            "type": "string",
+            "title": "runnerRepoUrl",
+            "default": ""
+          },
+          "runnerRef": {
+            "type": "string",
+            "title": "runnerRef",
+            "default": "main"
           }
         }
       },
@@ -52,69 +62,18 @@
           "reproduced": {
             "type": "boolean",
             "title": "reproduced"
+          },
+          "fixVerified": {
+            "type": "boolean",
+            "title": "fixVerified"
+          },
+          "prUrl": {
+            "type": "string",
+            "title": "prUrl"
           }
         }
       },
       "displayName": "Manual trigger"
-    },
-    {
-      "filePath": "content/e41af830-1e4b-4d6b-a7e0-5595f152ea88/agent.json",
-      "uniqueId": "e41af830-1e4b-4d6b-a7e0-5595f152ea88",
-      "type": "agent",
-      "targetRuntime": "pythonAgent",
-      "input": {
-        "type": "object",
-        "properties": {
-          "start__output__repoUrl": {
-            "type": "string"
-          },
-          "start__output__branch": {
-            "type": "string"
-          },
-          "start__output__testCommand": {
-            "type": "string"
-          },
-          "start__output__runId": {
-            "type": "string"
-          },
-          "runTest__output__ExitCode": {
-            "type": "integer"
-          },
-          "runTest__output__Stdout": {
-            "type": "string"
-          },
-          "runTest__output__OutputBlobPath": {
-            "type": "string"
-          },
-          "iteration": {
-            "type": "number",
-            "description": "Bound from $vars.iteration"
-          }
-        }
-      },
-      "output": {
-        "type": "object",
-        "required": [
-          "investigationComplete",
-          "nextFocus",
-          "rationale"
-        ],
-        "properties": {
-          "investigationComplete": {
-            "type": "boolean"
-          },
-          "nextFocus": {
-            "type": "string",
-            "description": "What the next pass should focus on. Empty when investigation complete."
-          },
-          "rationale": {
-            "type": "string",
-            "description": "Why was the investigation marked as complete/not complete?"
-          }
-        }
-      },
-      "displayName": "Investigator",
-      "hiddenAtDesignTime": true
     },
     {
       "filePath": "content/ee9f4167-4fc2-4b1b-a1a7-dfb48a9bfff4/agent.json",
@@ -136,29 +95,49 @@
             "type": "string",
             "description": "Bound from $vars.start.output.branch"
           },
-          "runTest__output__ExitCode": {
+          "repro__exitCode": {
             "type": "integer",
-            "description": "Bound from $vars.runTest.output.ExitCode"
+            "description": "Bound from (($vars.parseStatusRepro.output || {}).exitCode ?? -1)"
           },
-          "runTest__output__OutputBlobPath": {
+          "repro__blobPath": {
             "type": "string",
-            "description": "Bound from $vars.runTest.output.OutputBlobPath"
+            "description": "Bound from (($vars.repro.output || {}).OutputBlobPath || '')"
           },
-          "iteration": {
+          "fixAttempts": {
             "type": "number",
-            "description": "Bound from $vars.iteration"
+            "description": "Bound from $vars.fixAttempts"
           },
-          "start__output__maxIterations": {
-            "type": "number",
-            "description": "Bound from $vars.start.output.maxIterations"
-          },
-          "runTest__output__Stdout": {
+          "repro__ciHistory": {
             "type": "string",
-            "description": "Bound from $vars.runTest.output.Stdout"
+            "description": "Bound from (($vars.parseStatusRepro.output || {}).ciHistory || '')"
           },
-          "readNotes__output__Stdout": {
+          "repro__excerpt": {
             "type": "string",
-            "description": "Bound from $vars.readNotes.output.Stdout"
+            "description": "Bound from (($vars.parseStatusRepro.output || {}).excerpt || '')"
+          },
+          "investigate__notebook": {
+            "type": "string",
+            "description": "Bound from (($vars.parseStatusInvestigate.output || {}).notebook || '')"
+          },
+          "fix__fixSummary": {
+            "type": "string",
+            "description": "Bound from (($vars.parseStatusFix.output || {}).fixSummary || '')"
+          },
+          "fix__confidence": {
+            "type": "string",
+            "description": "Bound from (($vars.parseStatusFix.output || {}).confidence || '')"
+          },
+          "fix__fixVerified": {
+            "type": "boolean",
+            "description": "Bound from (($vars.parseStatusFix.output || {}).fixVerified === true)"
+          },
+          "fix__patch": {
+            "type": "string",
+            "description": "Bound from (($vars.parseStatusFix.output || {}).patch || '')"
+          },
+          "pr__prUrl": {
+            "type": "string",
+            "description": "Bound from (($vars.parseStatusPr.output || {}).prUrl || '')"
           }
         }
       },
@@ -182,67 +161,6 @@
         }
       },
       "displayName": "Investigation Summarizer",
-      "hiddenAtDesignTime": true
-    },
-    {
-      "filePath": "content/86439ed0-f87f-4651-b049-9b2b870842c3/agent.json",
-      "uniqueId": "86439ed0-f87f-4651-b049-9b2b870842c3",
-      "type": "agent",
-      "targetRuntime": "pythonAgent",
-      "input": {
-        "type": "object",
-        "properties": {
-          "start__output__testCommand": {
-            "type": "string"
-          },
-          "start__output__repoUrl": {
-            "type": "string"
-          },
-          "start__output__branch": {
-            "type": "string"
-          },
-          "testEvidence__output__exitCode": {
-            "type": "integer"
-          },
-          "testEvidence__output__stdout": {
-            "type": "string"
-          },
-          "readNotes__output__Stdout": {
-            "type": "string"
-          },
-          "verifyFix__output__Stdout": {
-            "type": "string"
-          },
-          "fixAttempts": {
-            "type": "number"
-          },
-          "deriveRunId__output": {
-            "description": "Bound from $vars.deriveRunId.output"
-          }
-        }
-      },
-      "output": {
-        "type": "object",
-        "required": [
-          "patchWritten",
-          "fixSummary"
-        ],
-        "properties": {
-          "patchWritten": {
-            "type": "boolean",
-            "description": "true only if fix.patch was written and is non-empty"
-          },
-          "fixSummary": {
-            "type": "string",
-            "description": "What was changed and why, or why no fix was written"
-          },
-          "confidence": {
-            "type": "string",
-            "description": "high | medium | low (optional; omit if unsure)"
-          }
-        }
-      },
-      "displayName": "Fixer",
       "hiddenAtDesignTime": true
     }
   ]

@@ -4,10 +4,9 @@
 #   ./release.sh 1.0.19 [job-input.json]
 #
 # Encodes the traps learned on 2026-09-03/04 (see FINDINGS-uip.md):
-#   * the agent tool's bare `vm-exec-vm` binding is dropped from VmAgent.flow by the
-#     pack/validate cycle -> re-add it before packing and ASSERT it is in the packaged
-#     content/bindings_v2.json, or the agent's tool call 404s at runtime
 #   * `uip solution pack` rewrites files in the source tree -> git checkout after packing
+#   * the packaged bindings_v2.json must still carry e2e-investigator.vm-exec-vm, or every
+#     phase job fails to start; assert it before publishing
 #   * `deploy uninstall` fails while any job in the folder is Running -> stop them first
 #   * `deploy upgrade` and `processes update-version` do not work for this solution
 set -euo pipefail
@@ -16,50 +15,19 @@ INPUT="${2:-/tmp/job-input.json}"
 PKG="vm-agent 8"; DEPLOY="vm-agent 11"; FOLDER="Shared/vm-agent 11"; OUT=/tmp/vm-agent-pkg
 cd "$(dirname "$0")"
 
-python3 - <<'PY'
-import json
-p='vm-agent/VmAgent/VmAgent.flow'; d=json.load(open(p))
-want=[
- {"id":"bVmExecToolName","name":"name","type":"string","resource":"process","resourceKey":"vm-exec-vm","default":"vm-exec-vm","propertyAttribute":"name","resourceSubType":"Process"},
- {"id":"bVmExecToolFolderPath","name":"folderPath","type":"string","resource":"process","resourceKey":"vm-exec-vm","default":"e2e-investigator","propertyAttribute":"folderPath","resourceSubType":"Process"}]
-added=0
-for b in want:
-    if not any(x['resourceKey']==b['resourceKey'] and x['name']==b['name'] for x in d['bindings']): d['bindings'].append(b); added+=1
-if added: open(p,'w').write(json.dumps(d,indent=2,ensure_ascii=False))
-print(f're-added {added} agent tool binding(s)')
-PY
-if ! git diff --quiet -- vm-agent/VmAgent/VmAgent.flow; then
-  git add vm-agent/VmAgent/VmAgent.flow && git commit -q -m "Re-add bare vm-exec-vm tool binding before release $VERSION"
-fi
-
 mkdir -p "$OUT"
 ZIP="$OUT/${PKG}_${VERSION}.zip"
-# `pack` is nondeterministic: it sometimes rebuilds bindings_v2.json from node manifests and
-# drops the agent tool's bare binding (see FINDINGS-uip.md). Retry until the package is good.
-for attempt in 1 2 3 4 5; do
-  rm -f "$ZIP"
-  uip solution pack vm-agent "$OUT" -n "$PKG" -v "$VERSION" --repository-commit "$(git rev-parse HEAD)" >/dev/null
-  git checkout -- vm-agent/   # pack rewrites source files; discard
-  if python3 -c "
-import sys,zipfile,io,json
-z=zipfile.ZipFile(sys.argv[1]); p=[x for x in z.namelist() if 'flow.VmAgent' in x and x.endswith('.nupkg')][0]
-keys=[r.get('key') for r in json.loads(zipfile.ZipFile(io.BytesIO(z.read(p))).read('content/bindings_v2.json'))['resources']]
-sys.exit(0 if 'vm-exec-vm' in keys else 1)" "$ZIP"; then
-    echo "pack attempt $attempt: bindings OK"; break
-  fi
-  echo "pack attempt $attempt: agent tool binding dropped, retrying"
-  [ "$attempt" = "5" ] && { echo "pack never produced the binding in 5 tries - aborting"; exit 1; }
-done
+rm -f "$ZIP"
+uip solution pack vm-agent "$OUT" -n "$PKG" -v "$VERSION" --repository-commit "$(git rev-parse HEAD)" >/dev/null
+git checkout -- vm-agent/   # pack rewrites source files; discard
 python3 - "$ZIP" <<'PY'
-import sys,zipfile,io,json
-z=zipfile.ZipFile(sys.argv[1]); p=[x for x in z.namelist() if 'flow.VmAgent' in x and x.endswith('.nupkg')][0]
-keys=[r.get('key') for r in json.loads(zipfile.ZipFile(io.BytesIO(z.read(p))).read('content/bindings_v2.json'))['resources']]
-print('packaged bindings_v2:',keys)
-assert 'vm-exec-vm' in keys, 'agent tool binding missing from package - not publishing'
-ag=json.loads(zipfile.ZipFile(io.BytesIO(z.read(p))).read('content/e41af830-1e4b-4d6b-a7e0-5595f152ea88/agent.json'))
-tools=[r.get('name') for r in (ag.get('resources') or [])]
-print('packaged investigator tools:',tools)
-assert 'vm_exec' in tools, 'investigator has no vm_exec tool in package (tool resource.json missing?) - not publishing'
+import sys, zipfile, io, json
+z = zipfile.ZipFile(sys.argv[1])
+p = [x for x in z.namelist() if 'flow.VmAgent' in x and x.endswith('.nupkg')][0]
+inner = zipfile.ZipFile(io.BytesIO(z.read(p)))
+keys = [r.get('key') for r in json.loads(inner.read('content/bindings_v2.json'))['resources']]
+print('packaged bindings_v2:', keys)
+assert 'e2e-investigator.vm-exec-vm' in keys, 'RPA node binding missing from package - not publishing'
 PY
 uip solution publish "$ZIP" --output json | grep '"PackageVersion"'
 

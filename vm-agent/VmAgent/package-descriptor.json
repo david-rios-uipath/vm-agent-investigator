@@ -6,7 +6,6 @@
     "bindings.json": "content/bindings_v2.json",
     "VmAgent.bpmn": "content/VmAgent.bpmn",
     "VmAgent.flow": "flow_files/VmAgent.flow",
-    "e41af830-1e4b-4d6b-a7e0-5595f152ea88/agent.json": "content/e41af830-1e4b-4d6b-a7e0-5595f152ea88/agent.json",
     "ee9f4167-4fc2-4b1b-a1a7-dfb48a9bfff4/agent.json": "content/ee9f4167-4fc2-4b1b-a1a7-dfb48a9bfff4/agent.json"
   }
 }

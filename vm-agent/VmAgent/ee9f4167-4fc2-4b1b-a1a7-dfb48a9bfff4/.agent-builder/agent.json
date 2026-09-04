@@ -23,29 +23,49 @@
         "type": "string",
         "description": "Bound from $vars.start.output.branch"
       },
-      "testEvidence__output__exitCode": {
+      "repro__exitCode": {
         "type": "integer",
-        "description": "Bound from $vars.runTest.output.ExitCode"
+        "description": "Bound from (($vars.parseStatusRepro.output || {}).exitCode ?? -1)"
       },
-      "testEvidence__output__blobPath": {
+      "repro__blobPath": {
         "type": "string",
-        "description": "Bound from $vars.runTest.output.OutputBlobPath"
+        "description": "Bound from (($vars.repro.output || {}).OutputBlobPath || '')"
       },
-      "iteration": {
+      "fixAttempts": {
         "type": "number",
-        "description": "Bound from $vars.iteration"
+        "description": "Bound from $vars.fixAttempts"
       },
-      "start__output__maxIterations": {
-        "type": "number",
-        "description": "Bound from $vars.start.output.maxIterations"
-      },
-      "testEvidence__output__stdout": {
+      "repro__ciHistory": {
         "type": "string",
-        "description": "Bound from $vars.runTest.output.Stdout"
+        "description": "Bound from (($vars.parseStatusRepro.output || {}).ciHistory || '')"
       },
-      "readNotes__output__Stdout": {
+      "repro__excerpt": {
         "type": "string",
-        "description": "Bound from $vars.readNotes.output.Stdout"
+        "description": "Bound from (($vars.parseStatusRepro.output || {}).excerpt || '')"
+      },
+      "investigate__notebook": {
+        "type": "string",
+        "description": "Bound from (($vars.parseStatusInvestigate.output || {}).notebook || '')"
+      },
+      "fix__fixSummary": {
+        "type": "string",
+        "description": "Bound from (($vars.parseStatusFix.output || {}).fixSummary || '')"
+      },
+      "fix__confidence": {
+        "type": "string",
+        "description": "Bound from (($vars.parseStatusFix.output || {}).confidence || '')"
+      },
+      "fix__fixVerified": {
+        "type": "boolean",
+        "description": "Bound from (($vars.parseStatusFix.output || {}).fixVerified === true)"
+      },
+      "fix__patch": {
+        "type": "string",
+        "description": "Bound from (($vars.parseStatusFix.output || {}).patch || '')"
+      },
+      "pr__prUrl": {
+        "type": "string",
+        "description": "Bound from (($vars.parseStatusPr.output || {}).prUrl || '')"
       }
     }
   },
@@ -54,7 +74,10 @@
     "required": [
       "reproduced",
       "hypothesis",
-      "evidence"
+      "evidence",
+      "patch",
+      "fixVerified",
+      "prUrl"
     ],
     "properties": {
       "reproduced": {
@@ -65,6 +88,18 @@
       },
       "evidence": {
         "type": "string"
+      },
+      "patch": {
+        "type": "string",
+        "description": "The diff verbatim from the ### patch section of the verification output, or empty"
+      },
+      "fixVerified": {
+        "type": "boolean",
+        "description": "true only if the verification output contains FIX_VERIFIED=true"
+      },
+      "prUrl": {
+        "type": "string",
+        "description": "The value after PR_URL= in the PR step output, or empty"
       }
     }
   },
@@ -78,100 +113,14 @@
   "messages": [
     {
       "role": "system",
-      "content": "You write the final report for an automated e2e test investigation. You have no tools.\nYou are given: the failing test command, the test run's exit code and output tail, the bucket path of the full log, and the investigator's notebook (its own record across passes).\n\nBase every claim on the notebook and the test output. Never invent a cause that the notebook does not support.\n\nSet classification to:\n  - regression: the notebook identifies a code change that breaks the test\n  - flake: timing/ordering dependent, passes on retry, no code cause\n  - infrastructure: the VM, licensing, environment or tooling caused it, not the product\n  - known-platform-issue: a known Studio Web / Orchestrator / solution failure\n  - inconclusive: the notebook does not establish a cause\n\nIf the notebook is missing or empty, set classification to inconclusive, explain that inunverified, and report what the raw test output alone shows.\n\nQuote decisive error lines in evidence, with file:line where the notebook has them, and list the bucket log paths. State plainly in unverified what remains unchecked. An honest gap is more useful than a confident guess.",
-      "contentTokens": [
-        {
-          "type": "simpleText",
-          "rawString": "You write the final report for an automated e2e test investigation. You have no tools.\nYou are given: the failing test command, the test run's exit code and output tail, the bucket path of the full log, and the investigator's notebook (its own record across passes).\n\nBase every claim on the notebook and the test output. Never invent a cause that the notebook does not support.\n\nSet classification to:\n  - regression: the notebook identifies a code change that breaks the test\n  - flake: timing/ordering dependent, passes on retry, no code cause\n  - infrastructure: the VM, licensing, environment or tooling caused it, not the product\n  - known-platform-issue: a known Studio Web / Orchestrator / solution failure\n  - inconclusive: the notebook does not establish a cause\n\nIf the notebook is missing or empty, set classification to inconclusive, explain that inunverified, and report what the raw test output alone shows.\n\nQuote decisive error lines in evidence, with file:line where the notebook has them, and list the bucket log paths. State plainly in unverified what remains unchecked. An honest gap is more useful than a confident guess."
-        }
-      ]
+      "content": "You write the final report for an automated e2e test investigation. You have no tools.\nYou are given: the failing test command, the repro phase's exit code, output excerpt and CI\nhistory, the investigator's notebook, and the fix, verification and PR results.\n\nBase every claim on the notebook and the repro output. Never invent a cause the notebook does\nnot support.\n\nSet classification to:\n  - regression: the notebook identifies a code change that breaks the test\n  - flake: timing/ordering dependent, passes on retry, no code cause\n  - infrastructure: the VM, licensing, environment or tooling caused it, not the product\n  - known-platform-issue: a known Studio Web / Orchestrator / solution failure\n  - inconclusive: the notebook does not establish a cause\n\nIf the notebook is missing or empty, set classification to inconclusive, say so in unverified,\nand report what the repro output alone shows.\n\nQuote decisive error lines in evidence, with file:line where the notebook has them. State\nplainly in unverified what remains unchecked. An honest gap is more useful than a confident\nguess."
     },
     {
       "role": "user",
-      "content": "Test command: {{input.start__output__testCommand}}\nRepository: {{input.start__output__repoUrl}} @ {{input.start__output__branch}}\nTest exit code: {{input.testEvidence__output__exitCode}}\nFull test log in bucket: {{input.testEvidence__output__blobPath}}\nInvestigation passes used: {{input.iteration}} of {{input.start__output__maxIterations}}\n\nTest run output tail: {{input.testEvidence__output__stdout}}\n\nInvestigator notebook: {{input.readNotes__output__Stdout}}\n\nWrite the final report. Base every claim on the notebook and the test output above, and fill every field of the output schema.",
-      "contentTokens": [
-        {
-          "type": "simpleText",
-          "rawString": "Test command: "
-        },
-        {
-          "type": "variable",
-          "rawString": "input.start__output__testCommand"
-        },
-        {
-          "type": "simpleText",
-          "rawString": "\nRepository: "
-        },
-        {
-          "type": "variable",
-          "rawString": "input.start__output__repoUrl"
-        },
-        {
-          "type": "simpleText",
-          "rawString": " @ "
-        },
-        {
-          "type": "variable",
-          "rawString": "input.start__output__branch"
-        },
-        {
-          "type": "simpleText",
-          "rawString": "\nTest exit code: "
-        },
-        {
-          "type": "variable",
-          "rawString": "input.testEvidence__output__exitCode"
-        },
-        {
-          "type": "simpleText",
-          "rawString": "\nFull test log in bucket: "
-        },
-        {
-          "type": "variable",
-          "rawString": "input.testEvidence__output__blobPath"
-        },
-        {
-          "type": "simpleText",
-          "rawString": "\nInvestigation passes used: "
-        },
-        {
-          "type": "variable",
-          "rawString": "input.iteration"
-        },
-        {
-          "type": "simpleText",
-          "rawString": " of "
-        },
-        {
-          "type": "variable",
-          "rawString": "input.start__output__maxIterations"
-        },
-        {
-          "type": "simpleText",
-          "rawString": "\n\nTest run output tail: "
-        },
-        {
-          "type": "variable",
-          "rawString": "input.testEvidence__output__stdout"
-        },
-        {
-          "type": "simpleText",
-          "rawString": "\n\nInvestigator notebook: "
-        },
-        {
-          "type": "variable",
-          "rawString": "input.readNotes__output__Stdout"
-        },
-        {
-          "type": "simpleText",
-          "rawString": "\n\nWrite the final report. Base every claim on the notebook and the test output above, and fill every field of the output schema."
-        }
-      ]
+      "content": "Test command: {{input.start__output__testCommand}}\nRepository: {{input.start__output__repoUrl}} @ {{input.start__output__branch}}\nRepro exit code: {{input.repro__exitCode}}\nFull repro log in bucket: {{input.repro__blobPath}}\nFix attempts used: {{input.fixAttempts}}\n\nCI history for this spec: {{input.repro__ciHistory}}\n\nRepro output excerpt: {{input.repro__excerpt}}\n\nInvestigator notebook: {{input.investigate__notebook}}\n\nFix attempt (may be empty if no fix was attempted): {{input.fix__fixSummary}} (confidence {{input.fix__confidence}})\nFix verified: {{input.fix__fixVerified}}\nPatch (may be empty): {{input.fix__patch}}\nPR URL (may be empty if no PR was opened): {{input.pr__prUrl}}\n\nWrite the final report. Base every claim on the notebook and the repro output above, and fill\nevery field of the output schema.\n\nSet patch to the patch above verbatim, or empty if there is none. Set fixVerified to the value\nabove. Set prUrl to the URL above, or the empty string."
     }
   ],
   "projectId": "ee9f4167-4fc2-4b1b-a1a7-dfb48a9bfff4",
   "id": "ee9f4167-4fc2-4b1b-a1a7-dfb48a9bfff4",
-  "name": "Investigation Summarizer",
-  "resources": [],
-  "features": []
+  "name": "Investigation Summarizer"
 }

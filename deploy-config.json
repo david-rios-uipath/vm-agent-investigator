@@ -33,7 +33,7 @@
         "solution_folder"
       ],
       "configuration": {
-        "description": "vm-exec bound in the VM-pool folder; referenced as an agent tool so calls run on the Windows robot VM",
+        "description": "vm-exec bound in the VM-pool folder; every phase job runs through it on the Windows robot VM",
         "packageName": "vm-exec",
         "inputArguments": null,
         "jobPriority": "Medium",

@@ -1,19 +1,87 @@
 # vm-agent — handoff
 
-Last updated 2026-09-04 ~17:40 UTC. Written for an agent or human with no prior context.
-Read this file, then `FINDINGS-uip.md` (CLI/platform traps — several will bite you).
+Last updated 2026-09-04 ~19:00 UTC. Written for an agent or human with no prior context.
+Read this file, then `FINDINGS-uip.md` (CLI/platform traps — several will bite you), then
+`DESIGN-phase-runner.md` (the restructure that is now implemented but unreleased).
 
 ## What this is
 
 `~/code/vm-agent-investigator` builds a UiPath Maestro Flow (`VmAgent`) that investigates a
-failing Playwright e2e test in `UiPath/flow-workbench`. Three inline agents — investigator,
-fixer, summarizer — drive a Windows robot VM through one RPA tool (`vm_exec`, a PowerShell
-runner). See `PLAN.md` for the original design and run economics.
+failing Playwright e2e test in `UiPath/flow-workbench`, on a Windows robot VM driven by one RPA
+process (`vm-exec`, a PowerShell runner).
+
+Up to and including 1.0.24 the reasoning lived in the cloud: three inline agents (investigator,
+fixer, summarizer) drove the VM through ~34 `vm_exec` tool calls, each its own Orchestrator job.
+That only worked because the robot pool has a single VM, so state left on disk survived between
+jobs. `DESIGN-phase-runner.md` explains why that had to change.
+
+**The tree now holds the phase-runner restructure (unreleased, unrun):** four coarse RPA jobs,
+the LLM reasoning moved onto the VM as `claude -p`, and every job self-contained — it refreshes
+the checkout, pulls its state from the bucket, and pushes it back. See "Phase runner" below.
+`PLAN.md` describes the superseded agent-driven shape and the run economics.
 
 **Goal:** a deployed (not Studio-Web-debug) run that goes start → investigate → fix → verify →
 summarize without human intervention.
 
-## Current state
+## Phase runner (in the tree, not yet released)
+
+Everything below `vm/` is new and runs ON the VM; the flow only orchestrates it.
+
+| file | what |
+|---|---|
+| `vm/run-phase.ps1` | one `switch ($Phase)` over `repro`, `investigate`, `fix`, `pr`; same prologue and epilogue for each |
+| `vm/lib/prologue.ps1` | `Ensure-Tools` (rg, gh, pnpm shim, Claude Code — idempotent), `Refresh-Repo`, `Invoke-Cmd`, `Write-Utf8Lf`, `Write-Status` |
+| `vm/lib/ci-history.ps1` | the old `ciHistoryInstructions` node, ported to a function |
+| `vm/prompts/{investigator,fixer}.md` | the two agent prompts, rewritten for real file tools |
+| `vm/selfcheck.ps1` | `pwsh -NoProfile -File vm/selfcheck.ps1` — 23 asserts over the pure logic (status line, patch encoding, PR title, repro routing). Passes. |
+| `probe-phase.sh` | run one phase through `vm-exec-vm` without packing: `RUNNER_REPO_URL=… ./probe-phase.sh repro <runId>` |
+
+Flow shape now: `start -> deriveRunId -> decisionResume -> bootstrap<Phase> -> <phase RPA node>
+-> parseStatus<Phase> -> decision… -> investigationSummarizer -> end`, 29 nodes. The four
+`bootstrap*` script nodes emit a ~15-line PowerShell that clones this repo to
+`C:\vm-agent\runner` at `runnerRef` and invokes `vm/run-phase.ps1` — so a runner change is a
+git push, not a solution release. Each phase prints one `STATUS_JSON=<json>` line as its last
+line of stdout and `parseStatus*` parses only that; its absence routes to `endSetupFailed`.
+
+New trigger inputs: `maxFixAttempts` (3), `runnerRepoUrl`, `runnerRef` (`main`). `maxIterations`
+and the `iteration` global are gone with the investigator loop.
+
+`vm-exec` (`vm-agent/vm-exec/Main.xaml`) gained: an `ANTHROPIC_API_KEY` Credential asset,
+injected as an env var and added to the redaction list; a `StateKey` in-argument; defaults
+raised to 45 minutes and 32000 output chars.
+
+Three deliberate deviations from `DESIGN-phase-runner.md`:
+
+- **State is one archive, `<runId>/state.zip`, not a `<runId>/state/` prefix.** Per-file sync
+  needs `ListStorageFiles`, whose XAML signature is unverified here; a single
+  `DownloadStorageFile` / `UploadStorageFile` pair uses only the activity shape this workflow
+  already proves. `run-phase.ps1` expands the archive into `C:\vm-agent\notes\<runId>` on entry
+  and rewrites it in a `finally`, so early exits still push state. To read a notebook by hand:
+  download `<runId>/state.zip` and unzip it.
+- **One in-argument `StateKey`, not `StatePullPrefix` + `StatePushDir`.** The local path is
+  derived from `RunId` in both the XAML and the script.
+- **Two extra decision nodes**, `decisionReproRan` and `decisionInvestigated`, so a runner that
+  never printed a status is reported as infrastructure instead of "not reproduced".
+
+The investigator's allowed-tools list includes `Write` (the notebook is its deliverable) on top
+of the design's read-only set.
+
+### What is NOT verified
+
+Nothing here has run. In particular:
+
+- **This repo has no git remote,** so `runnerRepoUrl` has no real value yet and the bootstrap
+  cannot clone. `inputs/*.json` carry a placeholder. Push the repo somewhere the VM's
+  `GIT_TOKEN` can read, then set that URL.
+- `claude -p` has never been run on a Windows robot account. `Ensure-Tools` installs it with
+  `npm install -g --prefix C:\vm-agent\node-global` and pins `CLAUDE_CONFIG_DIR` to
+  `C:\vm-agent\claude-home`, on the assumption `%USERPROFILE%` is not dependable there.
+- The `ANTHROPIC_API_KEY` Credential asset does not exist in `e2e-investigator` yet.
+- The XAML edits have not been packed or run; they are XML-well-formed and nothing more.
+- The migration order in the design (one phase at a time through `probe-phase.sh`) is still the
+  right way to bring this up — start with two consecutive `repro` probes on the same VM.
+
+## Current state (as released)
 
 - **Deployment:** `Shared/vm-agent 11` @ **1.0.24**, package identity `vm-agent 8`.
 - **1.0.24 ran the whole loop including the PR, in 17 minutes** - instance
@@ -43,21 +111,27 @@ summarize without human intervention.
 
 ## Do this next
 
-1. **Release 1.0.23 with the fixed test command** (already committed, `097b75e`): the
-   `testCommand` in `inputs/*.json` was missing `--config e2e/playwright.config.ts`, so
-   verify's Playwright run died with `Project(s) "studio-alpha" not found. Available projects: ""`.
+1. **Give the runner repo a remote and set `runnerRepoUrl`.** Until then no phase can start.
+   Check `GIT_TOKEN`'s read scope on it from the VM in the same breath.
 
+2. **Create the `ANTHROPIC_API_KEY` Credential asset** in `e2e-investigator`
+   (`uip or assets create ANTHROPIC_API_KEY <key> --type Credential --credential-store-key <k>`),
+   release `vm-exec`, and confirm in a job log that `claude --version` works and the key shows
+   as `***ANTHROPIC_API_KEY***`.
+
+3. **Probe the phases one at a time**, cheapest first:
    ```bash
-   cd ~/code/vm-agent-investigator
-   ./release.sh 1.0.23 inputs/debug-execution.json
+   export RUNNER_REPO_URL=https://github.com/<owner>/vm-agent-investigator
+   SMOKE_ONLY=1 ./probe-phase.sh repro probe-1     # twice: the second prologue must be < 60 s
+   ./probe-phase.sh investigate <runId>
+   ./probe-phase.sh fix <runId>
+   ./probe-phase.sh pr <runId>
    ```
-   Before spending a full run, consider `./probe-verify.sh <runId>` (see below) — it validates
-   the verify step in ~5 minutes.
-   `release.sh` does everything: re-add the fragile binding, pack (with retry), assert the
-   package is good, publish, stop running jobs, uninstall+redeploy the same folder, start the
-   job. **Never hand-run the pack step** — see FINDINGS.
+   Only then `./release.sh <version> inputs/debug-execution.json`. `release.sh` packs, asserts
+   the packaged `bindings_v2.json`, publishes, stops running jobs, uninstalls + redeploys
+   `Shared/vm-agent 11` and starts the job. **Never hand-run the pack step** — see FINDINGS.
 
-2. **Watch the verify step**, which is the current frontier:
+4. **The old verify step**, for reference while the port is unproven:
    ```bash
    # parent + agent children
    uip or jobs list --folder-path "Shared/vm-agent 11" --output json
@@ -88,21 +162,15 @@ summarize without human intervention.
      --folder-path "e2e-investigator" --destination reports/<date>-run-<key>-notes.md
    ```
 
-## Fast validation: `./probe-verify.sh`
+## Fast validation: `./probe-phase.sh`
 
-Do **not** wait 30-60 minutes for a full flow run to test a change to the fix/verify step:
-
-```bash
-./probe-verify.sh debug-execution-20260904-143456          # runId folder on the VM
-./probe-verify.sh <runId> "<alternate test command>"
-```
-
-It calls `e2e-investigator/vm-exec-vm` directly with the PowerShell that
-`verifyFixInstructions` generates - **rendered from `VmAgent.flow` with node, not a copy**, so
-the probe cannot drift from what the flow runs - against a `fix.patch` a previous fixer already
-wrote on the VM. Prints the patch's first bytes, the `git apply` result, the studio dev server
-port and the test tail. ~10 minutes now that it boots the studio bundle; no pack/publish/deploy,
-no agents, no LLM cost. Find a runId with:
+Do **not** wait 30-60 minutes for a full flow run to test a phase. `probe-phase.sh` calls
+`e2e-investigator/vm-exec-vm` directly with the bootstrap PowerShell that the flow's
+`bootstrap<Phase>` node generates — **rendered from `VmAgent.flow` with node, not a copy**, so
+the probe cannot drift from what the flow runs — and prints the phase's `STATUS_JSON`. State
+comes from and goes back to `<runId>/state.zip`, exactly as in a real run. No pack, no publish,
+no deploy. (It replaces `probe-verify.sh`, which rendered `verifyFixInstructions`; that node no
+longer exists.) Find a runId with:
 
 ```bash
 uip or bucket-files list be6369c7-02a4-4b80-957b-e95d06177692 --folder-path "e2e-investigator" --output json

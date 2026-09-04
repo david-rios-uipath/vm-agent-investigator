@@ -1,7 +1,7 @@
 <Activity mc:Ignorable="sap sap2010" x:Class="Main" mva:VisualBasic.Settings="{x:Null}"
  this:Main.RunId="[&quot;manual&quot;]"
- this:Main.TimeoutMinutes="[30]"
- this:Main.MaxOutputChars="[8000]"
+ this:Main.TimeoutMinutes="[45]"
+ this:Main.MaxOutputChars="[32000]"
  this:Main.WorkDir="[&quot;C:\vm-agent&quot;]"
  xmlns="http://schemas.microsoft.com/netfx/2009/xaml/activities"
  xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -20,6 +20,7 @@
     <x:Property Name="Script" Type="InArgument(x:String)" />
     <x:Property Name="WorkDir" Type="InArgument(x:String)" />
     <x:Property Name="RunId" Type="InArgument(x:String)" />
+    <x:Property Name="StateKey" Type="InArgument(x:String)" />
     <x:Property Name="TimeoutMinutes" Type="InArgument(x:Int32)" />
     <x:Property Name="MaxOutputChars" Type="InArgument(x:Int32)" />
     <x:Property Name="ExitCode" Type="OutArgument(x:Int32)" />
@@ -62,6 +63,9 @@
     <Sequence.Variables>
       <Variable x:TypeArguments="x:String" Name="logPath" />
       <Variable x:TypeArguments="x:String" Name="blobName" />
+      <Variable x:TypeArguments="x:String" Name="stateZip" />
+      <Variable x:TypeArguments="x:String" Name="anthropicUser" />
+      <Variable x:TypeArguments="ss:SecureString" Name="anthropicSecret" />
       <Variable x:TypeArguments="x:String" Name="ghUser" />
       <Variable x:TypeArguments="x:String" Name="slackUser" />
       <Variable x:TypeArguments="ss:SecureString" Name="ghSecret" />
@@ -76,9 +80,29 @@
       AssetName="[&quot;SLACK_TOKEN&quot;]" Username="[slackUser]" Password="[slackSecret]" />
     <ui:GetRobotCredential DisplayName="Get SLACK_COOKIE asset" sap2010:WorkflowViewState.IdRef="GetRobotCredential_3" TimeoutMS="{x:Null}" CacheStrategy="None"
       AssetName="[&quot;SLACK_COOKIE&quot;]" Username="[slackCookieUser]" Password="[slackCookieSecret]" />
+    <ui:GetRobotCredential DisplayName="Get ANTHROPIC_API_KEY asset" sap2010:WorkflowViewState.IdRef="GetRobotCredential_4" TimeoutMS="{x:Null}" CacheStrategy="None"
+      sap2010:Annotation.AnnotationText="Needed by `claude -p` on the VM. Credential asset ANTHROPIC_API_KEY in the process folder (password = the key)."
+      AssetName="[&quot;ANTHROPIC_API_KEY&quot;]" Username="[anthropicUser]" Password="[anthropicSecret]" />
+    <Assign DisplayName="State archive path" sap2010:WorkflowViewState.IdRef="Assign_2"
+      sap2010:Annotation.AnnotationText="Single archive per run, agreed by convention with vm/run-phase.ps1, which expands it into C:\vm-agent\notes\&lt;RunId&gt; on entry and rewrites it on exit.">
+      <Assign.To>
+        <OutArgument x:TypeArguments="x:String">[stateZip]</OutArgument>
+      </Assign.To>
+      <Assign.Value>
+        <InArgument x:TypeArguments="x:String">[If(String.IsNullOrWhiteSpace(WorkDir), "C:\vm-agent", WorkDir) &amp; "\" &amp; RunId.Replace("/", "_").Replace("\", "_") &amp; ".state.zip"]</InArgument>
+      </Assign.Value>
+    </Assign>
+    <If DisplayName="Pull state from bucket" sap2010:WorkflowViewState.IdRef="If_1" Condition="[Not String.IsNullOrWhiteSpace(StateKey)]"
+      sap2010:Annotation.AnnotationText="Missing on the first phase of a run; ContinueOnError lets that pass.">
+      <If.Then>
+        <ucas:DownloadStorageFile DisplayName="Download state archive" sap2010:WorkflowViewState.IdRef="DownloadStorageFile_1"
+          TimeoutMS="{x:Null}" ContinueOnError="True"
+          StorageBucketName="[&quot;e2e-investigations&quot;]" Path="[StateKey]" Destination="[stateZip]" />
+      </If.Then>
+    </If>
     <ui:InvokeCode DisplayName="Run script" sap2010:WorkflowViewState.IdRef="InvokeCode_1" Language="CSharp"
-      sap2010:Annotation.AnnotationText="Writes Script to a temp file and runs it (powershell.exe -File on Windows, /bin/sh elsewhere). Environment variables are inherited from the robot process, plus GH_TOKEN / SLACK_TOKEN / SLACK_COOKIE from the Credential assets of the same name in the process folder; GIT_TOKEN, GH_TOKEN, GH_NPM_REGISTRY_TOKEN, PLAYWRIGHT_PASSWORD, SLACK_TOKEN and SLACK_COOKIE values are redacted from the returned output. ExitCode 124 = timeout, -1 = runner exception. Stdout is the last MaxOutputChars chars (default 8000); the full log goes to the bucket."
-      Code="var sw = System.Diagnostics.Stopwatch.StartNew();&#xA;string root = string.IsNullOrWhiteSpace(WorkDir)&#xA;    ? System.IO.Path.Combine(System.IO.Path.GetTempPath(), &quot;vm-agent&quot;)&#xA;    : WorkDir;&#xA;System.IO.Directory.CreateDirectory(root);&#xA;bool win = System.OperatingSystem.IsWindows();&#xA;string scriptPath = System.IO.Path.Combine(root, &quot;vm-exec-&quot; + System.Guid.NewGuid().ToString(&quot;N&quot;) + (win ? &quot;.ps1&quot; : &quot;.sh&quot;));&#xA;string logPath = scriptPath + &quot;.log&quot;;&#xA;var sb = new System.Text.StringBuilder();&#xA;int exitCode = -1;&#xA;var injected = new System.Collections.Generic.Dictionary&lt;string, string&gt;();&#xA;&#xA;try&#xA;{&#xA;    System.IO.File.WriteAllText(scriptPath, Script);&#xA;    System.Diagnostics.ProcessStartInfo psi;&#xA;    if (win)&#xA;    {&#xA;        psi = new System.Diagnostics.ProcessStartInfo(&quot;powershell.exe&quot;);&#xA;        foreach (var a in new[] { &quot;-NoProfile&quot;, &quot;-NonInteractive&quot;, &quot;-ExecutionPolicy&quot;, &quot;Bypass&quot;, &quot;-File&quot;, scriptPath })&#xA;            psi.ArgumentList.Add(a);&#xA;    }&#xA;    else&#xA;    {&#xA;        psi = new System.Diagnostics.ProcessStartInfo(&quot;/bin/sh&quot;);&#xA;        psi.ArgumentList.Add(scriptPath);&#xA;    }&#xA;    // Credential assets win over inherited env vars; empty asset password = inject nothing.&#xA;    foreach (var kv in new[] { (&quot;GH_TOKEN&quot;, GhSecret), (&quot;SLACK_TOKEN&quot;, SlackSecret), (&quot;SLACK_COOKIE&quot;, SlackCookieSecret) })&#xA;    {&#xA;        string v = kv.Item2 == null ? null : new System.Net.NetworkCredential(&quot;&quot;, kv.Item2).Password;&#xA;        if (!string.IsNullOrWhiteSpace(v)) { psi.Environment[kv.Item1] = v; injected[kv.Item1] = v; }&#xA;    }&#xA;    psi.WorkingDirectory = root;&#xA;    psi.UseShellExecute = false; psi.CreateNoWindow = true;&#xA;    psi.RedirectStandardOutput = true; psi.RedirectStandardError = true;&#xA;    using (var p = new System.Diagnostics.Process { StartInfo = psi })&#xA;    {&#xA;        p.OutputDataReceived += (s, e) =&gt; { if (e.Data != null) lock (sb) sb.AppendLine(e.Data); };&#xA;        p.ErrorDataReceived += (s, e) =&gt; { if (e.Data != null) lock (sb) sb.AppendLine(e.Data); };&#xA;        p.Start(); p.BeginOutputReadLine(); p.BeginErrorReadLine();&#xA;        int limitMin = TimeoutMinutes &gt; 0 ? TimeoutMinutes : 30;&#xA;        if (!p.WaitForExit(limitMin * 60 * 1000))&#xA;        {&#xA;            try { p.Kill(true); } catch { }&#xA;            p.WaitForExit();&#xA;            lock (sb) sb.AppendLine(&quot;[runner] TIMEOUT after &quot; + limitMin + &quot; minutes - process tree killed&quot;);&#xA;            exitCode = 124;&#xA;        }&#xA;        else&#xA;        {&#xA;            p.WaitForExit();&#xA;            exitCode = p.ExitCode;&#xA;        }&#xA;    }&#xA;}&#xA;catch (System.Exception ex)&#xA;{&#xA;    sb.AppendLine(&quot;[runner] exception: &quot; + ex);&#xA;    exitCode = -1;&#xA;}&#xA;sw.Stop();&#xA;&#xA;string body = sb.ToString();&#xA;// Redact any secret the robot carries in its environment.&#xA;foreach (var name in new[] { &quot;GIT_TOKEN&quot;, &quot;GH_TOKEN&quot;, &quot;GH_NPM_REGISTRY_TOKEN&quot;, &quot;PLAYWRIGHT_PASSWORD&quot;, &quot;SLACK_TOKEN&quot;, &quot;SLACK_COOKIE&quot; })&#xA;{&#xA;    string v = injected.ContainsKey(name) ? injected[name] : System.Environment.GetEnvironmentVariable(name);&#xA;    if (!string.IsNullOrEmpty(v) &amp;&amp; v.Length &gt; 6) body = body.Replace(v, &quot;***&quot; + name + &quot;***&quot;);&#xA;}&#xA;string header = &quot;work dir: &quot; + root + &quot;\nscript:\n&quot; + Script&#xA;    + &quot;\n\nexit code: &quot; + exitCode + &quot;\nduration seconds: &quot; + (int)sw.Elapsed.TotalSeconds + &quot;\n\n&quot;;&#xA;string full = header + body;&#xA;System.IO.File.WriteAllText(logPath, full);&#xA;&#xA;// Agent tool arguments have a size limit; return the tail and keep the whole log in the bucket.&#xA;int cap = MaxOutputChars &gt; 0 ? MaxOutputChars : 8000;&#xA;string tail = full.Length &lt;= cap&#xA;    ? full&#xA;    : &quot;[runner] output truncated to last &quot; + cap + &quot; chars; full log in bucket\n&quot; + full.Substring(full.Length - cap);&#xA;&#xA;try { System.IO.File.Delete(scriptPath); } catch { }&#xA;&#xA;ExitCode = exitCode;&#xA;Stdout = tail;&#xA;LogPath = logPath;&#xA;BlobName = RunId + &quot;/&quot; + System.DateTime.UtcNow.ToString(&quot;yyyyMMdd-HHmmss&quot;) + &quot;-&quot; + System.Guid.NewGuid().ToString(&quot;N&quot;).Substring(0, 6) + &quot;-exec.log&quot;;&#xA;">
+      sap2010:Annotation.AnnotationText="Writes Script to a temp file and runs it (powershell.exe -File on Windows, /bin/sh elsewhere). Environment variables are inherited from the robot process, plus GH_TOKEN / SLACK_TOKEN / SLACK_COOKIE / ANTHROPIC_API_KEY from the Credential assets of the same name in the process folder; GIT_TOKEN, GH_TOKEN, GH_NPM_REGISTRY_TOKEN, PLAYWRIGHT_PASSWORD, SLACK_TOKEN, SLACK_COOKIE and ANTHROPIC_API_KEY values are redacted from the returned output. ExitCode 124 = timeout, -1 = runner exception. Stdout is the last MaxOutputChars chars (default 8000); the full log goes to the bucket."
+      Code="var sw = System.Diagnostics.Stopwatch.StartNew();&#xA;string root = string.IsNullOrWhiteSpace(WorkDir)&#xA;    ? System.IO.Path.Combine(System.IO.Path.GetTempPath(), &quot;vm-agent&quot;)&#xA;    : WorkDir;&#xA;System.IO.Directory.CreateDirectory(root);&#xA;bool win = System.OperatingSystem.IsWindows();&#xA;string scriptPath = System.IO.Path.Combine(root, &quot;vm-exec-&quot; + System.Guid.NewGuid().ToString(&quot;N&quot;) + (win ? &quot;.ps1&quot; : &quot;.sh&quot;));&#xA;string logPath = scriptPath + &quot;.log&quot;;&#xA;var sb = new System.Text.StringBuilder();&#xA;int exitCode = -1;&#xA;var injected = new System.Collections.Generic.Dictionary&lt;string, string&gt;();&#xA;&#xA;try&#xA;{&#xA;    System.IO.File.WriteAllText(scriptPath, Script);&#xA;    System.Diagnostics.ProcessStartInfo psi;&#xA;    if (win)&#xA;    {&#xA;        psi = new System.Diagnostics.ProcessStartInfo(&quot;powershell.exe&quot;);&#xA;        foreach (var a in new[] { &quot;-NoProfile&quot;, &quot;-NonInteractive&quot;, &quot;-ExecutionPolicy&quot;, &quot;Bypass&quot;, &quot;-File&quot;, scriptPath })&#xA;            psi.ArgumentList.Add(a);&#xA;    }&#xA;    else&#xA;    {&#xA;        psi = new System.Diagnostics.ProcessStartInfo(&quot;/bin/sh&quot;);&#xA;        psi.ArgumentList.Add(scriptPath);&#xA;    }&#xA;    // Credential assets win over inherited env vars; empty asset password = inject nothing.&#xA;    foreach (var kv in new[] { (&quot;GH_TOKEN&quot;, GhSecret), (&quot;SLACK_TOKEN&quot;, SlackSecret), (&quot;SLACK_COOKIE&quot;, SlackCookieSecret), (&quot;ANTHROPIC_API_KEY&quot;, AnthropicSecret) })&#xA;    {&#xA;        string v = kv.Item2 == null ? null : new System.Net.NetworkCredential(&quot;&quot;, kv.Item2).Password;&#xA;        if (!string.IsNullOrWhiteSpace(v)) { psi.Environment[kv.Item1] = v; injected[kv.Item1] = v; }&#xA;    }&#xA;    psi.WorkingDirectory = root;&#xA;    psi.UseShellExecute = false; psi.CreateNoWindow = true;&#xA;    psi.RedirectStandardOutput = true; psi.RedirectStandardError = true;&#xA;    using (var p = new System.Diagnostics.Process { StartInfo = psi })&#xA;    {&#xA;        p.OutputDataReceived += (s, e) =&gt; { if (e.Data != null) lock (sb) sb.AppendLine(e.Data); };&#xA;        p.ErrorDataReceived += (s, e) =&gt; { if (e.Data != null) lock (sb) sb.AppendLine(e.Data); };&#xA;        p.Start(); p.BeginOutputReadLine(); p.BeginErrorReadLine();&#xA;        int limitMin = TimeoutMinutes &gt; 0 ? TimeoutMinutes : 30;&#xA;        if (!p.WaitForExit(limitMin * 60 * 1000))&#xA;        {&#xA;            try { p.Kill(true); } catch { }&#xA;            p.WaitForExit();&#xA;            lock (sb) sb.AppendLine(&quot;[runner] TIMEOUT after &quot; + limitMin + &quot; minutes - process tree killed&quot;);&#xA;            exitCode = 124;&#xA;        }&#xA;        else&#xA;        {&#xA;            p.WaitForExit();&#xA;            exitCode = p.ExitCode;&#xA;        }&#xA;    }&#xA;}&#xA;catch (System.Exception ex)&#xA;{&#xA;    sb.AppendLine(&quot;[runner] exception: &quot; + ex);&#xA;    exitCode = -1;&#xA;}&#xA;sw.Stop();&#xA;&#xA;string body = sb.ToString();&#xA;// Redact any secret the robot carries in its environment.&#xA;foreach (var name in new[] { &quot;GIT_TOKEN&quot;, &quot;GH_TOKEN&quot;, &quot;GH_NPM_REGISTRY_TOKEN&quot;, &quot;PLAYWRIGHT_PASSWORD&quot;, &quot;SLACK_TOKEN&quot;, &quot;SLACK_COOKIE&quot;, &quot;ANTHROPIC_API_KEY&quot; })&#xA;{&#xA;    string v = injected.ContainsKey(name) ? injected[name] : System.Environment.GetEnvironmentVariable(name);&#xA;    if (!string.IsNullOrEmpty(v) &amp;&amp; v.Length &gt; 6) body = body.Replace(v, &quot;***&quot; + name + &quot;***&quot;);&#xA;}&#xA;string header = &quot;work dir: &quot; + root + &quot;\nscript:\n&quot; + Script&#xA;    + &quot;\n\nexit code: &quot; + exitCode + &quot;\nduration seconds: &quot; + (int)sw.Elapsed.TotalSeconds + &quot;\n\n&quot;;&#xA;string full = header + body;&#xA;System.IO.File.WriteAllText(logPath, full);&#xA;&#xA;// Agent tool arguments have a size limit; return the tail and keep the whole log in the bucket.&#xA;int cap = MaxOutputChars &gt; 0 ? MaxOutputChars : 8000;&#xA;string tail = full.Length &lt;= cap&#xA;    ? full&#xA;    : &quot;[runner] output truncated to last &quot; + cap + &quot; chars; full log in bucket\n&quot; + full.Substring(full.Length - cap);&#xA;&#xA;try { System.IO.File.Delete(scriptPath); } catch { }&#xA;&#xA;ExitCode = exitCode;&#xA;Stdout = tail;&#xA;LogPath = logPath;&#xA;BlobName = RunId + &quot;/&quot; + System.DateTime.UtcNow.ToString(&quot;yyyyMMdd-HHmmss&quot;) + &quot;-&quot; + System.Guid.NewGuid().ToString(&quot;N&quot;).Substring(0, 6) + &quot;-exec.log&quot;;&#xA;">
       <ui:InvokeCode.Arguments>
         <scg:Dictionary x:TypeArguments="x:String, Argument">
           <InArgument x:TypeArguments="x:String" x:Key="Script">[Script]</InArgument>
@@ -89,6 +113,7 @@
           <InArgument x:TypeArguments="ss:SecureString" x:Key="GhSecret">[ghSecret]</InArgument>
           <InArgument x:TypeArguments="ss:SecureString" x:Key="SlackSecret">[slackSecret]</InArgument>
           <InArgument x:TypeArguments="ss:SecureString" x:Key="SlackCookieSecret">[slackCookieSecret]</InArgument>
+          <InArgument x:TypeArguments="ss:SecureString" x:Key="AnthropicSecret">[anthropicSecret]</InArgument>
           <OutArgument x:TypeArguments="x:Int32" x:Key="ExitCode">[ExitCode]</OutArgument>
           <OutArgument x:TypeArguments="x:String" x:Key="Stdout">[Stdout]</OutArgument>
           <OutArgument x:TypeArguments="x:String" x:Key="LogPath">[logPath]</OutArgument>
@@ -96,6 +121,13 @@
         </scg:Dictionary>
       </ui:InvokeCode.Arguments>
     </ui:InvokeCode>
+    <If DisplayName="Push state to bucket" sap2010:WorkflowViewState.IdRef="If_2" Condition="[Not String.IsNullOrWhiteSpace(StateKey)]">
+      <If.Then>
+        <ucas:UploadStorageFile DisplayName="Upload state archive" sap2010:WorkflowViewState.IdRef="UploadStorageFile_2"
+          FileResource="{x:Null}" TimeoutMS="{x:Null}" ContinueOnError="True"
+          StorageBucketName="[&quot;e2e-investigations&quot;]" Path="[stateZip]" Destination="[StateKey]" />
+      </If.Then>
+    </If>
     <ui:LogMessage DisplayName="Log result" sap2010:WorkflowViewState.IdRef="LogMessage_1" Level="Info"
       Message="[&quot;Script finished with exit code &quot; &amp; ExitCode.ToString() &amp; &quot;; uploading &quot; &amp; blobName &amp; &quot; to bucket e2e-investigations&quot;]" />
     <ucas:UploadStorageFile DisplayName="Upload log to e2e-investigations" sap2010:WorkflowViewState.IdRef="UploadStorageFile_1"

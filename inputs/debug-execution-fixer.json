@@ -2,7 +2,9 @@
   "repoUrl": "https://github.com/UiPath/flow-workbench",
   "branch": "develop",
   "testCommand": "corepack pnpm exec playwright test --config e2e/playwright.config.ts e2e/specs/debug/debug-execution.spec.ts --project studio-alpha --grep \"should run a debug session and show execution results\"",
-  "maxIterations": 2,
   "smokeOnly": true,
-  "resumeRunId": "debug-execution-20260904-143456"
+  "resumeRunId": "debug-execution-20260904-143456",
+  "maxFixAttempts": 3,
+  "runnerRepoUrl": "https://github.com/UiPath/vm-agent-investigator",
+  "runnerRef": "main"
 }
