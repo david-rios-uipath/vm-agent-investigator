@@ -5484,6 +5484,26 @@
       "default": "0b28296b-1f4a-4ea9-a3d5-8b0abaac1cf0",
       "propertyAttribute": "folderKey",
       "resourceSubType": "Process"
+    },
+    {
+      "id": "bVmExecToolName",
+      "name": "name",
+      "type": "string",
+      "resource": "process",
+      "resourceKey": "vm-exec-vm",
+      "default": "vm-exec-vm",
+      "propertyAttribute": "name",
+      "resourceSubType": "Process"
+    },
+    {
+      "id": "bVmExecToolFolderPath",
+      "name": "folderPath",
+      "type": "string",
+      "resource": "process",
+      "resourceKey": "vm-exec-vm",
+      "default": "e2e-investigator",
+      "propertyAttribute": "folderPath",
+      "resourceSubType": "Process"
     }
   ],
   "layout": {
