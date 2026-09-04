@@ -80,6 +80,16 @@ Each item was observed directly, not inferred. `uip` was `1.201.0-preview.131`.
   `Running` for 20 h in that folder (`jobs list` shows them; `jobs stop k1 k2` accepts several
   keys). Always list jobs in a folder before concluding an uninstall is wedged.
 
+- **Agent tool `resource.json` files can vanish from the tree too.** Commit `89c8587` deleted
+  both `VmAgent/<agent>/resources/<toolId>/resource.json` after an edit→`validate`→commit
+  sequence; 1.0.17–1.0.19 then shipped agents with `resources: []` (placeholder output in 27 s,
+  then `AGENT_RUNTIME.ROUTING_ERROR 'vm_exec' is not a registered tool`). Neither `validate` nor
+  `resources refresh` reproduced the deletion in isolation. `release.sh` asserts the packaged
+  investigator `agent.json` lists `vm_exec`.
+- **`pack` output is not deterministic.** One `release.sh` run had the binding assert fire on a
+  correct tree; two probe packs of the same tree seconds later were correct. Always gate publish
+  on inspecting the produced zip, never on the source.
+
 ## Solution resources
 
 - `uip solution resources add --source remote --kind Process --name X --folder-path F` writes a

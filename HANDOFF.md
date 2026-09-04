@@ -83,6 +83,28 @@ turned out not to matter for resolution. Still worth a CLI bug report: `uip solu
 does not reproduce Studio Web's `bindings_v2.json` for inline-agent tool bindings; repro is
 the published `1.0.0` zip vs a local pack of `/tmp/cloud8/…` (or of this repo at `dec75c0`).
 
+## UPDATE 01:55 UTC — 1.0.17–1.0.19 shipped agents with NO tools; 1.0.20 in flight
+
+Runs 1.0.18 (`378e5f5f`) and 1.0.19 (`23264d3b`) failed a new way: the investigator returned
+placeholder output in 27 s with zero tool calls, then its retry faulted
+`AGENT_RUNTIME.ROUTING_ERROR — The agent attempted to route to 'vm_exec', which is not a
+registered tool`. The packaged investigator `agent.json` had `resources: []`. Cause: commit
+`89c8587` **deleted both tool `resource.json` files** (`VmAgent/<agent>/resources/<id>/resource.json`,
+81 lines each). Something in that edit→validate→commit sequence removed them; tested afterwards,
+neither `uip maestro flow validate` nor `uip solution resources refresh` deletes them in
+isolation, so the culprit is still unidentified. Restored from `e1ceece` in `12de81a`.
+
+`release.sh` now asserts **both** that the packaged `bindings_v2.json` contains `vm-exec-vm` and
+that the packaged investigator `agent.json` lists the `vm_exec` tool. The first 1.0.20 attempt
+was refused by the binding assert even though the source was correct; two probe packs of the
+same tree (HEAD and `e1ceece`) immediately after were both correct, so `pack` output is not
+fully deterministic — the assert is load-bearing, never bypass it.
+
+1.0.20 published and deployed to `Shared/vm-agent 11`; full run
+`3bc47073-c356-4ba3-9649-f82cb6aa8ea8` started 01:53:22 UTC. Same expected path as before;
+this is the first build since 1.0.16 that has the tool binding, the tool, the null-safe
+summarizer and the optional fixer `confidence` all together.
+
 ## UPDATE 01:50 UTC — full run d99c4204 result, fixer fix, use `release.sh` from now on
 
 Full run `d99c4204` (1.0.16) worked end to end for the investigator: **3 passes, 34 `vm_exec`
