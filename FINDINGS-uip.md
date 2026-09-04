@@ -62,7 +62,13 @@ Each item was observed directly, not inferred. `uip` was `1.201.0-preview.131`.
   `Serverless.Runtime.JobExecutionTimeout`. RPA nodes are unaffected.
 - Fix that survives packing: add `name` + `folderPath` bindings with `resourceKey` = the bare
   process name (`vm-exec-vm`) to the flow's `bindings` array. Verify with a throwaway pack and
-  read `content/bindings_v2.json` out of the nupkg before deploying.
+  read `content/bindings_v2.json` out of the nupkg before deploying. **Confirmed 2026-09-04 00:34
+  UTC** — agent tool calls reached the VM (1.0.14).
+- **`pack` also rewrites `VmAgent.flow` in the source tree and strips those bare bindings again**,
+  plus it touches the agents' `agent.json` and the flow declaration. The 1.0.14 pack removed the
+  bindings, the next commit captured that silently, and 1.0.15 shipped broken. After every pack:
+  `git status` → `git checkout -- vm-agent/` → assert `vm-exec-vm` is in the packaged
+  `bindings_v2.json` (the 1.0.16 pack command in `HANDOFF.md` does this).
 - `uip solution packages download "<name>" <version> -d <dir>` fetches a published solution zip
   (version is positional, not `--version`). Published zips use a single `resources.json` +
   `configurations/default/configuration.json`; locally packed zips use per-resource files under

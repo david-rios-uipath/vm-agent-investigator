@@ -83,11 +83,45 @@ turned out not to matter for resolution. Still worth a CLI bug report: `uip solu
 does not reproduce Studio Web's `bindings_v2.json` for inline-agent tool bindings; repro is
 the published `1.0.0` zip vs a local pack of `/tmp/cloud8/…` (or of this repo at `dec75c0`).
 
-Next for a fresh agent: let job `67953871` finish (smoke run, `maxIterations: 2`), read the
-investigator output, then start a **full** run with `/tmp/job-input.json` against
-`debug-execution.spec.ts` — that is the original goal. Remove the single-folder leftovers in
-`Shared/vm-agent 11` (machine template `685f30b9`, placeholder assets) and uninstall
-`vm-agent-priv` from the personal workspace when convenient.
+## UPDATE 01:15 UTC — smoke result, two more fixes, full run in flight (1.0.16)
+
+Smoke run `67953871` (1.0.14): investigator made 16 successful `vm_exec` calls and reached a
+verdict — infra flakiness (identity-service 429s on the shared studio-alpha account), not a code
+regression; notebook saved at `reports/2026-09-04-run-67953871-notes.md`. The flow then faulted
+in `investigationSummarizer`: `400300 … =js:vars.verifyFix.output.Stdout — Cannot read property
+'Stdout' of null` (verifyFix never ran because no fix was written).
+
+Shipped in **1.0.16** (commits `baa6a52`, `6aa25de`, `e1ceece`):
+- null-safe `$vars.verifyFix/openPr.output.Stdout` in summarizer, fixer, decisionVerify, decisionPr
+- `ciHistory` now scans every sampled night's job log for environment signals (identity 429,
+  cleanup 400, editor-load failure, network) and keeps an 800-char failure excerpt per failing
+  night; `classifyFailure` passes the `runs` table through; `testEvidence.ciHistory` folds the
+  other nights in so the agent gets the cross-check without extra tool calls
+- the bare `vm-exec-vm` binding re-added — see the trap below
+
+**Trap that bit twice:** `uip solution pack` rewrites `VmAgent.flow` in the source tree and
+strips the bare `vm-exec-vm` bindings (also touches `agent.json` files and the flow
+declaration). 1.0.15 shipped broken because a later commit captured the stripped flow. The pack
+step must be: pack → `git status` → `git checkout -- vm-agent/` → assert `vm-exec-vm` in the
+nupkg's `content/bindings_v2.json` → publish.
+
+**Full run in flight:** job `d99c4204-4f63-4847-ac27-15f9a958f130`, `Shared/vm-agent 11` @1.0.16,
+started 01:12:11 UTC with `/tmp/job-input.json` (no smoke flag). Expect setup ~1.5 min,
+ci-history ~1 min (longer now: it downloads every failing night's log), then — since history
+should classify `flaky` — no `runTest`, investigator, fixer, summarizer. Read `OutputArguments`
+on the parent when it finishes; if it faults, `uip maestro flow instance incidents <jobKey> -f
+<folderKey>` (folder key changes on every redeploy: `uip or folders list --all --name "vm-agent 11"`).
+
+Open items:
+- `smokeOnly: true` did **not** take effect in the 1.0.14 smoke run (setup ran the real clone,
+  82 s; ci-history real, 30 s). `$vars.start.output.smokeOnly` is probably not populated from
+  the job input; unverified.
+- `rg` is not on PATH in the agent's `vm_exec` sessions (setup only prepends `C:\vm-agent\bin`
+  for its own session; the agent fell back to `Select-String`). Fix in the tool description or
+  have setup install rg somewhere already on the robot's PATH.
+- Cleanup: single-folder leftovers in `Shared/vm-agent 11` (machine template `685f30b9`,
+  placeholder assets — recreated folder may have dropped them already), `vm-agent-priv` in the
+  personal workspace.
 
 The section below is the plan as written before this result; the deploy loop and cleanup notes
 still apply. Cleanup progress: `Shared/vm-agent 8` finally uninstalled — it had two `Running`
