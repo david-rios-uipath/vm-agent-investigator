@@ -23,9 +23,14 @@ summarize without human intervention.
 - The fixer's patch retargets the two broken locators at `debug-execution.spec.ts:84,87` to
   match the new aria-label directly:
   `getByRole('button', { name: /^Copy path for \$vars\.\w+\.output\.name$/ })`.
-- **openPr did not publish anything.** It branched and committed on the VM, then
-  `gh pr create` returned no URL (`PR_URL=`, `[pr] git commit failed`). No
-  `e2e-investigator/*` branch exists on the remote and no PR was opened. Unfixed.
+- **openPr did not publish anything on 1.0.23**, and `GH_TOKEN` was not the reason (the
+  script exits early with `[pr] GH_TOKEN not set` and that never printed). The commit
+  succeeded - its hash `7495ff13d` is in the output - but the exit-code check read
+  `$LASTEXITCODE` after `| Select-Object -First 1`, which closes the pipeline early and
+  makes the code unreliable. The identical trap as `b36ec3f`. So a good commit reported
+  failure, `Reset-Tree` deleted the branch, and push / `gh pr create` never ran.
+  Fixed in 1.0.24; the PR title now comes from the fixer's `fixSummary` instead of a
+  hardcoded `test(e2e): fix <spec>` that was wrong about what the patch did.
 - **Fast iteration works now:** `smokeOnly` stubs setup + ci-history, and the new
   `resumeRunId` trigger input reuses an existing notebook on the VM and skips the
   investigator entirely (`decisionResume` routes `testEvidence -> readNotes`).
@@ -182,6 +187,7 @@ searched GitHub and found none.
 | verify ran `studio-alpha` (deployed bundle), so product fixes were unverifiable | (1.0.24) |
 | `set VAR=v &&` in cmd.exe put a trailing space in `E2E_STUDIO_PORT` / `E2E_SKIP_WEBSERVER` | (1.0.24) |
 | rsbuild's index.html fallback made `/remoteEntry.js` look ready mid-build | (1.0.24) |
+| openPr read `$LASTEXITCODE` after `\| Select-Object -First 1`, so a good commit "failed" | (1.0.24) |
 
 Also added: `ciHistory` scans every sampled night's job log for environment signatures and keeps
 per-night excerpts, so the agent gets the cross-night pattern as evidence instead of spending
@@ -204,8 +210,11 @@ replacement.
 - ~~`smokeOnly` may not be wired~~ — fixed in `4e24810`; it was missing from
   `variables.globals`. Confirmed working (setup + ci-history stubbed, `classifyFailure` reached
   in ~4 min).
-- **`openPr` never publishes.** It commits on the VM and then `gh pr create` returns no URL.
-  Next thing to fix if the flow should actually raise PRs; harmless until then.
+- `openPr` push + `gh pr create` are **still unproven end to end** - the exit-code bug meant
+  they have never once executed. The first 1.0.24 run that verifies a fix will be the first
+  real attempt to push to `UiPath/flow-workbench` and open a draft PR. Whether the folder's
+  `GH_TOKEN` asset has write scope on that repo is untested (it demonstrably works for reads -
+  ci-history uses it).
 - **Editing `VmAgent.flow` regenerates the nested `agent.json` and the tool `resource.json`**,
   and silently reverts hand-made fixes in them (the rg-not-on-PATH hint and the fixer tool's
   `RunId` binding both came back). That is the "kept reverting" in `ea140a8`. Check
