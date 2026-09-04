@@ -42,6 +42,10 @@ z=zipfile.ZipFile(sys.argv[1]); p=[x for x in z.namelist() if 'flow.VmAgent' in 
 keys=[r.get('key') for r in json.loads(zipfile.ZipFile(io.BytesIO(z.read(p))).read('content/bindings_v2.json'))['resources']]
 print('packaged bindings_v2:',keys)
 assert 'vm-exec-vm' in keys, 'agent tool binding missing from package - not publishing'
+ag=json.loads(zipfile.ZipFile(io.BytesIO(z.read(p))).read('content/e41af830-1e4b-4d6b-a7e0-5595f152ea88/agent.json'))
+tools=[r.get('name') for r in (ag.get('resources') or [])]
+print('packaged investigator tools:',tools)
+assert 'vm_exec' in tools, 'investigator has no vm_exec tool in package (tool resource.json missing?) - not publishing'
 PY
 uip solution publish "$ZIP" --output json | grep '"PackageVersion"'
 
