@@ -30,6 +30,11 @@
             "type": "boolean",
             "title": "smokeOnly",
             "default": false
+          },
+          "resumeRunId": {
+            "type": "string",
+            "title": "resumeRunId",
+            "default": ""
           }
         }
       },
