@@ -34,6 +34,7 @@ Everything below `vm/` is new and runs ON the VM; the flow only orchestrates it.
 | `vm/lib/ci-history.ps1` | the old `ciHistoryInstructions` node, ported to a function |
 | `vm/prompts/{investigator,fixer}.md` | the two agent prompts, rewritten for real file tools |
 | `vm/selfcheck.ps1` | `pwsh -NoProfile -File vm/selfcheck.ps1` — 23 asserts over the pure logic (status line, patch encoding, PR title, repro routing). Passes. |
+| `release-vm-exec.sh` | publish `vm-exec` and repoint `e2e-investigator/vm-exec-vm`: `./release-vm-exec.sh 1.0.4` |
 | `probe-phase.sh` | run one phase through `vm-exec-vm` without packing: `RUNNER_REPO_URL=… ./probe-phase.sh repro <runId>` |
 
 Flow shape now: `start -> deriveRunId -> decisionResume -> bootstrap<Phase> -> <phase RPA node>
@@ -83,6 +84,12 @@ Nothing here has run. In particular:
   assets). Both activities hand back a `SecureString`, so the env-var injection is identical.
   Never actually read at runtime yet.
 - The XAML edits have not been packed or run; they are XML-well-formed and nothing more.
+  **`vm-exec` does not ship through `release.sh`.** `release.sh` packs the solution (the flow
+  plus an in-solution `vm-exec` that nothing calls); the process the phase nodes invoke is
+  `vm-exec-vm` in the standard folder `e2e-investigator`, bound to the tenant-feed package
+  `vm-exec` — published with `uip rpa pack` + `uip rpa publish`, then `uip or processes
+  update-version`. `./release-vm-exec.sh <version>` does all three. The VM runs 1.0.3
+  (2026-09-03 17:53), which predates every change in this restructure.
 - The migration order in the design (one phase at a time through `probe-phase.sh`) is still the
   right way to bring this up — start with two consecutive `repro` probes on the same VM.
 
