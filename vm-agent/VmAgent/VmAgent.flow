@@ -184,72 +184,72 @@
           {
             "id": "start__output__testCommand",
             "type": "string",
-            "binding": "=$vars.start.output.testCommand"
+            "binding": "=$vars.start?.output?.testCommand ?? ''"
           },
           {
             "id": "start__output__repoUrl",
             "type": "string",
-            "binding": "=$vars.start.output.repoUrl"
+            "binding": "=$vars.start?.output?.repoUrl ?? ''"
           },
           {
             "id": "start__output__branch",
             "type": "string",
-            "binding": "=$vars.start.output.branch"
-          },
-          {
-            "id": "repro__exitCode",
-            "type": "number",
-            "binding": "=$vars.parseStatusRepro?.output?.exitCode ?? -1"
-          },
-          {
-            "id": "repro__excerpt",
-            "type": "string",
-            "binding": "=$vars.parseStatusRepro?.output?.excerpt ?? ''"
-          },
-          {
-            "id": "repro__ciHistory",
-            "type": "string",
-            "binding": "=$vars.parseStatusRepro?.output?.ciHistory ?? ''"
-          },
-          {
-            "id": "repro__blobPath",
-            "type": "string",
-            "binding": "=$vars.repro?.output?.OutputBlobPath ?? ''"
-          },
-          {
-            "id": "investigate__notebook",
-            "type": "string",
-            "binding": "=$vars.parseStatusInvestigate?.output?.notebook ?? ''"
-          },
-          {
-            "id": "fix__fixSummary",
-            "type": "string",
-            "binding": "=$vars.parseStatusFix?.output?.fixSummary ?? ''"
-          },
-          {
-            "id": "fix__confidence",
-            "type": "string",
-            "binding": "=$vars.parseStatusFix?.output?.confidence ?? ''"
-          },
-          {
-            "id": "fix__fixVerified",
-            "type": "boolean",
-            "binding": "=$vars.parseStatusFix?.output?.fixVerified ?? false"
-          },
-          {
-            "id": "fix__patch",
-            "type": "string",
-            "binding": "=$vars.parseStatusFix?.output?.patch ?? ''"
-          },
-          {
-            "id": "pr__prUrl",
-            "type": "string",
-            "binding": "=$vars.parseStatusPr?.output?.prUrl ?? ''"
+            "binding": "=$vars.start?.output?.branch ?? ''"
           },
           {
             "id": "fixAttempts",
             "type": "number",
-            "binding": "=$vars.fixAttempts"
+            "binding": "=$vars.fixAttempts ?? -1"
+          },
+          {
+            "id": "parseStatusRepro__output__exitCode",
+            "type": "number",
+            "binding": "=$vars.parseStatusRepro?.output?.exitCode ?? -1"
+          },
+          {
+            "id": "parseStatusRepro__output__excerpt",
+            "type": "string",
+            "binding": "=$vars.parseStatusRepro?.output?.excerpt ?? ''"
+          },
+          {
+            "id": "parseStatusRepro__output__ciHistory",
+            "type": "string",
+            "binding": "=$vars.parseStatusRepro?.output?.ciHistory ?? ''"
+          },
+          {
+            "id": "repro__output__OutputBlobPath",
+            "type": "string",
+            "binding": "=$vars.repro?.output?.OutputBlobPath ?? ''"
+          },
+          {
+            "id": "parseStatusInvestigate__output__notebook",
+            "type": "string",
+            "binding": "=$vars.parseStatusInvestigate?.output?.notebook ?? ''"
+          },
+          {
+            "id": "parseStatusFix__output__fixSummary",
+            "type": "string",
+            "binding": "=$vars.parseStatusFix?.output?.fixSummary ?? ''"
+          },
+          {
+            "id": "parseStatusFix__output__confidence",
+            "type": "string",
+            "binding": "=$vars.parseStatusFix?.output?.confidence ?? ''"
+          },
+          {
+            "id": "parseStatusFix__output__fixVerified",
+            "type": "boolean",
+            "binding": "=$vars.parseStatusFix?.output?.fixVerified ?? false"
+          },
+          {
+            "id": "parseStatusFix__output__patch",
+            "type": "string",
+            "binding": "=$vars.parseStatusFix?.output?.patch ?? ''"
+          },
+          {
+            "id": "parseStatusPr__output__prUrl",
+            "type": "string",
+            "binding": "=$vars.parseStatusPr?.output?.prUrl ?? ''"
           }
         ],
         "agentOutputVariables": [
