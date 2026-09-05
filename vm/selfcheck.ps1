@@ -39,18 +39,42 @@ $parsed = ConvertFrom-Json $last.Substring('STATUS_JSON='.Length)
 Assert ($parsed.reproduced -eq $true -and $parsed.exitCode -eq 1) 'status round-trips through JSON'
 Assert ($parsed.excerpt -eq "two`nlines") 'embedded newlines survive as JSON escapes'
 
-# Get-LastJson lives in run-phase.ps1; copy of the same expression under test.
+# Get-LastJson, lifted verbatim out of run-phase.ps1.
 function Get-LastJson([string]$Text) {
   if (-not $Text) { return $null }
-  $found = [regex]::Matches($Text, '\{[^{}]*\}')
-  for ($i = $found.Count - 1; $i -ge 0; $i--) {
-    try { return ConvertFrom-Json $found[$i].Value } catch { }
+  $spans = @()
+  $depth = 0; $start = -1; $inStr = $false; $esc = $false
+  for ($i = 0; $i -lt $Text.Length; $i++) {
+    $c = $Text[$i]
+    if ($inStr) {
+      if ($esc) { $esc = $false }
+      elseif ($c -eq '\') { $esc = $true }
+      elseif ($c -eq '"') { $inStr = $false }
+      continue
+    }
+    if ($c -eq '"') { $inStr = $true }
+    elseif ($c -eq '{') { if ($depth -eq 0) { $start = $i }; $depth++ }
+    elseif ($c -eq '}') {
+      $depth--
+      if ($depth -eq 0 -and $start -ge 0) { $spans += , $Text.Substring($start, $i - $start + 1); $start = -1 }
+      if ($depth -lt 0) { $depth = 0 }
+    }
+  }
+  for ($i = $spans.Count - 1; $i -ge 0; $i--) {
+    try { return ConvertFrom-Json $spans[$i] } catch { }
   }
   return $null
 }
 $j = Get-LastJson 'chatter {"a":1} more {"patchWritten": true, "confidence": "high"}'
 Assert ($j.patchWritten -eq $true -and $j.confidence -eq 'high') 'the last JSON object wins'
 Assert ($null -eq (Get-LastJson 'no json here')) 'no JSON returns null'
+# The real fix-phase message: the summary quotes code containing braces, which defeated the
+# flat-regex version and cost a run its fixSummary (and so the PR title).
+$real = 'chatter{"patchWritten": true, "fixSummary": "changed getByRole(''button'', { name: ''x'' }) to getByText(''x'', { exact: true })", "confidence": "high"}'
+$j2 = Get-LastJson $real
+Assert ($j2.confidence -eq 'high') 'braces inside a string value do not break the parse'
+Assert ($j2.fixSummary -like '*exact: true*') 'the whole summary survives, braces and all'
+Assert ((Get-LastJson '{"a":{"b":2}}').a.b -eq 2) 'a nested object parses as one span'
 Assert ($null -eq (Get-LastJson '')) 'empty text returns null'
 
 # Repro routing: only an unsettled CI verdict costs a local test run.

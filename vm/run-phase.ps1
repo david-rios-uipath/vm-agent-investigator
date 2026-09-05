@@ -108,13 +108,34 @@ function Invoke-Claude([string]$PromptFile, [string]$AllowedTools, [int]$MaxTurn
   return $text
 }
 
-# The prompts ask for one flat JSON object as the last message. Anything else is a soft failure:
-# every field that matters is also derived from the filesystem by the caller.
+# Finds the last balanced {...} in the text and parses it. A flat regex is not enough: the
+# fixSummary quotes code like `getByRole('button', { name: 'x' })`, so the object's own braces
+# are not the outermost ones a naive match finds. Tracks string state so braces inside a JSON
+# string value do not affect the depth count.
+# Anything unparsable is a soft failure: every field that matters is also derived from the
+# filesystem by the caller.
 function Get-LastJson([string]$Text) {
   if (-not $Text) { return $null }
-  $found = [regex]::Matches($Text, '\{[^{}]*\}')
-  for ($i = $found.Count - 1; $i -ge 0; $i--) {
-    try { return ConvertFrom-Json $found[$i].Value } catch { }
+  $spans = @()
+  $depth = 0; $start = -1; $inStr = $false; $esc = $false
+  for ($i = 0; $i -lt $Text.Length; $i++) {
+    $c = $Text[$i]
+    if ($inStr) {
+      if ($esc) { $esc = $false }
+      elseif ($c -eq '\') { $esc = $true }
+      elseif ($c -eq '"') { $inStr = $false }
+      continue
+    }
+    if ($c -eq '"') { $inStr = $true }
+    elseif ($c -eq '{') { if ($depth -eq 0) { $start = $i }; $depth++ }
+    elseif ($c -eq '}') {
+      $depth--
+      if ($depth -eq 0 -and $start -ge 0) { $spans += , $Text.Substring($start, $i - $start + 1); $start = -1 }
+      if ($depth -lt 0) { $depth = 0 }
+    }
+  }
+  for ($i = $spans.Count - 1; $i -ge 0; $i--) {
+    try { return ConvertFrom-Json $spans[$i] } catch { }
   }
   return $null
 }
