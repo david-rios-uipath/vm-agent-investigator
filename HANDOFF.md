@@ -15,7 +15,8 @@ fixer, summarizer) drove the VM through ~34 `vm_exec` tool calls, each its own O
 That only worked because the robot pool has a single VM, so state left on disk survived between
 jobs. `DESIGN-phase-runner.md` explains why that had to change.
 
-**The tree now holds the phase-runner restructure (unreleased, unrun):** four coarse RPA jobs,
+**The phase runner is released and has run clean end to end** — see "First full run" below.
+The shape: four coarse RPA jobs,
 the LLM reasoning moved onto the VM as `claude -p`, and every job self-contained — it refreshes
 the checkout, pulls its state from the bucket, and pushes it back. See "Phase runner" below.
 `PLAN.md` describes the superseded agent-driven shape and the run economics.
@@ -112,6 +113,46 @@ Nothing here has run. In particular:
   publishes. (This trap was already in the session memory and I walked into it anyway.)
 - The migration order in the design (one phase at a time through `probe-phase.sh`) is still the
   right way to bring this up — start with two consecutive `repro` probes on the same VM.
+
+## First full run from the trigger (1.0.29, 2026-09-05)
+
+Instance `f5893ef7-3655-4077-9021-fe5e0a49109e`, 03:52-04:27 UTC, 35 minutes, `Successful`:
+`repro` (2 min, reproduced) -> `investigate` (6 min) -> `fixVerify` (17 min, attempt 1 not
+verified) -> `bumpFixAttempts` -> `fixVerify` (8 min, `FIX_VERIFIED=true`) -> `openPr`
+-> `investigationSummarizer` -> `end`. Classification `regression`, `reproduced=true`,
+`fixVerified=true`, PR opened on the one-file spec fix. The retry loop
+(`decisionVerify` false -> `bumpFixAttempts` -> `fixVerify`) is now exercised too.
+
+Draft PRs from a test run get closed and their branch deleted straight away - do not leave
+them on `UiPath/flow-workbench`. #3717, #3719 and #3720 were all closed this way.
+
+Four bugs stood between the first trigger run and that one. All four were invisible to
+`probe-phase.sh`, which drives `vm-exec-vm` directly and never evaluates a flow expression:
+
+- **The status line was mangled by a codepage.** The VM printed valid `STATUS_JSON=`, but
+  stdout returns through a legacy codepage, so an em-dash in the notebook arrived as bytes
+  ending in a literal `"`; `JSON.parse` died at column 440 and `parseStatusInvestigate`
+  reported `runnerFailed` after a perfect 7-minute investigation. `Write-Status` now escapes
+  every non-ASCII char to `\uXXXX`; two selfcheck asserts cover it.
+- **`deriveRunId` matched the first `.ts` in the test command**, which is
+  `playwright.config.ts`, so runs were named `playwright.config-<stamp>`. It prefers a
+  `.spec.ts` match now.
+- **The agent package, not the flow node, is what runs.** The summarizer's prompt mixed
+  `{{input.NAME}}` (substituted) with `{{ (($agent.X || {}).y) }}` expressions (not
+  substituted), so every field sourced from a phase status reached the model as literal
+  braces and it terminated with `AGENT_RUNTIME.TERMINATION_LLM_RAISED_ERROR`, "investigation
+  inputs are unresolved template placeholders" - twice, each time after a verified fix and an
+  opened PR. Every placeholder is a plain `{{input.a__b__c}}` now, mirroring the flow node's
+  `{{ $vars.a.b.c }}`, with the null guards in the bindings. **Editing `VmAgent.flow` by hand
+  does not regenerate `<agentId>/agent.json`; patch both, plus `.agent-builder/agent.json`.**
+- **The parse nodes advertised `output` as untyped `any`**, so the designer showed
+  `output 0 keys` and every `$vars.parseStatusX.output.field` was an unresolvable red pill
+  (the RPA nodes' own fields resolve because they carry a schema). Each `parseStatus*` node
+  now declares the union of its success payload and its `runnerFailed` fallback.
+
+`uip solution deploy run` also returned an HTTP 504 once, after `release.sh` had already
+uninstalled the previous deployment - the folder was left empty and the run never started.
+Re-running the same `deploy run` by hand fixed it; the script has no retry there.
 
 ## Current state (as released)
 
