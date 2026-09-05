@@ -81,15 +81,24 @@ Nothing here has run. In particular:
   `C:\vm-agent\claude-home`, on the assumption `%USERPROFILE%` is not dependable there.
 - `ANTHROPIC_API_KEY` exists in `e2e-investigator` as a **Secret** asset, so `vm-exec` reads it
   with `ui:GetSecret`, not `ui:GetRobotCredential` (the other three tokens are Credential
-  assets). Both activities hand back a `SecureString`, so the env-var injection is identical.
-  Never actually read at runtime yet.
-- The XAML edits have not been packed or run; they are XML-well-formed and nothing more.
+  assets). Both hand back a `SecureString`, so the env-var injection is identical. **Verified
+  on the VM 2026-09-05:** the key arrives (108 chars), `GH_TOKEN` and `GIT_TOKEN` are present,
+  `SLACK_TOKEN` is not.
+- **`vm-exec` 1.0.5 is published and live** (`vm-exec-vm` points at it). `StateKey` round-trips
+  through the bucket in both directions, proven by wiping the VM's local copies from a job with
+  no `StateKey` and then pulling them back from one with it.
   **`vm-exec` does not ship through `release.sh`.** `release.sh` packs the solution (the flow
   plus an in-solution `vm-exec` that nothing calls); the process the phase nodes invoke is
   `vm-exec-vm` in the standard folder `e2e-investigator`, bound to the tenant-feed package
   `vm-exec` — published with `uip rpa pack` + `uip rpa publish`, then `uip or processes
-  update-version`. `./release-vm-exec.sh <version>` does all three. The VM runs 1.0.3
-  (2026-09-03 17:53), which predates every change in this restructure.
+  update-version`. `./release-vm-exec.sh <version>` does all three.
+
+  **Pack it with the pinned toolchain, which that script now bootstraps.** Robot 25.10 on this
+  pool runs .NET 8; `uip` 1.201 packs `net10.0`, and the job faults in four seconds with
+  `NU1202: Package vm-exec 1.0.4 is not compatible with net8.0`. 1.0.4 shipped exactly that way
+  and had to be rolled forward to 1.0.5, packed with CLI `1.197.0-dev.7683` plus a local .NET 8
+  SDK at `~/.dotnet8`. The script now asserts the packaged `lib/` target is `net8.0` before it
+  publishes. (This trap was already in the session memory and I walked into it anyway.)
 - The migration order in the design (one phase at a time through `probe-phase.sh`) is still the
   right way to bring this up — start with two consecutive `repro` probes on the same VM.
 
