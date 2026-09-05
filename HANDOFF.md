@@ -154,6 +154,29 @@ Four bugs stood between the first trigger run and that one. All four were invisi
 uninstalled the previous deployment - the folder was left empty and the run never started.
 Re-running the same `deploy run` by hand fixed it; the script has no retry there.
 
+## Second full run, and the PR description (2026-09-05)
+
+Instance from job `fe223250-a461-4e30-9729-4ecb8dae5944`, 13:00-13:28 UTC, 28 minutes,
+`Successful`, on a spec it had never seen: `data-transform.spec.ts` "should add a Map operation
+with field mappings", the neighbor-rail regression from that night's triage. Evidence source was
+`ci` (no local Playwright artifacts), classification `regression`, fix verified on attempt 1,
+draft PR **flow-workbench#3729** on a two-file product patch under `packages/canvas/`. Left open
+as a draft deliberately, as the sample of the new description - close it when done reading.
+
+The description is now written for a reviewer, in `vm/lib/pr-body.ps1` (`New-PrBody`), checked by
+`vm/tests/pr-body.tests.ps1` (runs anywhere pwsh runs, no VM):
+
+- one sentence of Problem, one of Solution, everything else behind `<details>` - failure output
+  and CI window, then the fix with its file list and verification log, then the notebook verbatim.
+- the fixer returns `problem` and `solution` one-liners plus `fixSummary` as bullets; the
+  investigator writes a `Ruled out:` line per pass, since the notebook is published now.
+- built line by line, not from a here-string: notebooks and logs contain `$` and backticks.
+
+#3729 exposed three defects in that first body, all fixed in `c933ef1`: the spec name resolved to
+`playwright.config` (the pattern's plain `.ts` branch wins over `.spec.ts` - the deriveRunId trap
+again), the fenced logs carried codepage mojibake and raw ANSI escapes, and the verification
+sentence claimed a pass without reading `verified`.
+
 ## Current state (as released)
 
 - **Deployment:** `Shared/vm-agent 11` @ **1.0.24**, package identity `vm-agent 8`.
