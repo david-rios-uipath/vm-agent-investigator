@@ -62,7 +62,7 @@ function Ensure-Tools {
   if (-not (Test-Path (Join-Path $Bin 'pnpm.cmd'))) {
     $missing += 'pnpm-shim'
     Write-Output '[ensure] enabling corepack pnpm shim'
-    corepack enable --install-directory $Bin pnpm
+    Invoke-Cmd "corepack enable --install-directory `"$Bin`" pnpm" $VmRoot | ForEach-Object { Write-Output "  $_" }
     if (-not (Test-Path (Join-Path $Bin 'pnpm.cmd'))) { throw '[ensure] corepack produced no pnpm shim' }
   }
 
@@ -73,7 +73,11 @@ function Ensure-Tools {
   if (-not (Test-Tool 'claude')) {
     $missing += 'claude'
     Write-Output '[ensure] installing Claude Code'
-    npm install -g @anthropic-ai/claude-code --prefix $NodeBin 2>&1 | Select-Object -Last 3 | ForEach-Object { Write-Output "  $_" }
+    # Through cmd.exe, not PowerShell: npm writes warnings to stderr, and the caller's
+    # $ErrorActionPreference = 'Stop' turns native stderr into a terminating error. A warning
+    # about install scripts killed the prologue before this was routed through Invoke-Cmd.
+    Invoke-Cmd "npm install -g @anthropic-ai/claude-code --prefix `"$NodeBin`"" $VmRoot |
+      Select-Object -Last 5 | ForEach-Object { Write-Output "  $_" }
     Add-ToolPath
     if (-not (Test-Tool 'claude')) { throw '[ensure] claude still not runnable after npm install' }
   }
@@ -135,6 +139,7 @@ function Install-Deps {
 function Invoke-Cmd([string]$CommandLine, [string]$WorkingDir = $RepoDir, [hashtable]$Env = @{}) {
   $prefix = "set `"PATH=$Bin;$NodeBin;%PATH%`""
   foreach ($k in $Env.Keys) { $prefix += " && set `"$k=$($Env[$k])`"" }
+  if (-not (Test-Path $WorkingDir)) { New-Item -ItemType Directory -Force -Path $WorkingDir | Out-Null }
   Push-Location $WorkingDir
   try { & cmd.exe /c "$prefix && $CommandLine" } finally { Pop-Location }
 }
