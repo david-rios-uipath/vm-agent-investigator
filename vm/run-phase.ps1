@@ -340,7 +340,22 @@ switch ($Phase) {
     $fixVerified = ($exit -eq 0)
     $video = Get-ChildItem (Join-Path $RepoDir 'e2e\test-results') -Recurse -Filter *.webm -ErrorAction SilentlyContinue |
       Sort-Object LastWriteTime -Descending | Select-Object -First 1
-    if ($video) { Copy-Item $video.FullName (Join-Path $notes 'video.webm') -Force; Note '[verify] video saved to state' }
+    if ($video) {
+      Copy-Item $video.FullName (Join-Path $notes 'video.webm') -Force
+      Note '[verify] video saved to state'
+      # GitHub will not render a raw webm, so convert to the mp4/gif pair the PR can show.
+      # ffmpeg arguments taken from flow-workbench scripts/record-demo.sh so the output
+      # matches what the pr-demo skill produces by hand.
+      if (Test-Tool 'ffmpeg' @('-version')) {
+        $mp4 = Join-Path $notes 'fix-demo.mp4'; $gif = Join-Path $notes 'fix-demo.gif'
+        Invoke-Cmd ('ffmpeg -y -loglevel error -i "{0}" -vf "fps=30,scale=trunc(iw/2)*2:trunc(ih/2)*2" -c:v libx264 -pix_fmt yuv420p "{1}"' -f $video.FullName, $mp4) $RepoDir | Out-Null
+        if (Test-Path $mp4) {
+          Invoke-Cmd ('ffmpeg -y -loglevel error -i "{0}" -vf "fps=12,scale=960:-1:flags=lanczos,split[a][b];[a]palettegen=stats_mode=diff[p];[b][p]paletteuse=dither=bayer" -loop 0 "{1}"' -f $mp4, $gif) $RepoDir | Out-Null
+          Note ("[verify] demo mp4 {0:N1} MB, gif {1:N1} MB" -f ((Get-Item $mp4).Length / 1MB),
+            $(if (Test-Path $gif) { (Get-Item $gif).Length / 1MB } else { 0 }))
+        } else { Note '[verify] ffmpeg produced no mp4; the PR will have no video' }
+      } else { Note '[verify] no ffmpeg on this VM; the PR will have no video' }
+    }
   }
 
   taskkill /PID $dev.Id /T /F 2>&1 | Out-Null
@@ -439,8 +454,19 @@ Notebook and full logs: bucket e2e-investigations/$RunId/
 "@
 
   $env:GH_PROMPT_DISABLED = '1'
-  $video = Join-Path $notes 'video.webm'
-  $attachArgs = if (Test-Path $video) { @('--attach', $video) } else { @() }
+  # GitHub caps attachments (10 MB for images, more for video), and a two-minute e2e run makes a
+  # large gif. Prefer the mp4 player, fall back to the gif, skip rather than fail the PR.
+  $attachArgs = @()
+  $mp4 = Join-Path $notes 'fix-demo.mp4'; $gif = Join-Path $notes 'fix-demo.gif'
+  if ((Test-Path $mp4) -and (Get-Item $mp4).Length -lt 24MB) {
+    $attachArgs = @('--attach', $mp4)   # video renders as a player and takes no alt text
+    Write-Output ('[pr] attaching fix-demo.mp4 ({0:N1} MB)' -f ((Get-Item $mp4).Length / 1MB))
+  } elseif ((Test-Path $gif) -and (Get-Item $gif).Length -lt 9MB) {
+    $attachArgs = @('--attach', "$gif#The e2e spec passing with this fix applied")
+    Write-Output ('[pr] attaching fix-demo.gif ({0:N1} MB)' -f ((Get-Item $gif).Length / 1MB))
+  } else {
+    Write-Output '[pr] no attachable recording under the size limit; see the run state in the bucket'
+  }
   $out = @(gh pr create --draft --repo $ownerRepo --base $Branch --head $prBranch --title $title --body-file $bodyFile @attachArgs 2>&1 |
     ForEach-Object { "$_" -replace $tokenRe, '***' })
   $out | ForEach-Object { Write-Output $_ }

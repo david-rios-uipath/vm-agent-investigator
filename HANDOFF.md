@@ -32,6 +32,7 @@ Everything below `vm/` is new and runs ON the VM; the flow only orchestrates it.
 | `vm/run-phase.ps1` | one `switch ($Phase)` over `repro`, `investigate`, `fix`, `pr`; same prologue and epilogue for each |
 | `vm/lib/prologue.ps1` | `Ensure-Tools` (rg, gh, pnpm shim, Claude Code — idempotent), `Refresh-Repo`, `Invoke-Cmd`, `Write-Utf8Lf`, `Write-Status` |
 | `vm/lib/ci-history.ps1` | the old `ciHistoryInstructions` node, ported to a function |
+| PR video | the verified run records with `E2E_RECORD=1`; ffmpeg converts the webm to mp4+gif with the same arguments as flow-workbench `scripts/record-demo.sh`, and the `pr` phase attaches it with `gh pr create --attach` (needs gh >= 2.99; the VM has 2.100) |
 | `vm/prompts/{investigator,fixer}.md` | the two agent prompts, rewritten for real file tools |
 | `vm/selfcheck.ps1` | `pwsh -NoProfile -File vm/selfcheck.ps1` — 23 asserts over the pure logic (status line, patch encoding, PR title, repro routing). Passes. |
 | `release-vm-exec.sh` | publish `vm-exec` and repoint `e2e-investigator/vm-exec-vm`: `./release-vm-exec.sh 1.0.4` |

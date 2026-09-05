@@ -58,6 +58,15 @@ function Ensure-Tools {
     if (-not (Test-Tool 'gh')) { throw '[ensure] gh still not runnable after install' }
   }
 
+  # ffmpeg turns the verified run's webm into the mp4/gif that GitHub can render in a PR body.
+  # Same conversion flow-workbench's scripts/record-demo.sh uses.
+  if (-not (Test-Tool 'ffmpeg' @('-version'))) {
+    $missing += 'ffmpeg'
+    Write-Output '[ensure] installing ffmpeg'
+    try { Install-GhRelease 'BtbN/FFmpeg-Builds' 'ffmpeg-master-latest-win64-gpl.zip' 'ffmpeg' }
+    catch { Write-Output "[ensure] ffmpeg install failed: $_ (PR videos will be skipped)" }
+  }
+
   if (-not (Test-Tool 'node')) { throw '[ensure] node is not on PATH; this VM is not provisioned' }
   if (-not (Test-Path (Join-Path $Bin 'pnpm.cmd'))) {
     $missing += 'pnpm-shim'
@@ -84,7 +93,8 @@ function Ensure-Tools {
 
   if ($missing.Count -eq 0) { Write-Output '[ensure] all tools present' }
   else { Write-Output ('[ensure] installed: ' + ($missing -join ', ')) }
-  Write-Output ('[ensure] rg ' + (Test-Tool 'rg') + ' | gh ' + (Test-Tool 'gh') + ' | node ' + (Test-Tool 'node') + ' | claude ' + (Test-Tool 'claude'))
+  Write-Output ('[ensure] rg ' + (Test-Tool 'rg') + ' | gh ' + (Test-Tool 'gh') + ' | node ' + (Test-Tool 'node') +
+    ' | claude ' + (Test-Tool 'claude') + ' | ffmpeg ' + $(if (Test-Tool 'ffmpeg' @('-version')) { 'ok' } else { 'MISSING' }))
 }
 
 # The checkout is a cache, never wiped: fetch and hard-reset onto the branch, keep node_modules,
