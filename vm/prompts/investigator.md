@@ -10,6 +10,11 @@ Write `{{NOTES_DIR}}\notebook.md`. Everything not in that file is lost: the flow
 notebook and a one-line status. Write it even when you find nothing — "no cause established,
 here is what I ruled out" is a usable result, a missing file is not.
 
+**Write it early and keep it current.** Create the notebook as soon as you have your first
+claim — before you start probing — and append to it as each leg settles. Your run can be cut
+off when it hits its turn limit, and anything not yet on disk at that moment is gone. Do not
+save the write-up for the end.
+
 ## Run context
 
 - repository: {{REPO_URL}} @ {{BRANCH}}

@@ -71,24 +71,33 @@ function Invoke-Claude([string]$PromptFile, [string]$AllowedTools, [int]$MaxTurn
   if ($PermissionMode) { $claudeArgs += @('--permission-mode', $PermissionMode) }
   # Empty means whatever the account default is; set it to run cheap models while testing.
   if ($Model) { $claudeArgs += @('--model', $Model) }
-  Write-Output "[claude] claude $($claudeArgs -join ' ')"
+  Write-Host "[claude] claude $($claudeArgs -join ' ')"
   Push-Location $RepoDir
   try {
     # Transcript to file, not to stdout: the exec log's tail must end at STATUS_JSON=.
     Get-Content -Raw $PromptFile | & claude @claudeArgs 2>&1 | Out-File -FilePath $transcript -Encoding utf8
   } finally { Pop-Location }
   $lines = @(Get-Content $transcript -ErrorAction SilentlyContinue)
-  Write-Output "[claude] $($lines.Count) transcript lines -> $transcript"
+  Write-Host "[claude] $($lines.Count) transcript lines -> $transcript"
   $resultLine = $lines | Where-Object { $_ -match '"type"\s*:\s*"result"' } | Select-Object -Last 1
   if (-not $resultLine) {
-    Write-Output '[claude] no result event in the transcript; last 3 lines:'
-    $lines | Select-Object -Last 3 | ForEach-Object { Write-Output "  $_" }
+    Write-Host '[claude] no result event in the transcript; last 3 lines:'
+    $lines | Select-Object -Last 3 | ForEach-Object { Write-Host "  $_" }
     return ''
   }
+  $r = $null
+  try { $r = ConvertFrom-Json $resultLine } catch { }
+  if ($r) {
+    # error_max_turns means the run was cut off mid-thought: whatever it had not yet written
+    # to the notebook is lost, and that is a budget problem, not a model failure.
+    Write-Host ("[claude] ended {0}{1} after {2} turns in {3}s, cost `$${4:N2}" -f `
+      $r.subtype, $(if ($r.is_error) { ' (ERROR)' } else { '' }), $r.num_turns,
+      [int]($r.duration_ms / 1000), [double]$r.total_cost_usd)
+  }
   $text = ''
-  try { $text = [string](ConvertFrom-Json $resultLine).result } catch { }
-  Write-Output '[claude] final message:'
-  Write-Output (Get-Tail $text 2000)
+  try { $text = [string]$r.result } catch { }
+  Write-Host '[claude] final message:'
+  Write-Host (Get-Tail $text 2000)
   return $text
 }
 
@@ -206,7 +215,7 @@ switch ($Phase) {
     SOURCE = $ev.source; EXIT_CODE = $ev.exitCode; CI_HISTORY = $ev.ciHistory
     OUTPUT_TAIL = $ev.excerpt; NOTES_DIR = $notes
   }
-  $final = Invoke-Claude $prompt 'Read,Grep,Glob,Bash(rg:*),Bash(git log:*),Bash(git show:*),Bash(git diff:*),Bash(git blame:*),Bash(git merge-base:*),Bash(git fetch:*),Write' 40 $null
+  $final = Invoke-Claude $prompt 'Read,Grep,Glob,Bash(rg:*),Bash(git log:*),Bash(git show:*),Bash(git diff:*),Bash(git blame:*),Bash(git merge-base:*),Bash(git fetch:*),Write' 80 $null
   $json = Get-LastJson $final
 
   # The notebook on disk is the truth, not the model's self-report.
