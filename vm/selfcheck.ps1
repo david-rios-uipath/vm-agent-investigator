@@ -85,19 +85,40 @@ foreach ($c in @('unknown', 'absent', 'passing')) {
   Assert (Test-NeedsRepro @{ classification = $c }) "$c needs a local repro"
 }
 
-# PR title trimming, as the pr phase does it.
-function Get-PrTitle([string]$FixSummary, [string]$Spec) {
-  $short = ((($FixSummary -split "`n")[0]).Trim())
-  if ($short.Length -gt 60) { $short = $short.Substring(0, 60) -replace '\s+\S*$', '' }
-  $short = $short -replace '\s*\([^)]*$', '' -replace '[\s(,;:-]+$', ''
-  if ($short) { return "fix: $short (automated investigator)" }
-  return "test(e2e): fix $Spec (automated investigator)"
+# New-CommitSubject, lifted verbatim out of run-phase.ps1.
+function New-CommitSubject([string]$Title, [string]$Summary, [string]$Spec, [string]$Scope) {
+  $t = $Title.Trim()
+  if (-not $t) {
+    $t = (($Summary -split "`n")[0]).Trim()
+    $t = $t -replace '^\w+\s+\S*/\S+\s*', '' -replace '^(lines?|line)\s+[\d,\s and]+', ''
+  }
+  $t = $t -replace '^(fix|feat|chore|test)(\([^)]*\))?:\s*', ''
+  if (-not $t) { return "$Scope`: repair $Spec" }
+  $t = $t.Substring(0, 1).ToUpper() + $t.Substring(1)
+  $budget = 72 - $Scope.Length - 2
+  if ($t.Length -gt $budget) { $t = ($t.Substring(0, $budget) -replace '\s+\S*$', '') }
+  $t = $t -replace '\s*\([^)]*$', '' -replace '[\s(,;:.\-]+$', ''
+  if (-not $t) { return "$Scope`: repair $Spec" }
+  return "$Scope`: $t"
 }
-Assert ((Get-PrTitle '' 'debug-execution') -eq 'test(e2e): fix debug-execution (automated investigator)') 'empty summary falls back to the spec name'
-$t = Get-PrTitle 'Retarget the two copy-path locators at debug-execution.spec.ts (lines 84 and 87) to the new aria-label' 'x'
-Assert (-not ($t -match '\($')) 'the title never ends mid-parenthesis'
-Assert ($t.EndsWith('(automated investigator)')) 'the title keeps its suffix'
-Assert ($t.Length -lt 110) 'the title stays short'
+
+# The model's own short title is used as-is.
+$s1 = New-CommitSubject 'Match JsonTree text rendering in the debug spec' '' 'debug-execution' 'fix(e2e)'
+Assert ($s1 -eq 'fix(e2e): Match JsonTree text rendering in the debug spec') 'a good title passes through with the scope'
+
+# The real summary from PR 3714, which produced a subject truncated mid-sentence.
+$real = "Updated e2e/specs/debug/debug-execution.spec.ts lines 84 and 87 from getByRole('button', { name: ... }) to getByText(..., { exact: true }) to match JsonTree's text-based rendering."
+$s2 = New-CommitSubject '' $real 'debug-execution' 'fix(e2e)'
+Assert ($s2.Length -le 72) 'a subject built from a summary fits in 72 characters'
+Assert ($s2 -notmatch '\.spec\.ts') 'the leading file path is dropped, not truncated around'
+Assert ($s2 -notmatch '[,;:(\-]$') 'the subject never ends on dangling punctuation'
+Assert ($s2 -like 'fix(e2e):*') 'the scope prefix is applied'
+
+Assert ((New-CommitSubject '' '' 'debug-execution' 'fix') -eq 'fix: repair debug-execution') 'nothing usable falls back to the spec name'
+Assert ((New-CommitSubject 'fix(e2e): Stop double prefixing' '' 'x' 'fix(e2e)') -eq 'fix(e2e): Stop double prefixing') 'a prefix the model added is not doubled'
+$s3 = New-CommitSubject ('Do something ' * 12) '' 'x' 'fix'
+Assert ($s3.Length -le 72) 'an over-long model title is cut to budget'
+Assert ($s3 -notmatch '\s$') 'the cut leaves no trailing space'
 
 Write-Host ''
 Write-Host 'selfcheck passed'

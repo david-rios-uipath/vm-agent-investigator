@@ -64,6 +64,11 @@ notebook's cause does not explain it.
 
 End your run with a single line of JSON and nothing else:
 
-    {"patchWritten": true, "fixSummary": "<what you changed and why>", "confidence": "high|medium|low"}
+    {"patchWritten": true, "title": "<imperative subject, under 50 characters>", "fixSummary": "<what you changed and why>", "confidence": "high|medium|low"}
 
 `patchWritten` is true only if you left real edits in the working tree.
+
+`title` becomes the commit subject and the PR title, so write it like one: imperative mood,
+under 50 characters, no file paths, no trailing period, and no `fix:` prefix (one is added for
+you). Say what changes, not where. "Match JsonTree text rendering in debug spec" is good;
+"Updated e2e/specs/debug/debug-execution.spec.ts lines 84 and 87" is not.

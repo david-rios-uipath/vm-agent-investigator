@@ -140,6 +140,26 @@ function Get-LastJson([string]$Text) {
   return $null
 }
 
+# A commit subject, not a paragraph: the model is asked for a short imperative `title`, and
+# this is the guard for when it ignores that or returns nothing. A summary that opens with a
+# file path burns the whole budget before saying anything, so paths are dropped first.
+function New-CommitSubject([string]$Title, [string]$Summary, [string]$Spec, [string]$Scope) {
+  $t = $Title.Trim()
+  if (-not $t) {
+    $t = (($Summary -split "`n")[0]).Trim()
+    # "Updated e2e/specs/debug/debug-execution.spec.ts lines 84 and 87 from ..." -> "from ..."
+    $t = $t -replace '^\w+\s+\S*/\S+\s*', '' -replace '^(lines?|line)\s+[\d,\s and]+', ''
+  }
+  $t = $t -replace '^(fix|feat|chore|test)(\([^)]*\))?:\s*', ''   # do not double the prefix
+  if (-not $t) { return "$Scope`: repair $Spec" }
+  $t = $t.Substring(0, 1).ToUpper() + $t.Substring(1)
+  $budget = 72 - $Scope.Length - 2
+  if ($t.Length -gt $budget) { $t = ($t.Substring(0, $budget) -replace '\s+\S*$', '') }
+  $t = $t -replace '\s*\([^)]*$', '' -replace '[\s(,;:.\-]+$', ''
+  if (-not $t) { return "$Scope`: repair $Spec" }
+  return "$Scope`: $t"
+}
+
 # ---------------------------------------------------------------- phases
 
 # The archive is rewritten however the phase ends, including the early exits below; vm_exec
@@ -288,6 +308,7 @@ switch ($Phase) {
   $json = Get-LastJson $final
   $fixSummary = if ($json -and $json.fixSummary) { [string]$json.fixSummary } else { '(no fixSummary returned)' }
   $confidence = if ($json -and $json.confidence) { [string]$json.confidence } else { 'low' }
+  $fixTitle = if ($json -and $json.title) { [string]$json.title } else { '' }
 
   # git diff is the arbiter of whether anything was actually changed.
   $diff = (& git -C $RepoDir diff | Out-String)
@@ -364,13 +385,15 @@ switch ($Phase) {
 
   Write-Utf8Lf $prevFile $verify.ToString()
   Write-Utf8Lf (Join-Path $notes 'fix-summary.json') (([ordered]@{
-    fixSummary = $fixSummary; confidence = $confidence; attempts = $FixAttempt; verified = $fixVerified
+    title = $fixTitle; fixSummary = $fixSummary; confidence = $confidence
+    attempts = $FixAttempt; verified = $fixVerified
   }) | ConvertTo-Json -Depth 4)
 
   Write-Status @{
     patchWritten = $true
     fixVerified = $fixVerified
     fixSummary = $fixSummary
+    title = $fixTitle
     confidence = $confidence
     attempt = $FixAttempt
     patch = Get-Tail $diff 6000
@@ -390,16 +413,17 @@ switch ($Phase) {
   }
 
   $summaryFile = Join-Path $notes 'fix-summary.json'
-  $fixSummary = if (Test-Path $summaryFile) { [string](Get-Content -Raw $summaryFile | ConvertFrom-Json).fixSummary } else { '' }
+  $summary = if (Test-Path $summaryFile) { Get-Content -Raw $summaryFile | ConvertFrom-Json } else { $null }
+  $fixSummary = if ($summary) { [string]$summary.fixSummary } else { '' }
   $ownerRepo = (($RepoUrl -replace '^https://github.com/', '') -replace '\.git$', '').Trim('/')
   $spec = if ($TestCommand -match '([\w.-]+?)(?:\.spec)?\.ts\b') { $Matches[1] } else { 'e2e' }
   $prBranch = "e2e-investigator/$RunId"
 
-  # First line of the fix summary, cut at a word boundary and stripped of a dangling clause.
-  $short = ((($fixSummary -split "`n")[0]).Trim())
-  if ($short.Length -gt 60) { $short = $short.Substring(0, 60) -replace '\s+\S*$', '' }
-  $short = $short -replace '\s*\([^)]*$', '' -replace '[\s(,;:-]+$', ''
-  $title = if ($short) { "fix: $short (automated investigator)" } else { "test(e2e): fix $spec (automated investigator)" }
+  # e2e-only changes get the scope the repo uses for them.
+  $touched = @(& git -C $RepoDir apply --numstat $patchFile 2>$null | ForEach-Object { ($_ -split "`t")[2] })
+  $scope = if ($touched.Count -gt 0 -and -not ($touched | Where-Object { $_ -notlike 'e2e/*' })) { 'fix(e2e)' } else { 'fix' }
+  $title = New-CommitSubject $(if ($summary) { [string]$summary.title } else { '' }) $fixSummary $spec $scope
+  Write-Output "[pr] $title" 
 
   $tokenRe = [regex]::Escape($env:GH_TOKEN)
   function Reset-Tree {
@@ -418,7 +442,8 @@ switch ($Phase) {
   }
 
   # Capture the exit code before any pipeline that could reset it (FINDINGS-uip.md).
-  $commitOut = @(& git -C $RepoDir -c user.name='e2e-investigator' -c user.email='e2e-investigator@uipath.com' commit -am $title 2>&1)
+  $commitMsg = "$title`n`nVerified by re-running the spec. Automated investigator run $RunId."
+  $commitOut = @(& git -C $RepoDir -c user.name='e2e-investigator' -c user.email='e2e-investigator@uipath.com' commit -am $commitMsg 2>&1)
   $commitRc = $LASTEXITCODE
   $commitOut | Select-Object -First 2 | ForEach-Object { Write-Output "$_" }
   if ($commitRc -ne 0) {
