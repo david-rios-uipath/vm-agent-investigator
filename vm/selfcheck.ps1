@@ -39,6 +39,13 @@ $parsed = ConvertFrom-Json $last.Substring('STATUS_JSON='.Length)
 Assert ($parsed.reproduced -eq $true -and $parsed.exitCode -eq 1) 'status round-trips through JSON'
 Assert ($parsed.excerpt -eq "two`nlines") 'embedded newlines survive as JSON escapes'
 
+# Non-ASCII must leave as \uXXXX: the codepage round-trip mangles it into a literal quote.
+$dash = [string][char]0x2014
+$out = @(Write-Status @{ notebook = "a${dash}b" })
+$last = $out[-1]
+Assert (-not ($last.ToCharArray() | Where-Object { [int]$_ -gt 126 })) 'STATUS_JSON is pure ASCII'
+Assert ((ConvertFrom-Json $last.Substring('STATUS_JSON='.Length)).notebook -eq "a${dash}b") 'escaped non-ASCII round-trips'
+
 # Get-LastJson, lifted verbatim out of run-phase.ps1.
 function Get-LastJson([string]$Text) {
   if (-not $Text) { return $null }

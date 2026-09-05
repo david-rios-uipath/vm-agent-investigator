@@ -176,6 +176,9 @@ function Write-Utf8Lf([string]$Path, [string]$Text) {
 # The flow parses this line and nothing else. It must be the last line of stdout.
 function Write-Status([hashtable]$Status) {
   $json = ($Status | ConvertTo-Json -Compress -Depth 6)
+  # Stdout comes back through a legacy codepage, which turns a U+2014 into bytes ending in a
+  # literal quote and breaks JSON.parse in the flow. Keep the line pure ASCII.
+  $json = [regex]::Replace($json, '[^\x20-\x7E]', { param($m) '\u{0:x4}' -f [int][char]$m.Value })
   Write-Output ''
   Write-Output "STATUS_JSON=$json"
 }

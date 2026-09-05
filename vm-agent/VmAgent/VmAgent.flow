@@ -106,7 +106,7 @@
       "inputs": {
         "script": {
           "type": "literal",
-          "expression": "const resume = $vars.start.output.resumeRunId;\n// Resume mode: the state for that runId is already in the bucket, so the fix phase can\n// start straight from its notebook.\nif (resume) return resume;\nconst cmd = $vars.start.output.testCommand || '';\nconst m = cmd.match(/([\\w.-]+?)(?:\\.spec)?\\.ts\\b/);\nconst slug = (m ? m[1] : 'run').replace(/[^\\w.-]/g, '-').slice(0, 40);\nconst d = new Date(); const p = (n) => String(n).padStart(2, '0');\nreturn `${slug}-${d.getUTCFullYear()}${p(d.getUTCMonth() + 1)}${p(d.getUTCDate())}-${p(d.getUTCHours())}${p(d.getUTCMinutes())}${p(d.getUTCSeconds())}`;",
+          "expression": "const resume = $vars.start.output.resumeRunId;\n// Resume mode: the state for that runId is already in the bucket, so the fix phase can\n// start straight from its notebook.\nif (resume) return resume;\nconst cmd = $vars.start.output.testCommand || '';\nconst m = cmd.match(/([\\w.-]+?)\\.spec\\.ts\\b/) || cmd.match(/([\\w.-]+?)\\.ts\\b/);\nconst slug = (m ? m[1] : 'run').replace(/[^\\w.-]/g, '-').slice(0, 40);\nconst d = new Date(); const p = (n) => String(n).padStart(2, '0');\nreturn `${slug}-${d.getUTCFullYear()}${p(d.getUTCMonth() + 1)}${p(d.getUTCDate())}-${p(d.getUTCHours())}${p(d.getUTCMinutes())}${p(d.getUTCSeconds())}`;",
           "fieldType": "string"
         }
       },
