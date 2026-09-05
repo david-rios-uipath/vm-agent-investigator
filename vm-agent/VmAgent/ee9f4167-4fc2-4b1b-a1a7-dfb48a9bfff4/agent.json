@@ -23,21 +23,35 @@
       "fixAttempts": {
         "type": "number"
       },
-      "parseStatusRepro__output": {
-        "description": "Bound from $vars.parseStatusRepro.output"
+      "repro__exitCode": {
+        "type": "number"
       },
-      "repro__output": {
-        "type": "object",
-        "description": "Bound from $vars.repro.output"
+      "repro__excerpt": {
+        "type": "string"
       },
-      "parseStatusInvestigate__output": {
-        "description": "Bound from $vars.parseStatusInvestigate.output"
+      "repro__ciHistory": {
+        "type": "string"
       },
-      "parseStatusFix__output": {
-        "description": "Bound from $vars.parseStatusFix.output"
+      "repro__blobPath": {
+        "type": "string"
       },
-      "parseStatusPr__output": {
-        "description": "Bound from $vars.parseStatusPr.output"
+      "investigate__notebook": {
+        "type": "string"
+      },
+      "fix__fixSummary": {
+        "type": "string"
+      },
+      "fix__confidence": {
+        "type": "string"
+      },
+      "fix__fixVerified": {
+        "type": "boolean"
+      },
+      "fix__patch": {
+        "type": "string"
+      },
+      "pr__prUrl": {
+        "type": "string"
       }
     }
   },
@@ -95,45 +109,7 @@
     },
     {
       "role": "user",
-      "content": "Test command: {{input.start__output__testCommand}}\nRepository: {{input.start__output__repoUrl}} @ {{input.start__output__branch}}\nRepro exit code: {{ (($agent.parseStatusRepro__output || {}).exitCode ?? -1) }}\nFull repro log in bucket: {{ (($agent.repro__output || {}).OutputBlobPath || '') }}\nFix attempts used: {{input.fixAttempts}}\n\nCI history for this spec: {{ (($agent.parseStatusRepro__output || {}).ciHistory || '') }}\n\nRepro output excerpt: {{ (($agent.parseStatusRepro__output || {}).excerpt || '') }}\n\nInvestigator notebook: {{ (($agent.parseStatusInvestigate__output || {}).notebook || '') }}\n\nFix attempt (may be empty if no fix was attempted): {{ (($agent.parseStatusFix__output || {}).fixSummary || '') }} (confidence {{ (($agent.parseStatusFix__output || {}).confidence || '') }})\nFix verified: {{ (($agent.parseStatusFix__output || {}).fixVerified === true) }}\nPatch (may be empty): {{ (($agent.parseStatusFix__output || {}).patch || '') }}\nPR URL (may be empty if no PR was opened): {{ (($agent.parseStatusPr__output || {}).prUrl || '') }}\n\nWrite the final report. Base every claim on the notebook and the repro output above, and fill\nevery field of the output schema.\n\nSet patch to the patch above verbatim, or empty if there is none. Set fixVerified to the value\nabove. Set prUrl to the URL above, or the empty string.",
-      "contentTokens": [
-        {
-          "type": "simpleText",
-          "rawString": "Test command: "
-        },
-        {
-          "type": "variable",
-          "rawString": "input.start__output__testCommand"
-        },
-        {
-          "type": "simpleText",
-          "rawString": "\nRepository: "
-        },
-        {
-          "type": "variable",
-          "rawString": "input.start__output__repoUrl"
-        },
-        {
-          "type": "simpleText",
-          "rawString": " @ "
-        },
-        {
-          "type": "variable",
-          "rawString": "input.start__output__branch"
-        },
-        {
-          "type": "simpleText",
-          "rawString": "\nRepro exit code: {{ (($agent.parseStatusRepro__output || {}).exitCode ?? -1) }}\nFull repro log in bucket: {{ (($agent.repro__output || {}).OutputBlobPath || '') }}\nFix attempts used: "
-        },
-        {
-          "type": "variable",
-          "rawString": "input.fixAttempts"
-        },
-        {
-          "type": "simpleText",
-          "rawString": "\n\nCI history for this spec: {{ (($agent.parseStatusRepro__output || {}).ciHistory || '') }}\n\nRepro output excerpt: {{ (($agent.parseStatusRepro__output || {}).excerpt || '') }}\n\nInvestigator notebook: {{ (($agent.parseStatusInvestigate__output || {}).notebook || '') }}\n\nFix attempt (may be empty if no fix was attempted): {{ (($agent.parseStatusFix__output || {}).fixSummary || '') }} (confidence {{ (($agent.parseStatusFix__output || {}).confidence || '') }})\nFix verified: {{ (($agent.parseStatusFix__output || {}).fixVerified === true) }}\nPatch (may be empty): {{ (($agent.parseStatusFix__output || {}).patch || '') }}\nPR URL (may be empty if no PR was opened): {{ (($agent.parseStatusPr__output || {}).prUrl || '') }}\n\nWrite the final report. Base every claim on the notebook and the repro output above, and fill\nevery field of the output schema.\n\nSet patch to the patch above verbatim, or empty if there is none. Set fixVerified to the value\nabove. Set prUrl to the URL above, or the empty string."
-        }
-      ]
+      "content": "Test command: {{input.start__output__testCommand}}\nRepository: {{input.start__output__repoUrl}} @ {{input.start__output__branch}}\nRepro exit code: {{input.repro__exitCode}}\nFull repro log in bucket: {{input.repro__blobPath}}\nFix attempts used: {{input.fixAttempts}}\n\nCI history for this spec: {{input.repro__ciHistory}}\n\nRepro output excerpt: {{input.repro__excerpt}}\n\nInvestigator notebook: {{input.investigate__notebook}}\n\nFix attempt (may be empty if no fix was attempted): {{input.fix__fixSummary}} (confidence {{input.fix__confidence}})\nFix verified: {{input.fix__fixVerified}}\nPatch (may be empty): {{input.fix__patch}}\nPR URL (may be empty if no PR was opened): {{input.pr__prUrl}}\n\nWrite the final report. Base every claim on the notebook and the repro output above, and fill\nevery field of the output schema.\n\nSet patch to the patch above verbatim, or empty if there is none. Set fixVerified to the value\nabove. Set prUrl to the URL above, or the empty string."
     }
   ],
   "projectId": "ee9f4167-4fc2-4b1b-a1a7-dfb48a9bfff4",

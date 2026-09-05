@@ -12,60 +12,46 @@
     "type": "object",
     "properties": {
       "start__output__testCommand": {
-        "type": "string",
-        "description": "Bound from $vars.start.output.testCommand"
+        "type": "string"
       },
       "start__output__repoUrl": {
-        "type": "string",
-        "description": "Bound from $vars.start.output.repoUrl"
+        "type": "string"
       },
       "start__output__branch": {
-        "type": "string",
-        "description": "Bound from $vars.start.output.branch"
-      },
-      "repro__exitCode": {
-        "type": "integer",
-        "description": "Bound from (($vars.parseStatusRepro.output || {}).exitCode ?? -1)"
-      },
-      "repro__blobPath": {
-        "type": "string",
-        "description": "Bound from (($vars.repro.output || {}).OutputBlobPath || '')"
+        "type": "string"
       },
       "fixAttempts": {
-        "type": "number",
-        "description": "Bound from $vars.fixAttempts"
+        "type": "number"
       },
-      "repro__ciHistory": {
-        "type": "string",
-        "description": "Bound from (($vars.parseStatusRepro.output || {}).ciHistory || '')"
+      "repro__exitCode": {
+        "type": "number"
       },
       "repro__excerpt": {
-        "type": "string",
-        "description": "Bound from (($vars.parseStatusRepro.output || {}).excerpt || '')"
+        "type": "string"
+      },
+      "repro__ciHistory": {
+        "type": "string"
+      },
+      "repro__blobPath": {
+        "type": "string"
       },
       "investigate__notebook": {
-        "type": "string",
-        "description": "Bound from (($vars.parseStatusInvestigate.output || {}).notebook || '')"
+        "type": "string"
       },
       "fix__fixSummary": {
-        "type": "string",
-        "description": "Bound from (($vars.parseStatusFix.output || {}).fixSummary || '')"
+        "type": "string"
       },
       "fix__confidence": {
-        "type": "string",
-        "description": "Bound from (($vars.parseStatusFix.output || {}).confidence || '')"
+        "type": "string"
       },
       "fix__fixVerified": {
-        "type": "boolean",
-        "description": "Bound from (($vars.parseStatusFix.output || {}).fixVerified === true)"
+        "type": "boolean"
       },
       "fix__patch": {
-        "type": "string",
-        "description": "Bound from (($vars.parseStatusFix.output || {}).patch || '')"
+        "type": "string"
       },
       "pr__prUrl": {
-        "type": "string",
-        "description": "Bound from (($vars.parseStatusPr.output || {}).prUrl || '')"
+        "type": "string"
       }
     }
   },
