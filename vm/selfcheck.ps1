@@ -10,6 +10,12 @@ function Assert([bool]$Cond, [string]$What) {
   Write-Host "ok  $What"
 }
 
+# Test-Tool must be silent about a missing command, not throw: the caller runs under
+# $ErrorActionPreference = 'Stop', where a throw skips the install branch entirely.
+$ErrorActionPreference = 'Stop'
+Assert ($null -eq (Test-Tool 'definitely-not-a-real-command-xyz')) 'a missing tool returns null instead of throwing'
+Assert ($null -ne (Test-Tool 'git')) 'an installed tool returns its version line'
+
 # Get-Tail
 Assert ((Get-Tail 'abc' 10) -eq 'abc') 'short text is returned whole'
 Assert ((Get-Tail ('x' * 100) 10).EndsWith('x' * 10)) 'long text keeps its tail'

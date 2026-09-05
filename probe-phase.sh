@@ -20,7 +20,11 @@ VMEXEC=CA36341D-ECEC-4BA6-AA76-134D0AFE4BA7   # e2e-investigator/vm-exec-vm
 : "${RUNNER_REPO_URL:?export RUNNER_REPO_URL to the clone URL of this repo}"
 RUNNER_REF="${RUNNER_REF:-main}"
 SMOKE="${SMOKE_ONLY:-0}"
-declare -A TIMEOUT=([repro]=15 [investigate]=20 [fix]=45 [pr]=10)
+# macOS ships bash 3.2: no associative arrays.
+case "$PHASE" in
+  repro) TIMEOUT=15;; investigate) TIMEOUT=20;; fix) TIMEOUT=45;; pr) TIMEOUT=10;;
+  *) echo "unknown phase: $PHASE" >&2; exit 1;;
+esac
 cd "$(dirname "$0")"
 
 python3 - "$PHASE" "$RUNID" "$CMD" "$RUNNER_REPO_URL" "$RUNNER_REF" "$SMOKE" > /tmp/phase_probe.js <<'PY'
@@ -41,7 +45,7 @@ print('const script = (() => {%s})();' % expr)
 print('process.stdout.write(JSON.stringify({Script: script, WorkDir: "C:\\\\vm-agent", RunId: %s, StateKey: %s, TimeoutMinutes: %s, MaxOutputChars: 32000}));'
       % (json.dumps(runid), json.dumps(runid + '/state.zip'), json.dumps(int(sys.argv[7]) if len(sys.argv) > 7 else 45)))
 PY
-node /tmp/phase_probe.js "${TIMEOUT[$PHASE]}" > /tmp/phase_probe.json
+node /tmp/phase_probe.js "$TIMEOUT" > /tmp/phase_probe.json
 
 KEY=$(uip or jobs start "$VMEXEC" --folder-path "e2e-investigator" --input-arguments "$(cat /tmp/phase_probe.json)" --output json | python3 -c "
 import sys,json;t=sys.stdin.read();i=t.find('{');d=json.loads(t[i:]);print(d['Data']['Jobs'][0]['Key'])")

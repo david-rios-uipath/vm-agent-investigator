@@ -15,10 +15,14 @@ function Add-ToolPath {
   }
 }
 
+# Returns the tool's version line, or $null if it is absent or broken. Never throws: calling a
+# missing command raises CommandNotFoundException, which $ErrorActionPreference = 'Stop' in the
+# caller turns terminating - the "install what is missing" branch would never be reached.
 # `native.exe | Select-Object -First 1` closes the pipeline and leaves $LASTEXITCODE set even
 # on success (FINDINGS-uip.md). Always capture into an array and read the code afterwards.
 function Test-Tool([string]$Exe, [string[]]$VersionArgs = @('--version')) {
-  $out = @(& $Exe @VersionArgs 2>&1)
+  if (-not (Get-Command $Exe -ErrorAction SilentlyContinue)) { return $null }
+  try { $out = @(& $Exe @VersionArgs 2>&1) } catch { return $null }
   if ($LASTEXITCODE -eq 0 -and $out.Count -gt 0) { return $out[0] }
   return $null
 }
