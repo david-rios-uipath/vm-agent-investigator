@@ -4130,8 +4130,8 @@
       },
       "end": {
         "position": {
-          "x": 3168,
-          "y": -368
+          "x": 5560,
+          "y": 144
         },
         "size": {
           "width": 96,
@@ -4141,7 +4141,7 @@
       },
       "deriveRunId": {
         "position": {
-          "x": 96,
+          "x": 144,
           "y": 144
         },
         "size": {
@@ -4152,8 +4152,8 @@
       },
       "investigationSummarizer": {
         "position": {
-          "x": 2784,
-          "y": -368
+          "x": 5136,
+          "y": 144
         },
         "size": {
           "width": 288,
@@ -4163,8 +4163,8 @@
       },
       "decisionVerify": {
         "position": {
-          "x": 1824,
-          "y": -176
+          "x": 3744,
+          "y": 144
         },
         "size": {
           "width": 96,
@@ -4174,8 +4174,8 @@
       },
       "bumpFixAttempts": {
         "position": {
-          "x": 2016,
-          "y": -160
+          "x": 3264,
+          "y": 420
         },
         "size": {
           "width": 96,
@@ -4185,8 +4185,8 @@
       },
       "decisionPr": {
         "position": {
-          "x": 2016,
-          "y": -352
+          "x": 3984,
+          "y": 144
         },
         "size": {
           "width": 96,
@@ -4196,8 +4196,8 @@
       },
       "endSetupFailed": {
         "position": {
-          "x": 2208,
-          "y": 336
+          "x": 1800,
+          "y": -160
         },
         "size": {
           "width": 96,
@@ -4207,8 +4207,8 @@
       },
       "endNotReproduced": {
         "position": {
-          "x": 1440,
-          "y": 320
+          "x": 1632,
+          "y": 420
         },
         "size": {
           "width": 96,
@@ -4218,7 +4218,7 @@
       },
       "decisionRepro": {
         "position": {
-          "x": 1248,
+          "x": 1632,
           "y": 144
         },
         "size": {
@@ -4229,7 +4229,7 @@
       },
       "decisionResume": {
         "position": {
-          "x": 288,
+          "x": 384,
           "y": 144
         },
         "size": {
@@ -4240,52 +4240,52 @@
       },
       "sticky-1": {
         "position": {
-          "x": 480,
-          "y": -60
+          "x": 624,
+          "y": 56
         },
         "size": {
-          "width": 820,
-          "height": 300
+          "width": 1152,
+          "height": 508
         },
         "collapsed": false
       },
       "sticky-2": {
         "position": {
-          "x": 1728,
-          "y": 784
+          "x": 1920,
+          "y": 56
         },
         "size": {
-          "width": 820,
-          "height": 300
+          "width": 912,
+          "height": 232
         },
         "collapsed": false
       },
       "sticky-3": {
         "position": {
-          "x": 2820,
-          "y": -60
+          "x": 2976,
+          "y": 56
         },
         "size": {
-          "width": 820,
-          "height": 300
+          "width": 1152,
+          "height": 508
         },
         "collapsed": false
       },
       "sticky-4": {
         "position": {
-          "x": 4120,
-          "y": -60
+          "x": 4272,
+          "y": 56
         },
         "size": {
-          "width": 820,
-          "height": 300
+          "width": 672,
+          "height": 232
         },
         "collapsed": false
       },
       "bootstrapRepro": {
         "position": {
-          "x": 480,
-          "y": 160
+          "x": 672,
+          "y": 144
         },
         "size": {
           "width": 96,
@@ -4295,8 +4295,8 @@
       },
       "repro": {
         "position": {
-          "x": 672,
-          "y": 160
+          "x": 912,
+          "y": 144
         },
         "size": {
           "width": 96,
@@ -4306,8 +4306,8 @@
       },
       "parseStatusRepro": {
         "position": {
-          "x": 864,
-          "y": 160
+          "x": 1152,
+          "y": 144
         },
         "size": {
           "width": 96,
@@ -4317,8 +4317,8 @@
       },
       "bootstrapInvestigate": {
         "position": {
-          "x": 1440,
-          "y": 128
+          "x": 1968,
+          "y": 144
         },
         "size": {
           "width": 96,
@@ -4328,8 +4328,8 @@
       },
       "investigate": {
         "position": {
-          "x": 1632,
-          "y": 128
+          "x": 2208,
+          "y": 144
         },
         "size": {
           "width": 96,
@@ -4339,8 +4339,8 @@
       },
       "parseStatusInvestigate": {
         "position": {
-          "x": 1824,
-          "y": 128
+          "x": 2448,
+          "y": 144
         },
         "size": {
           "width": 96,
@@ -4350,8 +4350,8 @@
       },
       "bootstrapFix": {
         "position": {
-          "x": 2208,
-          "y": -16
+          "x": 3024,
+          "y": 144
         },
         "size": {
           "width": 96,
@@ -4361,8 +4361,8 @@
       },
       "fixVerify": {
         "position": {
-          "x": 2400,
-          "y": -16
+          "x": 3264,
+          "y": 144
         },
         "size": {
           "width": 96,
@@ -4372,8 +4372,8 @@
       },
       "parseStatusFix": {
         "position": {
-          "x": 2592,
-          "y": -16
+          "x": 3504,
+          "y": 144
         },
         "size": {
           "width": 96,
@@ -4383,8 +4383,8 @@
       },
       "bootstrapPr": {
         "position": {
-          "x": 2208,
-          "y": -368
+          "x": 4320,
+          "y": 144
         },
         "size": {
           "width": 96,
@@ -4394,8 +4394,8 @@
       },
       "openPr": {
         "position": {
-          "x": 2400,
-          "y": -368
+          "x": 4560,
+          "y": 144
         },
         "size": {
           "width": 96,
@@ -4405,8 +4405,8 @@
       },
       "parseStatusPr": {
         "position": {
-          "x": 2592,
-          "y": -368
+          "x": 4800,
+          "y": 144
         },
         "size": {
           "width": 96,
@@ -4416,8 +4416,8 @@
       },
       "decisionReproRan": {
         "position": {
-          "x": 1056,
-          "y": 160
+          "x": 1392,
+          "y": 144
         },
         "size": {
           "width": 96,
@@ -4427,8 +4427,8 @@
       },
       "decisionInvestigated": {
         "position": {
-          "x": 2016,
-          "y": 128
+          "x": 2688,
+          "y": 144
         },
         "size": {
           "width": 96,
