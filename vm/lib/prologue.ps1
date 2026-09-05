@@ -141,7 +141,11 @@ function Invoke-Cmd([string]$CommandLine, [string]$WorkingDir = $RepoDir, [hasht
   foreach ($k in $Env.Keys) { $prefix += " && set `"$k=$($Env[$k])`"" }
   if (-not (Test-Path $WorkingDir)) { New-Item -ItemType Directory -Force -Path $WorkingDir | Out-Null }
   Push-Location $WorkingDir
-  try { & cmd.exe /c "$prefix && $CommandLine" } finally { Pop-Location }
+  # Belt and braces: whatever the caller's preference is, a native command writing to stderr
+  # must not become a terminating error here.
+  $prev = $ErrorActionPreference
+  $ErrorActionPreference = 'Continue'
+  try { & cmd.exe /c "$prefix && $CommandLine" } finally { $ErrorActionPreference = $prev; Pop-Location }
 }
 
 function Get-Tail([string]$Text, [int]$Max) {

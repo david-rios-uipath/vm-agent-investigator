@@ -21,7 +21,12 @@ param(
   [switch] $SmokeOnly
 )
 
-$ErrorActionPreference = 'Stop'
+# 'Continue', not 'Stop': git, pnpm, npm and Playwright all write progress to stderr, and with
+# 'Stop' the first such line becomes a terminating error that kills the phase. Playwright's very
+# first progress line did exactly that, after the patch was written but before the verdict.
+# Failures are caught explicitly instead - every native call checks $LASTEXITCODE and throws,
+# and `throw` stays terminating whatever this is set to.
+$ErrorActionPreference = 'Continue'
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $here 'lib\prologue.ps1')
 . (Join-Path $here 'lib\ci-history.ps1')
