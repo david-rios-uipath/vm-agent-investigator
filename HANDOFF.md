@@ -78,7 +78,10 @@ Nothing here has run. In particular:
 - `claude -p` has never been run on a Windows robot account. `Ensure-Tools` installs it with
   `npm install -g --prefix C:\vm-agent\node-global` and pins `CLAUDE_CONFIG_DIR` to
   `C:\vm-agent\claude-home`, on the assumption `%USERPROFILE%` is not dependable there.
-- The `ANTHROPIC_API_KEY` Credential asset does not exist in `e2e-investigator` yet.
+- `ANTHROPIC_API_KEY` exists in `e2e-investigator` as a **Secret** asset, so `vm-exec` reads it
+  with `ui:GetSecret`, not `ui:GetRobotCredential` (the other three tokens are Credential
+  assets). Both activities hand back a `SecureString`, so the env-var injection is identical.
+  Never actually read at runtime yet.
 - The XAML edits have not been packed or run; they are XML-well-formed and nothing more.
 - The migration order in the design (one phase at a time through `probe-phase.sh`) is still the
   right way to bring this up — start with two consecutive `repro` probes on the same VM.
