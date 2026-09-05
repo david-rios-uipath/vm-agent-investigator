@@ -90,7 +90,9 @@ function Invoke-Claude([string]$PromptFile, [string]$AllowedTools, [int]$MaxTurn
   if ($r) {
     # error_max_turns means the run was cut off mid-thought: whatever it had not yet written
     # to the notebook is lost, and that is a budget problem, not a model failure.
-    Write-Host ("[claude] ended {0}{1} after {2} turns in {3}s, cost `$${4:N2}" -f `
+    # Single-quoted format string: in a double-quoted one PowerShell reads {4:N2} preceded by
+    # a dollar as ${...} variable syntax and eats the placeholder, printing a bare "cost $".
+    Write-Host ('[claude] ended {0}{1} after {2} turns in {3}s, cost ${4:N4}' -f `
       $r.subtype, $(if ($r.is_error) { ' (ERROR)' } else { '' }), $r.num_turns,
       [int]($r.duration_ms / 1000), [double]$r.total_cost_usd)
   }
