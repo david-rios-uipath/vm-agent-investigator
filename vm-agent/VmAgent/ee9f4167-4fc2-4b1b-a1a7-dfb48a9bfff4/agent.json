@@ -24,35 +24,34 @@
         "type": "number"
       },
       "parseStatusRepro__output__exitCode": {
-        "description": "Bound from $vars.parseStatusRepro.output.exitCode"
-      },
-      "repro__output__OutputBlobPath": {
-        "type": "string",
-        "description": "Bound from $vars.repro.output.OutputBlobPath"
-      },
-      "parseStatusRepro__output__ciHistory": {
-        "description": "Bound from $vars.parseStatusRepro.output.ciHistory"
+        "type": "number"
       },
       "parseStatusRepro__output__excerpt": {
-        "description": "Bound from $vars.parseStatusRepro.output.excerpt"
+        "type": "string"
+      },
+      "parseStatusRepro__output__ciHistory": {
+        "type": "string"
+      },
+      "repro__output__OutputBlobPath": {
+        "type": "string"
       },
       "parseStatusInvestigate__output__notebook": {
-        "description": "Bound from $vars.parseStatusInvestigate.output.notebook"
+        "type": "string"
       },
       "parseStatusFix__output__fixSummary": {
-        "description": "Bound from $vars.parseStatusFix.output.fixSummary"
+        "type": "string"
       },
       "parseStatusFix__output__confidence": {
-        "description": "Bound from $vars.parseStatusFix.output.confidence"
+        "type": "string"
       },
       "parseStatusFix__output__fixVerified": {
-        "description": "Bound from $vars.parseStatusFix.output.fixVerified"
+        "type": "boolean"
       },
       "parseStatusFix__output__patch": {
-        "description": "Bound from $vars.parseStatusFix.output.patch"
+        "type": "string"
       },
       "parseStatusPr__output__prUrl": {
-        "description": "Bound from $vars.parseStatusPr.output.prUrl"
+        "type": "string"
       }
     }
   },

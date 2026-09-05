@@ -112,7 +112,7 @@
       },
       "outputs": {
         "output": {
-          "type": "any",
+          "type": "string",
           "description": "The return value of the script",
           "source": "=result.response",
           "var": "output"
@@ -369,7 +369,7 @@
       },
       "outputs": {
         "output": {
-          "type": "any",
+          "type": "number",
           "description": "The return value of the script",
           "source": "=result.response",
           "var": "output"
@@ -842,7 +842,36 @@
           "type": "any",
           "description": "The return value of the script",
           "source": "=result.response",
-          "var": "output"
+          "var": "output",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "reproduced": {
+                "type": "boolean"
+              },
+              "source": {
+                "type": "string"
+              },
+              "classification": {
+                "type": "string"
+              },
+              "excerpt": {
+                "type": "string"
+              },
+              "ciHistory": {
+                "type": "string"
+              },
+              "runnerFailed": {
+                "type": "boolean"
+              },
+              "exitCode": {
+                "type": "number"
+              },
+              "blobPath": {
+                "type": "string"
+              }
+            }
+          }
         },
         "error": {
           "type": "object",
@@ -1073,7 +1102,33 @@
           "type": "any",
           "description": "The return value of the script",
           "source": "=result.response",
-          "var": "output"
+          "var": "output",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "investigationComplete": {
+                "type": "boolean"
+              },
+              "hypothesis": {
+                "type": "string"
+              },
+              "notebook": {
+                "type": "string"
+              },
+              "error": {
+                "type": "string"
+              },
+              "runnerFailed": {
+                "type": "boolean"
+              },
+              "exitCode": {
+                "type": "number"
+              },
+              "blobPath": {
+                "type": "string"
+              }
+            }
+          }
         },
         "error": {
           "type": "object",
@@ -1304,7 +1359,45 @@
           "type": "any",
           "description": "The return value of the script",
           "source": "=result.response",
-          "var": "output"
+          "var": "output",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "patchWritten": {
+                "type": "boolean"
+              },
+              "fixVerified": {
+                "type": "boolean"
+              },
+              "fixSummary": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "confidence": {
+                "type": "string"
+              },
+              "attempt": {
+                "type": "number"
+              },
+              "patch": {
+                "type": "string"
+              },
+              "error": {
+                "type": "string"
+              },
+              "runnerFailed": {
+                "type": "boolean"
+              },
+              "exitCode": {
+                "type": "number"
+              },
+              "blobPath": {
+                "type": "string"
+              }
+            }
+          }
         },
         "error": {
           "type": "object",
@@ -1535,7 +1628,33 @@
           "type": "any",
           "description": "The return value of the script",
           "source": "=result.response",
-          "var": "output"
+          "var": "output",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "prUrl": {
+                "type": "string"
+              },
+              "branch": {
+                "type": "string"
+              },
+              "commit": {
+                "type": "string"
+              },
+              "error": {
+                "type": "string"
+              },
+              "runnerFailed": {
+                "type": "boolean"
+              },
+              "exitCode": {
+                "type": "number"
+              },
+              "blobPath": {
+                "type": "string"
+              }
+            }
+          }
         },
         "error": {
           "type": "object",
