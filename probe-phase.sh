@@ -21,6 +21,7 @@ VMEXEC=CA36341D-ECEC-4BA6-AA76-134D0AFE4BA7   # e2e-investigator/vm-exec-vm
 RUNNER_REF="${RUNNER_REF:-main}"
 SMOKE="${SMOKE_ONLY:-0}"
 MODEL="${CLAUDE_MODEL:-}"   # empty = account default; e.g. claude-haiku-4-5-20251001
+BRANCH="${TARGET_BRANCH:-}" # empty = the branch in inputs/debug-execution.json
 # macOS ships bash 3.2: no associative arrays.
 case "$PHASE" in
   repro) TIMEOUT=15;; investigate) TIMEOUT=20;; fix) TIMEOUT=45;; pr) TIMEOUT=10;;
@@ -28,9 +29,9 @@ case "$PHASE" in
 esac
 cd "$(dirname "$0")"
 
-python3 - "$PHASE" "$RUNID" "$CMD" "$RUNNER_REPO_URL" "$RUNNER_REF" "$SMOKE" "$MODEL" > /tmp/phase_probe.js <<'PY'
+python3 - "$PHASE" "$RUNID" "$CMD" "$RUNNER_REPO_URL" "$RUNNER_REF" "$SMOKE" "$MODEL" "$BRANCH" > /tmp/phase_probe.js <<'PY'
 import json, sys
-phase, runid, cmd, runner, ref, smoke, model = sys.argv[1:8]
+phase, runid, cmd, runner, ref, smoke, model, branch = sys.argv[1:9]
 node = 'bootstrap' + phase[0].upper() + phase[1:]
 d = json.load(open('vm-agent/VmAgent/VmAgent.flow'))
 expr = [n for n in d['nodes'] if n['id'] == node][0]['inputs']['script']['expression']
@@ -40,11 +41,11 @@ vars_ = {'deriveRunId': {'output': runid}, 'fixAttempts': 1,
                               'smokeOnly': smoke == '1', 'maxFixAttempts': 3, 'claudeModel': model}}}
 inp = json.load(open('inputs/debug-execution.json'))
 vars_['start']['output']['repoUrl'] = inp['repoUrl']
-vars_['start']['output']['branch'] = inp['branch']
+vars_['start']['output']['branch'] = branch or inp['branch']
 print('const $vars = %s;' % json.dumps(vars_))
 print('const script = (() => {%s})();' % expr)
 print('process.stdout.write(JSON.stringify({Script: script, WorkDir: "C:\\\\vm-agent", RunId: %s, StateKey: %s, TimeoutMinutes: %s, MaxOutputChars: 32000}));'
-      % (json.dumps(runid), json.dumps(runid + '/state.zip'), json.dumps(int(sys.argv[8]) if len(sys.argv) > 8 else 45)))
+      % (json.dumps(runid), json.dumps(runid + '/state.zip'), json.dumps(int(sys.argv[9]) if len(sys.argv) > 9 else 45)))
 PY
 node /tmp/phase_probe.js "$TIMEOUT" > /tmp/phase_probe.json
 
