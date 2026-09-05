@@ -64,9 +64,17 @@ notebook's cause does not explain it.
 
 End your run with a single line of JSON and nothing else:
 
-    {"patchWritten": true, "title": "<imperative subject, under 50 characters>", "fixSummary": "<what you changed and why>", "confidence": "high|medium|low"}
+    {"patchWritten": true, "title": "<imperative subject, under 50 characters>", "problem": "<one sentence>", "solution": "<one sentence>", "fixSummary": "<what you changed and why>", "confidence": "high|medium|low"}
 
 `patchWritten` is true only if you left real edits in the working tree.
+
+`problem` and `solution` head the pull request description, so each is exactly ONE plain
+sentence a reviewer can read without opening anything: `problem` names the mechanism that made
+the test fail, `solution` names the change. No file paths, no run ids, no hedging. Good:
+`"problem": "The debug panel renders JSON values as separate text nodes, so the spec's exact-text
+locator never matches."` / `"solution": "Match the value with a substring locator scoped to the
+row instead of exact text."` If you declined to fix, `solution` says so in one sentence and
+`fixSummary` carries the detail.
 
 `title` becomes the commit subject and the PR title, so write it like one: imperative mood,
 under 50 characters, no file paths, no trailing period, and no `fix:` prefix (one is added for

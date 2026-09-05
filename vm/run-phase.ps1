@@ -30,6 +30,7 @@ $ErrorActionPreference = 'Continue'
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $here 'lib\prologue.ps1')
 . (Join-Path $here 'lib\ci-history.ps1')
+. (Join-Path $here 'lib\pr-body.ps1')
 
 $notes = Join-Path 'C:\vm-agent\notes' $RunId
 New-Item -ItemType Directory -Force -Path $notes | Out-Null
@@ -291,6 +292,10 @@ switch ($Phase) {
   $hypothesis = if ($json -and $json.hypothesis) { [string]$json.hypothesis } else { '' }
   if (-not $complete) { Write-Output "[investigate] notebook is missing or too short ($($body.Length) chars)" }
 
+  Write-Utf8Lf (Join-Path $notes 'investigation.json') (([ordered]@{
+    complete = $complete; hypothesis = $hypothesis
+  }) | ConvertTo-Json -Depth 3)
+
   Write-Status @{
     investigationComplete = $complete
     hypothesis = $hypothesis
@@ -328,6 +333,8 @@ switch ($Phase) {
   $fixSummary = if ($json -and $json.fixSummary) { [string]$json.fixSummary } else { '(no fixSummary returned)' }
   $confidence = if ($json -and $json.confidence) { [string]$json.confidence } else { 'low' }
   $fixTitle = if ($json -and $json.title) { [string]$json.title } else { '' }
+  $problem = if ($json -and $json.problem) { [string]$json.problem } else { '' }
+  $solution = if ($json -and $json.solution) { [string]$json.solution } else { '' }
 
   # git diff is the arbiter of whether anything was actually changed.
   $diff = (& git -C $RepoDir diff | Out-String)
@@ -415,7 +422,8 @@ switch ($Phase) {
 
   Write-Utf8Lf $prevFile $verify.ToString()
   Write-Utf8Lf (Join-Path $notes 'fix-summary.json') (([ordered]@{
-    title = $fixTitle; fixSummary = $fixSummary; confidence = $confidence
+    title = $fixTitle; problem = $problem; solution = $solution
+    fixSummary = $fixSummary; confidence = $confidence
     attempts = $FixAttempt; verified = $fixVerified
   }) | ConvertTo-Json -Depth 4)
 
@@ -450,7 +458,8 @@ switch ($Phase) {
   $prBranch = "e2e-investigator/$RunId"
 
   # e2e-only changes get the scope the repo uses for them.
-  $touched = @(& git -C $RepoDir apply --numstat $patchFile 2>$null | ForEach-Object { ($_ -split "`t")[2] })
+  $numstat = @(& git -C $RepoDir apply --numstat $patchFile 2>$null)
+  $touched = @($numstat | ForEach-Object { ($_ -split "`t")[2] })
   $scope = if ($touched.Count -gt 0 -and -not ($touched | Where-Object { $_ -notlike 'e2e/*' })) { 'fix(e2e)' } else { 'fix' }
   $title = New-CommitSubject $(if ($summary) { [string]$summary.title } else { '' }) $fixSummary $spec $scope
   Write-Output "[pr] $title" 
@@ -494,19 +503,7 @@ switch ($Phase) {
   }
 
   $bodyFile = Join-Path $notes 'pr-body.md'
-  Write-Utf8Lf $bodyFile @"
-Automated fix from the e2e investigator flow.
-
-Run: $RunId
-
-## Fix summary
-$fixSummary
-
-## Verification
-Spec re-run with --retries=0 passed after applying this patch (see flow run $RunId).
-
-Notebook and full logs: bucket e2e-investigations/$RunId/
-"@
+  Write-Utf8Lf $bodyFile (New-PrBody $notes $RunId $spec $numstat)
 
   $env:GH_PROMPT_DISABLED = '1'
   # GitHub caps attachments (10 MB for images, more for video), and a two-minute e2e run makes a

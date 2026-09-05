@@ -68,8 +68,14 @@ Append (never overwrite) a section in exactly this shape:
     Hypothesis: <one sentence, or "no cause established">
     Decisive error lines: <quoted verbatim, with file:line>
     Evidence: <what you ran and what it showed>
+    Ruled out: <each hypothesis you dropped and the evidence that killed it, or "none">
     Artifacts read: <error-context.md / trace.zip / ci-job.log paths, or "none">
     Unchecked: <what a next pass should look at>
+
+The notebook is published verbatim inside the pull request, so write it for a reviewer who was
+not here: full sentences, no shorthand, and every claim tied to a quoted line or a command.
+`Ruled out` is what stops a reviewer redoing your dead ends - fill it in whenever a pass
+discarded a theory.
 
 ## Last message
 
