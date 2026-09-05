@@ -27,11 +27,15 @@ function New-PrBody {
 
   $lines = New-Object System.Collections.Generic.List[string]
   function Add-Line([string]$Text = '') { $lines.Add($Text) }
+  # Logs come back through the VM's legacy codepage, so Playwright's box-drawing rules land as
+  # mojibake and its cursor moves as raw ANSI escapes. Neither means anything to a reviewer.
   function Add-Fence([string]$Text, [int]$Max) {
-  if (-not $Text -or -not $Text.Trim()) { Add-Line '_(nothing captured)_'; return }
-  Add-Line '```text'
-  Add-Line (Get-Tail $Text $Max).TrimEnd()
-  Add-Line '```'
+    if (-not $Text -or -not $Text.Trim()) { Add-Line '_(nothing captured)_'; return }
+    $clean = (Get-Tail $Text $Max) -replace "\u001b\[[0-9;?]*[a-zA-Z]", '' -replace '[^\u0020-\u007e\t\r\n]', ''
+    $clean = ($clean -split "`n" | Where-Object { $_.Trim() }) -join "`n"
+    Add-Line '```text'
+    Add-Line $clean.TrimEnd()
+    Add-Line '```'
   }
 
   Add-Line '## Problem'
@@ -78,7 +82,10 @@ function New-PrBody {
   }
   $conf = if ($Summary -and $Summary.confidence) { [string]$Summary.confidence } else { 'unstated' }
   $tries = if ($Summary -and $Summary.attempts) { [string]$Summary.attempts } else { '1' }
-  Add-Line ('Verified by re-running the spec with `--retries=0` against a locally served studio bundle; it passed. Fixer confidence: **{0}**, on attempt {1}.' -f $conf, $tries)
+  # Never claim a pass the phase did not see: openPr only runs after a verified fix today, but a
+  # flow change that let an unverified patch through would otherwise publish a false claim.
+  $verdict = if ($Summary -and -not $Summary.verified) { 'The spec was re-run with `--retries=0` against a locally served studio bundle and did NOT pass' } else { 'Verified by re-running the spec with `--retries=0` against a locally served studio bundle; it passed' }
+  Add-Line ('{0}. Fixer confidence: **{1}**, on attempt {2}.' -f $verdict, $conf, $tries)
   Add-Line ''
   Add-Line 'Verification output:'
   Add-Line ''

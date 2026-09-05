@@ -68,6 +68,11 @@ End your run with a single line of JSON and nothing else:
 
 `patchWritten` is true only if you left real edits in the working tree.
 
+`fixSummary` sits under a collapsed heading a reviewer opens second, so write it as three to
+six markdown bullets (`- ...`), not one paragraph: what you changed per site, why it fixes the
+mechanism, what you deliberately did not do, and any residual risk. Run 130020 shipped a
+280-word single paragraph there and it was unreadable.
+
 `problem` and `solution` head the pull request description, so each is exactly ONE plain
 sentence a reviewer can read without opening anything: `problem` names the mechanism that made
 the test fail, `solution` names the change. No file paths, no run ids, no hedging. Good:

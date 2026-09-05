@@ -454,7 +454,9 @@ switch ($Phase) {
   $summary = if (Test-Path $summaryFile) { Get-Content -Raw $summaryFile | ConvertFrom-Json } else { $null }
   $fixSummary = if ($summary) { [string]$summary.fixSummary } else { '' }
   $ownerRepo = (($RepoUrl -replace '^https://github.com/', '') -replace '\.git$', '').Trim('/')
-  $spec = if ($TestCommand -match '([\w.-]+?)(?:\.spec)?\.ts\b') { $Matches[1] } else { 'e2e' }
+  # Prefer the .spec.ts: the plain .ts branch matches `playwright.config.ts` first, which is how
+  # run 130020's PR came out titled `- Spec: playwright.config` (same trap as deriveRunId).
+  $spec = if ($TestCommand -match '([\w.-]+?)\.spec\.ts\b') { $Matches[1] } elseif ($TestCommand -match '([\w.-]+?)\.ts\b') { $Matches[1] } else { 'e2e' }
   $prBranch = "e2e-investigator/$RunId"
 
   # e2e-only changes get the scope the repo uses for them.
