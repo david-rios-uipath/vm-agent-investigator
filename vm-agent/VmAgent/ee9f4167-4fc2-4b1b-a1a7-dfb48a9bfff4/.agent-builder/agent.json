@@ -23,34 +23,34 @@
       "fixAttempts": {
         "type": "number"
       },
-      "repro__exitCode": {
+      "parseStatusRepro__output__exitCode": {
         "type": "number"
       },
-      "repro__excerpt": {
+      "parseStatusRepro__output__excerpt": {
         "type": "string"
       },
-      "repro__ciHistory": {
+      "parseStatusRepro__output__ciHistory": {
         "type": "string"
       },
-      "repro__blobPath": {
+      "repro__output__OutputBlobPath": {
         "type": "string"
       },
-      "investigate__notebook": {
+      "parseStatusInvestigate__output__notebook": {
         "type": "string"
       },
-      "fix__fixSummary": {
+      "parseStatusFix__output__fixSummary": {
         "type": "string"
       },
-      "fix__confidence": {
+      "parseStatusFix__output__confidence": {
         "type": "string"
       },
-      "fix__fixVerified": {
+      "parseStatusFix__output__fixVerified": {
         "type": "boolean"
       },
-      "fix__patch": {
+      "parseStatusFix__output__patch": {
         "type": "string"
       },
-      "pr__prUrl": {
+      "parseStatusPr__output__prUrl": {
         "type": "string"
       }
     }
@@ -103,7 +103,7 @@
     },
     {
       "role": "user",
-      "content": "Test command: {{input.start__output__testCommand}}\nRepository: {{input.start__output__repoUrl}} @ {{input.start__output__branch}}\nRepro exit code: {{input.repro__exitCode}}\nFull repro log in bucket: {{input.repro__blobPath}}\nFix attempts used: {{input.fixAttempts}}\n\nCI history for this spec: {{input.repro__ciHistory}}\n\nRepro output excerpt: {{input.repro__excerpt}}\n\nInvestigator notebook: {{input.investigate__notebook}}\n\nFix attempt (may be empty if no fix was attempted): {{input.fix__fixSummary}} (confidence {{input.fix__confidence}})\nFix verified: {{input.fix__fixVerified}}\nPatch (may be empty): {{input.fix__patch}}\nPR URL (may be empty if no PR was opened): {{input.pr__prUrl}}\n\nWrite the final report. Base every claim on the notebook and the repro output above, and fill\nevery field of the output schema.\n\nSet patch to the patch above verbatim, or empty if there is none. Set fixVerified to the value\nabove. Set prUrl to the URL above, or the empty string."
+      "content": "Test command: {{input.start__output__testCommand}}\nRepository: {{input.start__output__repoUrl}} @ {{input.start__output__branch}}\nRepro exit code: {{input.parseStatusRepro__output__exitCode}}\nFull repro log in bucket: {{input.repro__output__OutputBlobPath}}\nFix attempts used: {{input.fixAttempts}}\n\nCI history for this spec: {{input.parseStatusRepro__output__ciHistory}}\n\nRepro output excerpt: {{input.parseStatusRepro__output__excerpt}}\n\nInvestigator notebook: {{input.parseStatusInvestigate__output__notebook}}\n\nFix attempt (may be empty if no fix was attempted): {{input.parseStatusFix__output__fixSummary}} (confidence {{input.parseStatusFix__output__confidence}})\nFix verified: {{input.parseStatusFix__output__fixVerified}}\nPatch (may be empty): {{input.parseStatusFix__output__patch}}\nPR URL (may be empty if no PR was opened): {{input.parseStatusPr__output__prUrl}}\n\nWrite the final report. Base every claim on the notebook and the repro output above, and fill\nevery field of the output schema.\n\nSet patch to the patch above verbatim, or empty if there is none. Set fixVerified to the value\nabove. Set prUrl to the URL above, or the empty string."
     }
   ],
   "projectId": "ee9f4167-4fc2-4b1b-a1a7-dfb48a9bfff4",

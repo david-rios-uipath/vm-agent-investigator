@@ -171,7 +171,7 @@
       },
       "inputs": {
         "systemPrompt": "You write the final report for an automated e2e test investigation. You have no tools.\nYou are given: the failing test command, the repro phase's exit code, output excerpt and CI\nhistory, the investigator's notebook, and the fix, verification and PR results.\n\nBase every claim on the notebook and the repro output. Never invent a cause the notebook does\nnot support.\n\nSet classification to:\n  - regression: the notebook identifies a code change that breaks the test\n  - flake: timing/ordering dependent, passes on retry, no code cause\n  - infrastructure: the VM, licensing, environment or tooling caused it, not the product\n  - known-platform-issue: a known Studio Web / Orchestrator / solution failure\n  - inconclusive: the notebook does not establish a cause\n\nIf the notebook is missing or empty, set classification to inconclusive, say so in unverified,\nand report what the repro output alone shows.\n\nQuote decisive error lines in evidence, with file:line where the notebook has them. State\nplainly in unverified what remains unchecked. An honest gap is more useful than a confident\nguess.",
-        "userPrompt": "Test command: {{input.start__output__testCommand}}\nRepository: {{input.start__output__repoUrl}} @ {{input.start__output__branch}}\nRepro exit code: {{input.repro__exitCode}}\nFull repro log in bucket: {{input.repro__blobPath}}\nFix attempts used: {{input.fixAttempts}}\n\nCI history for this spec: {{input.repro__ciHistory}}\n\nRepro output excerpt: {{input.repro__excerpt}}\n\nInvestigator notebook: {{input.investigate__notebook}}\n\nFix attempt (may be empty if no fix was attempted): {{input.fix__fixSummary}} (confidence {{input.fix__confidence}})\nFix verified: {{input.fix__fixVerified}}\nPatch (may be empty): {{input.fix__patch}}\nPR URL (may be empty if no PR was opened): {{input.pr__prUrl}}\n\nWrite the final report. Base every claim on the notebook and the repro output above, and fill\nevery field of the output schema.\n\nSet patch to the patch above verbatim, or empty if there is none. Set fixVerified to the value\nabove. Set prUrl to the URL above, or the empty string.",
+        "userPrompt": "Test command: {{ $vars.start.output.testCommand }}\nRepository: {{ $vars.start.output.repoUrl }} @ {{ $vars.start.output.branch }}\nRepro exit code: {{ $vars.parseStatusRepro.output.exitCode }}\nFull repro log in bucket: {{ $vars.repro.output.OutputBlobPath }}\nFix attempts used: {{ $vars.fixAttempts }}\n\nCI history for this spec: {{ $vars.parseStatusRepro.output.ciHistory }}\n\nRepro output excerpt: {{ $vars.parseStatusRepro.output.excerpt }}\n\nInvestigator notebook: {{ $vars.parseStatusInvestigate.output.notebook }}\n\nFix attempt (may be empty if no fix was attempted): {{ $vars.parseStatusFix.output.fixSummary }} (confidence {{ $vars.parseStatusFix.output.confidence }})\nFix verified: {{ $vars.parseStatusFix.output.fixVerified }}\nPatch (may be empty): {{ $vars.parseStatusFix.output.patch }}\nPR URL (may be empty if no PR was opened): {{ $vars.parseStatusPr.output.prUrl }}\n\nWrite the final report. Base every claim on the notebook and the repro output above, and fill\nevery field of the output schema.\n\nSet patch to the patch above verbatim, or empty if there is none. Set fixVerified to the value\nabove. Set prUrl to the URL above, or the empty string.",
         "model": "anthropic.claude-opus-4-8",
         "mode": "standard",
         "temperature": 0,
@@ -2675,7 +2675,7 @@
         "type": "bpmn:ServiceTask",
         "serviceType": "Orchestrator.StartJob",
         "version": "v2",
-        "listingVersion": "1.0.3",
+        "listingVersion": "1.0.5",
         "bindings": {
           "resource": "process",
           "resourceSubType": "Process",
@@ -2743,6 +2743,11 @@
                 "label": "RunId"
               },
               {
+                "name": "inputs.StateKey",
+                "type": "text",
+                "label": "StateKey"
+              },
+              {
                 "name": "inputs.TimeoutMinutes",
                 "type": "number",
                 "label": "TimeoutMinutes"
@@ -2768,6 +2773,9 @@
           "RunId": {
             "type": "string"
           },
+          "StateKey": {
+            "type": "string"
+          },
           "TimeoutMinutes": {
             "type": "number"
           },
@@ -2780,6 +2788,7 @@
         "Script": "",
         "WorkDir": "",
         "RunId": "",
+        "StateKey": "",
         "TimeoutMinutes": 0,
         "MaxOutputChars": 0
       },
