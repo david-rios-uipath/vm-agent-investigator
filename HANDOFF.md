@@ -44,7 +44,10 @@ Flow shape now: `start -> deriveRunId -> decisionResume -> bootstrap<Phase> -> <
 git push, not a solution release. Each phase prints one `STATUS_JSON=<json>` line as its last
 line of stdout and `parseStatus*` parses only that; its absence routes to `endSetupFailed`.
 
-New trigger inputs: `maxFixAttempts` (3), `runnerRepoUrl`, `runnerRef` (`master`). `maxIterations`
+New trigger inputs: `maxFixAttempts` (3), `runnerRepoUrl`, `runnerRef` (`master`), and
+`claudeModel` — empty means the account default, set it to e.g.
+`claude-haiku-4-5-20251001` to run the investigate and fix phases cheaply while testing.
+`probe-phase.sh` reads the same lever from `CLAUDE_MODEL`. `maxIterations`
 and the `iteration` global are gone with the investigator loop.
 
 `vm-exec` (`vm-agent/vm-exec/Main.xaml`) gained: an `ANTHROPIC_API_KEY` Credential asset,

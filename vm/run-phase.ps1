@@ -15,6 +15,7 @@ param(
   [Parameter(Mandatory)][string] $RepoUrl,
   [Parameter(Mandatory)][string] $Branch,
   [Parameter(Mandatory)][string] $TestCommand,
+  [string] $Model = '',
   [int] $FixAttempt = 1,
   [int] $MaxFixAttempts = 3,
   [switch] $SmokeOnly
@@ -68,6 +69,8 @@ function Invoke-Claude([string]$PromptFile, [string]$AllowedTools, [int]$MaxTurn
   $transcript = Join-Path $notes "claude-$Phase.jsonl"
   $claudeArgs = @('-p', '--output-format', 'stream-json', '--verbose', '--max-turns', "$MaxTurns", '--allowed-tools', $AllowedTools)
   if ($PermissionMode) { $claudeArgs += @('--permission-mode', $PermissionMode) }
+  # Empty means whatever the account default is; set it to run cheap models while testing.
+  if ($Model) { $claudeArgs += @('--model', $Model) }
   Write-Output "[claude] claude $($claudeArgs -join ' ')"
   Push-Location $RepoDir
   try {

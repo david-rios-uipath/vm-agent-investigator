@@ -5,5 +5,6 @@
   "smokeOnly": true,
   "maxFixAttempts": 3,
   "runnerRepoUrl": "https://github.com/david-rios-uipath/vm-agent-investigator",
-  "runnerRef": "master"
+  "runnerRef": "master",
+  "claudeModel": ""
 }

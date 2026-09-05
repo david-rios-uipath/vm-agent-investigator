@@ -45,6 +45,11 @@
             "type": "string",
             "title": "runnerRef",
             "default": "master"
+          },
+          "claudeModel": {
+            "type": "string",
+            "title": "claudeModel",
+            "default": ""
           }
         }
       },
