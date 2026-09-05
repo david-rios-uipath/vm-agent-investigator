@@ -47,8 +47,27 @@ if (Test-Path $stateZip) {
 }
 function Write-StateArchive {
   if (-not (Test-Path $notes)) { return }
-  if (@(Get-ChildItem $notes -Recurse -File).Count -eq 0) { return }
-  Compress-Archive -Path (Join-Path $notes '*') -DestinationPath $stateZip -Force -ErrorAction SilentlyContinue
+  $files = @(Get-ChildItem $notes -Recurse -File)
+  if ($files.Count -eq 0) { return }
+  # One unreadable file makes Compress-Archive fail for the whole set, and a background process
+  # can still hold a log open when the phase ends. Stage a copy, skip what cannot be read, and
+  # say so - silently pushing nothing is how several runs' state was lost.
+  $stage = Join-Path $env:TEMP ('state-' + [guid]::NewGuid().ToString('N'))
+  New-Item -ItemType Directory -Force -Path $stage | Out-Null
+  $skipped = @()
+  foreach ($f in $files) {
+    $rel = $f.FullName.Substring($notes.Length).TrimStart('\')
+    $dest = Join-Path $stage $rel
+    New-Item -ItemType Directory -Force -Path (Split-Path $dest) | Out-Null
+    try { Copy-Item $f.FullName $dest -ErrorAction Stop } catch { $skipped += $rel }
+  }
+  try {
+    Compress-Archive -Path (Join-Path $stage '*') -DestinationPath $stateZip -Force -ErrorAction Stop
+    Write-Output ('[state] archived {0} files, {1:N1} MB{2}' -f ($files.Count - $skipped.Count),
+      ((Get-Item $stateZip).Length / 1MB), $(if ($skipped.Count) { ' (unreadable: ' + ($skipped -join ', ') + ')' } else { '' }))
+  } catch {
+    Write-Output "[state] ARCHIVE FAILED, this run's state is not being pushed: $($_.Exception.Message)"
+  } finally { Remove-Item $stage -Recurse -Force -ErrorAction SilentlyContinue }
 }
 
 Write-Output "[phase] $Phase runId=$RunId branch=$Branch"
@@ -327,7 +346,9 @@ switch ($Phase) {
   $verify = New-Object System.Text.StringBuilder
   function Note([string]$Line) { Write-Output $Line; [void]$verify.AppendLine($Line) }
 
-  $devlog = Join-Path $notes 'studio-dev.log'
+  # Outside $notes: the dev server holds this open past the end of the phase, and a locked
+  # file in the state directory used to sink the whole archive.
+  $devlog = Join-Path 'C:\vm-agent' "studio-dev-$RunId.log"
   Note '[verify] starting local studio MFE (pnpm run dev:studio)'
   $dev = Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', "set `"PATH=$Bin;$NodeBin;%PATH%`" && corepack pnpm run dev:studio > `"$devlog`" 2>&1" -WorkingDirectory $RepoDir -PassThru -WindowStyle Hidden
   $port = ''
@@ -348,6 +369,8 @@ switch ($Phase) {
   if (-not $port) {
     Note '[verify] the studio dev server never served remoteEntry.js; tail of its log:'
     Get-Content $devlog -Tail 40 -ErrorAction SilentlyContinue | ForEach-Object { Note "  $_" }
+    # Only worth keeping in state when it explains a failure.
+    Copy-Item $devlog (Join-Path $notes 'studio-dev.log') -ErrorAction SilentlyContinue
   } else {
     Note "[verify] studio MFE serving on port $port"
     $cmd = "$localCmd --retries=0 --reporter=line"
@@ -374,6 +397,13 @@ switch ($Phase) {
           Invoke-Cmd ('ffmpeg -y -loglevel error -i "{0}" -vf "fps=12,scale=960:-1:flags=lanczos,split[a][b];[a]palettegen=stats_mode=diff[p];[b][p]paletteuse=dither=bayer" -loop 0 "{1}"' -f $mp4, $gif) $RepoDir | Out-Null
           Note ("[verify] demo mp4 {0:N1} MB, gif {1:N1} MB" -f ((Get-Item $mp4).Length / 1MB),
             $(if (Test-Path $gif) { (Get-Item $gif).Length / 1MB } else { 0 }))
+          # Keep the state archive small: the mp4 supersedes its own source, and a gif too big
+          # to attach is dead weight in every later pull.
+          Remove-Item (Join-Path $notes 'video.webm') -Force -ErrorAction SilentlyContinue
+          if ((Test-Path $gif) -and (Get-Item $gif).Length -ge 9MB) {
+            Note '[verify] gif is over the attachable size; keeping only the mp4'
+            Remove-Item $gif -Force -ErrorAction SilentlyContinue
+          }
         } else { Note '[verify] ffmpeg produced no mp4; the PR will have no video' }
       } else { Note '[verify] no ffmpeg on this VM; the PR will have no video' }
     }

@@ -1746,13 +1746,6 @@
       "targetPort": "input"
     },
     {
-      "id": "edge_parseStatusFix_success_decisionVerify_input",
-      "sourceNodeId": "parseStatusFix",
-      "sourcePort": "success",
-      "targetNodeId": "decisionVerify",
-      "targetPort": "input"
-    },
-    {
       "id": "edge_decisionVerify_true_decisionPr_input",
       "sourceNodeId": "decisionVerify",
       "sourcePort": "true",
@@ -1813,6 +1806,13 @@
       "sourceNodeId": "investigationSummarizer",
       "sourcePort": "success",
       "targetNodeId": "end",
+      "targetPort": "input"
+    },
+    {
+      "id": "xy-edge__parseStatusFixsuccess-decisionVerifyinput",
+      "sourceNodeId": "parseStatusFix",
+      "sourcePort": "success",
+      "targetNodeId": "decisionVerify",
       "targetPort": "input"
     }
   ],
@@ -4203,7 +4203,7 @@
       },
       "endSetupFailed": {
         "position": {
-          "x": 1800,
+          "x": 2256,
           "y": -160
         },
         "size": {
@@ -4270,7 +4270,7 @@
       "sticky-3": {
         "position": {
           "x": 2976,
-          "y": 56
+          "y": 64
         },
         "size": {
           "width": 1152,
@@ -4446,6 +4446,28 @@
     },
     "edges": {
       "edge_decisionResume_true_bootstrapFix_input": {
+        "waypoints": [
+          {
+            "id": "wp-f91d6ba0-5d36-40aa-a17b-f91614a399ac",
+            "x": 516.0000897481368,
+            "y": 176
+          },
+          {
+            "id": "wp-5ed40069-a251-45e6-a1c1-290ce8f64f7e",
+            "x": 516.0000897481368,
+            "y": -208
+          },
+          {
+            "id": "wp-c74a3054-fe89-4cae-acca-43402dcb79b6",
+            "x": 2992,
+            "y": -208
+          },
+          {
+            "id": "wp-13f5f4a7-4f47-41eb-b2a3-9e2ba21a5ae2",
+            "x": 2992,
+            "y": 192.00004396497198
+          }
+        ],
         "routedWaypoints": [
           {
             "id": "edge_decisionResume_true_bootstrapFix_input-r0",
@@ -4456,30 +4478,6 @@
             "id": "edge_decisionResume_true_bootstrapFix_input-r1",
             "x": 432,
             "y": 32
-          }
-        ]
-      },
-      "edge_decisionReproRan_false_endSetupFailed_input": {
-        "routedWaypoints": [
-          {
-            "id": "edge_decisionReproRan_false_endSetupFailed_input-r0",
-            "x": 1200,
-            "y": 224
-          },
-          {
-            "id": "edge_decisionReproRan_false_endSetupFailed_input-r1",
-            "x": 1200,
-            "y": 512
-          },
-          {
-            "id": "edge_decisionReproRan_false_endSetupFailed_input-r2",
-            "x": 2160,
-            "y": 512
-          },
-          {
-            "id": "edge_decisionReproRan_false_endSetupFailed_input-r3",
-            "x": 2160,
-            "y": 384
           }
         ]
       },
@@ -4498,6 +4496,18 @@
         ]
       },
       "edge_decisionInvestigated_true_bootstrapFix_input": {
+        "waypoints": [
+          {
+            "id": "wp-a9107356-ea2c-4f7d-aded-8a439d8e3b31",
+            "x": 2992,
+            "y": 176
+          },
+          {
+            "id": "wp-2f6fe0b8-889b-4a14-8e4c-fbc5fcee23c1",
+            "x": 2992,
+            "y": 192.00004952185986
+          }
+        ],
         "routedWaypoints": [
           {
             "id": "edge_decisionInvestigated_true_bootstrapFix_input-r0",
@@ -4512,44 +4522,42 @@
         ]
       },
       "edge_decisionInvestigated_false_endSetupFailed_input": {
-        "routedWaypoints": [
+        "waypoints": [
           {
-            "id": "edge_decisionInvestigated_false_endSetupFailed_input-r0",
-            "x": 2160,
-            "y": 192
+            "id": "wp-423a7b6b-af61-41f3-8f49-95c2616c97d3",
+            "x": 2880,
+            "y": 207.99373797241992
           },
           {
-            "id": "edge_decisionInvestigated_false_endSetupFailed_input-r1",
-            "x": 2160,
-            "y": 384
-          }
-        ]
-      },
-      "edge_parseStatusFix_success_decisionVerify_input": {
-        "routedWaypoints": [
-          {
-            "id": "edge_parseStatusFix_success_decisionVerify_input-r0",
-            "x": 2736,
-            "y": 32
+            "id": "wp-62b78ab1-fc8e-49a7-b906-fda5c2434583",
+            "x": 2880,
+            "y": -176
           },
           {
-            "id": "edge_parseStatusFix_success_decisionVerify_input-r1",
-            "x": 2736,
-            "y": 528
+            "id": "wp-39a52629-6425-4e24-8f3c-cd9cd4084c9b",
+            "x": 2224,
+            "y": -176
           },
           {
-            "id": "edge_parseStatusFix_success_decisionVerify_input-r2",
-            "x": 1776,
-            "y": 528
-          },
-          {
-            "id": "edge_parseStatusFix_success_decisionVerify_input-r3",
-            "x": 1776,
-            "y": -128
+            "id": "wp-d05d156e-8b7c-453e-8fe6-17e763a60930",
+            "x": 2224,
+            "y": -111.99997028560696
           }
         ]
       },
       "edge_decisionVerify_true_decisionPr_input": {
+        "waypoints": [
+          {
+            "id": "wp-8c81755e-d805-4ab7-8ee6-265303d13bd3",
+            "x": 3936,
+            "y": 176
+          },
+          {
+            "id": "wp-7ae7aeea-a713-44a8-af86-ad55cbe3b5c8",
+            "x": 3936,
+            "y": 192.00000937408092
+          }
+        ],
         "routedWaypoints": [
           {
             "id": "edge_decisionVerify_true_decisionPr_input-r0",
@@ -4563,7 +4571,53 @@
           }
         ]
       },
+      "edge_decisionVerify_false_bumpFixAttempts_input": {
+        "waypoints": [
+          {
+            "id": "wp-2ccf5055-0ecd-43df-a89d-de88d753d272",
+            "x": 3872,
+            "y": 207.99373311333417
+          },
+          {
+            "id": "wp-76a92046-de6a-4abd-8f16-4dfb2428412e",
+            "x": 3872,
+            "y": 736
+          },
+          {
+            "id": "wp-4b2cb0ed-1e4f-4a92-8707-6213726e6d77",
+            "x": 3136,
+            "y": 736
+          },
+          {
+            "id": "wp-13a65f40-7262-4b0a-9030-5155804be015",
+            "x": 3136,
+            "y": 468.00001591600585
+          }
+        ]
+      },
       "edge_bumpFixAttempts_success_bootstrapFix_input": {
+        "waypoints": [
+          {
+            "id": "wp-43260b0f-489f-463c-9a45-f3c56ccfff83",
+            "x": 3396.000141165133,
+            "y": 468.0000521534917
+          },
+          {
+            "id": "wp-6b69913e-6681-41f3-a4b7-b89a6a67cc42",
+            "x": 3396.000141165133,
+            "y": -208
+          },
+          {
+            "id": "wp-badef7d6-ecf4-453e-9bb7-eb8a1ed70825",
+            "x": 2912,
+            "y": -208
+          },
+          {
+            "id": "wp-c17a40c7-84ce-4e1e-8834-a905c383f485",
+            "x": 2912,
+            "y": 192.0000221793865
+          }
+        ],
         "routedWaypoints": [
           {
             "id": "edge_bumpFixAttempts_success_bootstrapFix_input-r0",
@@ -4578,6 +4632,28 @@
         ]
       },
       "edge_decisionPr_false_investigationSummarizer_input": {
+        "waypoints": [
+          {
+            "id": "wp-8eca3036-a279-4e69-9fea-8c5ea051d2ac",
+            "x": 4116.000102573989,
+            "y": 207.99385334230976
+          },
+          {
+            "id": "wp-4f5d7db7-c603-45b2-933a-a97b36fb7110",
+            "x": 4116.000102573989,
+            "y": 432
+          },
+          {
+            "id": "wp-4305bc1f-5e11-4aaa-826f-f3b7f2b1ba64",
+            "x": 5104,
+            "y": 432
+          },
+          {
+            "id": "wp-6f6526a3-13e5-4c95-bdeb-bdd4678a18ff",
+            "x": 5104,
+            "y": 192.00000937408092
+          }
+        ],
         "routedWaypoints": [
           {
             "id": "edge_decisionPr_false_investigationSummarizer_input-r0",

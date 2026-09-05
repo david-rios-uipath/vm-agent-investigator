@@ -88,6 +88,13 @@ Nothing here has run. In particular:
   assets). Both hand back a `SecureString`, so the env-var injection is identical. **Verified
   on the VM 2026-09-05:** the key arrives (108 chars), `GH_TOKEN` and `GIT_TOKEN` are present,
   `SLACK_TOKEN` is not.
+- **State pushes fail silently if any file in the state directory is locked.** The studio dev
+  server holds `studio-dev.log` open past the end of the fix phase, so `Compress-Archive` threw
+  `IOException` for the whole set and, with `-ErrorAction SilentlyContinue`, several fix runs
+  pushed nothing at all while still reporting success. The `pr` phase only worked because the
+  single-VM pool still had the files on local disk - exactly the assumption this restructure
+  exists to remove. Fixed: the dev log lives outside the state dir, the archive is staged
+  through a copy that skips unreadable files, and a failure is printed rather than swallowed.
 - **`vm-exec` 1.0.5 is published and live** (`vm-exec-vm` points at it). `StateKey` round-trips
   through the bucket in both directions, proven by wiping the VM's local copies from a job with
   no `StateKey` and then pulling them back from one with it.
