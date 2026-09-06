@@ -134,7 +134,10 @@ function Ensure-Tools {
 # and reinstall only when the lockfile actually moved.
 function Refresh-Repo([string]$RepoUrl, [string]$Branch) {
   $url = $RepoUrl
-  if ($env:GIT_TOKEN) { $url = $url -replace '^https://', "https://x-access-token:$($env:GIT_TOKEN)@" }
+  # GIT_TOKEN was never an asset, only a hand-set env var on the first VM; GH_TOKEN is the
+  # injected one (repo scope, it opens the PRs). Keep GIT_TOKEN as an override.
+  $tok = if ($env:GIT_TOKEN) { $env:GIT_TOKEN } else { $env:GH_TOKEN }
+  if ($tok) { $url = $url -replace '^https://', "https://x-access-token:$tok@" }
 
   if (Test-Path (Join-Path $RepoDir '.git')) {
     Write-Output "[repo] refreshing $RepoDir"
