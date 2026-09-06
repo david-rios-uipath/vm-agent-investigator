@@ -214,7 +214,9 @@ switch ($Phase) {
   } elseif (Test-NeedsRepro $ci) {
     $source = 'vm'
     Write-Output "[repro] $TestCommand"
-    $out = @(Invoke-Cmd $TestCommand $RepoDir @{ CI = 'true' } 2>&1)
+    # E2E_RECORD: playwright.config.ts only records with it set, and the failing run is the
+    # "before" clip the PR shows next to the verified fix.
+    $out = @(Invoke-Cmd $TestCommand $RepoDir @{ CI = 'true'; E2E_RECORD = '1' } 2>&1)
     $exit = $LASTEXITCODE
     $stdout = ($out -join "`n")
     Write-Utf8Lf (Join-Path $notes 'test-output.log') $stdout
@@ -225,6 +227,10 @@ switch ($Phase) {
     # in state so the investigate phase can still read the DOM and the trace.
     $results = Join-Path $RepoDir 'e2e\test-results'
     if (Test-Path $results) {
+      Save-DemoVideo $results $notes 'bug-demo' | Out-Null
+      # The clip is in state as bug-demo.mp4 now; the raw webms are the biggest thing in
+      # test-results and would push the copy below over its size guard.
+      Get-ChildItem $results -Recurse -Filter *.webm -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
       $dest = Join-Path $notes 'test-results'
       $size = (Get-ChildItem $results -Recurse -File -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum
       New-Item -ItemType Directory -Force -Path $dest | Out-Null
@@ -397,31 +403,7 @@ switch ($Phase) {
     $out | Select-Object -Last 60 | ForEach-Object { Note "  $_" }
     Note "[verify] test exit $exit"
     $fixVerified = ($exit -eq 0)
-    $video = Get-ChildItem (Join-Path $RepoDir 'e2e\test-results') -Recurse -Filter *.webm -ErrorAction SilentlyContinue |
-      Sort-Object LastWriteTime -Descending | Select-Object -First 1
-    if ($video) {
-      Copy-Item $video.FullName (Join-Path $notes 'video.webm') -Force
-      Note '[verify] video saved to state'
-      # GitHub will not render a raw webm, so convert to the mp4/gif pair the PR can show.
-      # ffmpeg arguments taken from flow-workbench scripts/record-demo.sh so the output
-      # matches what the pr-demo skill produces by hand.
-      if (Test-Tool 'ffmpeg' @('-version')) {
-        $mp4 = Join-Path $notes 'fix-demo.mp4'; $gif = Join-Path $notes 'fix-demo.gif'
-        Invoke-Cmd ('ffmpeg -y -loglevel error -i "{0}" -vf "fps=30,scale=trunc(iw/2)*2:trunc(ih/2)*2" -c:v libx264 -pix_fmt yuv420p "{1}"' -f $video.FullName, $mp4) $RepoDir | Out-Null
-        if (Test-Path $mp4) {
-          Invoke-Cmd ('ffmpeg -y -loglevel error -i "{0}" -vf "fps=12,scale=960:-1:flags=lanczos,split[a][b];[a]palettegen=stats_mode=diff[p];[b][p]paletteuse=dither=bayer" -loop 0 "{1}"' -f $mp4, $gif) $RepoDir | Out-Null
-          Note ("[verify] demo mp4 {0:N1} MB, gif {1:N1} MB" -f ((Get-Item $mp4).Length / 1MB),
-            $(if (Test-Path $gif) { (Get-Item $gif).Length / 1MB } else { 0 }))
-          # Keep the state archive small: the mp4 supersedes its own source, and a gif too big
-          # to attach is dead weight in every later pull.
-          Remove-Item (Join-Path $notes 'video.webm') -Force -ErrorAction SilentlyContinue
-          if ((Test-Path $gif) -and (Get-Item $gif).Length -ge 9MB) {
-            Note '[verify] gif is over the attachable size; keeping only the mp4'
-            Remove-Item $gif -Force -ErrorAction SilentlyContinue
-          }
-        } else { Note '[verify] ffmpeg produced no mp4; the PR will have no video' }
-      } else { Note '[verify] no ffmpeg on this VM; the PR will have no video' }
-    }
+    Save-DemoVideo (Join-Path $RepoDir 'e2e\test-results') $notes 'fix-demo' ${function:Note} | Out-Null
   }
 
   taskkill /PID $dev.Id /T /F 2>&1 | Out-Null
@@ -512,23 +494,32 @@ switch ($Phase) {
     exit 0
   }
 
-  $bodyFile = Join-Path $notes 'pr-body.md'
-  Write-Utf8Lf $bodyFile (New-PrBody $notes $RunId $spec $numstat)
-
   $env:GH_PROMPT_DISABLED = '1'
   # GitHub caps attachments (10 MB for images, more for video), and a two-minute e2e run makes a
   # large gif. Prefer the mp4 player, fall back to the gif, skip rather than fail the PR.
-  $attachArgs = @()
-  $mp4 = Join-Path $notes 'fix-demo.mp4'; $gif = Join-Path $notes 'fix-demo.gif'
-  if ((Test-Path $mp4) -and (Get-Item $mp4).Length -lt 24MB) {
-    $attachArgs = @('--attach', $mp4)   # video renders as a player and takes no alt text
-    Write-Output ('[pr] attaching fix-demo.mp4 ({0:N1} MB)' -f ((Get-Item $mp4).Length / 1MB))
-  } elseif ((Test-Path $gif) -and (Get-Item $gif).Length -lt 9MB) {
-    $attachArgs = @('--attach', "$gif#The e2e spec passing with this fix applied")
-    Write-Output ('[pr] attaching fix-demo.gif ({0:N1} MB)' -f ((Get-Item $gif).Length / 1MB))
-  } else {
+  # gh appends attachments to the body in the order given, and a video carries no alt text, so
+  # the body names that order instead - see $captions below.
+  $attachArgs = @(); $captions = @()
+  foreach ($clip in @(
+      @{ base = 'bug-demo'; caption = 'the spec failing before the fix' },
+      @{ base = 'fix-demo'; caption = 'the spec passing with the fix applied' })) {
+    $mp4 = Join-Path $notes ($clip.base + '.mp4'); $gif = Join-Path $notes ($clip.base + '.gif')
+    if ((Test-Path $mp4) -and (Get-Item $mp4).Length -lt 24MB) {
+      $attachArgs += @('--attach', $mp4)
+      $captions += $clip.caption
+      Write-Output ('[pr] attaching {0}.mp4 ({1:N1} MB)' -f $clip.base, ((Get-Item $mp4).Length / 1MB))
+    } elseif ((Test-Path $gif) -and (Get-Item $gif).Length -lt 9MB) {
+      $attachArgs += @('--attach', ('{0}#The e2e spec: {1}' -f $gif, $clip.caption))
+      $captions += $clip.caption
+      Write-Output ('[pr] attaching {0}.gif ({1:N1} MB)' -f $clip.base, ((Get-Item $gif).Length / 1MB))
+    }
+  }
+  if ($attachArgs.Count -eq 0) {
     Write-Output '[pr] no attachable recording under the size limit; see the run state in the bucket'
   }
+
+  $bodyFile = Join-Path $notes 'pr-body.md'
+  Write-Utf8Lf $bodyFile (New-PrBody $notes $RunId $spec $numstat $captions)
   $out = @(gh pr create --draft --repo $ownerRepo --base $Branch --head $prBranch --title $title --body-file $bodyFile @attachArgs 2>&1 |
     ForEach-Object { "$_" -replace $tokenRe, '***' })
   $out | ForEach-Object { Write-Output $_ }

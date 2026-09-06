@@ -13,7 +13,10 @@ function New-PrBody {
     [Parameter(Mandatory)][string] $Notes,
     [Parameter(Mandatory)][string] $RunId,
     [Parameter(Mandatory)][string] $Spec,
-    [string[]] $NumStat = @()
+    [string[]] $NumStat = @(),
+    # Captions for the clips the pr phase attaches, in attach order. gh appends them below the
+    # body and a video takes no alt text, so this is the only place a reader learns which is which.
+    [string[]] $Captions = @()
   )
   $Summary = if (Test-Path (Join-Path $Notes 'fix-summary.json')) { Get-Content -Raw (Join-Path $Notes 'fix-summary.json') | ConvertFrom-Json } else { $null }
   $fixSummary = if ($Summary -and $Summary.fixSummary) { [string]$Summary.fixSummary } else { '' }
@@ -50,6 +53,12 @@ function New-PrBody {
   $src = if ($ev.source -eq 'ci') { 'CI history only (the spec was not re-run here)' } else { 're-run on the investigator VM' }
   Add-Line ('- Evidence: {0}, exit code {1}' -f $src, $ev.exitCode)
   if ($ev.classification) { Add-Line ('- CI classification: {0}' -f $ev.classification) }
+  # No local recording exists on this path (the spec was never run here), so the nightly run
+  # itself is the evidence a reviewer can open.
+  if ($ev.source -eq 'ci') {
+    $night = @($ev.ciRuns | Where-Object { $_.url -and $_.verdict -in 'failed', 'flaky' })[0]
+    if ($night) { Add-Line ('- Nightly run: {0} (`{1}`, {2})' -f $night.url, $night.sha, $night.date) }
+  }
   if ($ev.firstFailSha) {
     $since = '- Failing since `{0}`' -f $ev.firstFailSha
     if ($ev.lastPassSha) { $since += ', last green `{0}`' -f $ev.lastPassSha }
@@ -102,6 +111,11 @@ function New-PrBody {
   Add-Line ''
   Add-Line '---'
   Add-Line ''
+  if ($Captions.Count -gt 0) {
+    Add-Line ('Recording{0} below, in order: {1}.' -f $(if ($Captions.Count -gt 1) { 's' } else { '' }),
+      (($Captions | ForEach-Object { '**' + $_ + '**' }) -join ', then '))
+    Add-Line ''
+  }
   Add-Line ('Automated e2e investigator, run `{0}`. Full logs and state: bucket `e2e-investigations/{0}/`.' -f $RunId)
 
   $lines -join "`n"

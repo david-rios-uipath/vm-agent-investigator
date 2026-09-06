@@ -203,3 +203,42 @@ function Write-Status([hashtable]$Status) {
   Write-Output ''
   Write-Output "STATUS_JSON=$json"
 }
+
+# Turns the newest .webm under $SearchRoot into the mp4/gif pair a PR body can render, in
+# $Notes/<BaseName>.{mp4,gif}. Returns the mp4 path, the gif path, or $null when there is
+# nothing to show. ffmpeg arguments are flow-workbench's scripts/record-demo.sh, so the output
+# matches what the pr-demo skill produces by hand. Both the failing repro and the verified fix
+# go through here, which is why the caller names the clip.
+function Save-DemoVideo {
+  param(
+    [Parameter(Mandatory)][string] $SearchRoot,
+    [Parameter(Mandatory)][string] $Notes,
+    [Parameter(Mandatory)][string] $BaseName,
+    # The fix phase mirrors its log into the PR body; the repro phase just prints.
+    [scriptblock] $Log = { param($m) Write-Output $m }
+  )
+  $video = Get-ChildItem $SearchRoot -Recurse -Filter *.webm -ErrorAction SilentlyContinue |
+    Sort-Object LastWriteTime -Descending | Select-Object -First 1
+  if (-not $video) { return $null }
+
+  $webm = Join-Path $Notes "$BaseName.webm"
+  Copy-Item $video.FullName $webm -Force
+  & $Log "[$BaseName] video saved to state"
+  if (-not (Test-Tool 'ffmpeg' @('-version'))) { & $Log "[$BaseName] no ffmpeg on this VM; the PR will have no video"; return $null }
+
+  $mp4 = Join-Path $Notes "$BaseName.mp4"; $gif = Join-Path $Notes "$BaseName.gif"
+  Invoke-Cmd ('ffmpeg -y -loglevel error -i "{0}" -vf "fps=30,scale=trunc(iw/2)*2:trunc(ih/2)*2" -c:v libx264 -pix_fmt yuv420p "{1}"' -f $video.FullName, $mp4) $RepoDir | Out-Null
+  if (-not (Test-Path $mp4)) { & $Log "[$BaseName] ffmpeg produced no mp4; the PR will have no video"; return $null }
+  Invoke-Cmd ('ffmpeg -y -loglevel error -i "{0}" -vf "fps=12,scale=960:-1:flags=lanczos,split[a][b];[a]palettegen=stats_mode=diff[p];[b][p]paletteuse=dither=bayer" -loop 0 "{1}"' -f $mp4, $gif) $RepoDir | Out-Null
+  & $Log ("[$BaseName] mp4 {0:N1} MB, gif {1:N1} MB" -f ((Get-Item $mp4).Length / 1MB),
+    $(if (Test-Path $gif) { (Get-Item $gif).Length / 1MB } else { 0 }))
+
+  # Keep the state archive small: the mp4 supersedes its own source, and a gif too big to
+  # attach is dead weight in every later pull.
+  Remove-Item $webm -Force -ErrorAction SilentlyContinue
+  if ((Test-Path $gif) -and (Get-Item $gif).Length -ge 9MB) {
+    & $Log "[$BaseName] gif is over the attachable size; keeping only the mp4"
+    Remove-Item $gif -Force -ErrorAction SilentlyContinue
+  }
+  return $mp4
+}
