@@ -167,9 +167,9 @@ function Refresh-Repo([string]$RepoUrl, [string]$Branch) {
 }
 
 function Install-Deps {
-  # .npmrc reads GH_NPM_REGISTRY_TOKEN for @uipath packages on npm.pkg.github.com. Only the
-  # injected GH_TOKEN asset exists, so derive it; never read it from the VM environment.
-  $env:GH_NPM_REGISTRY_TOKEN = $env:GH_TOKEN
+  # .npmrc reads GH_NPM_REGISTRY_TOKEN for @uipath packages on npm.pkg.github.com; vm-exec
+  # injects it from the asset of the same name (GH_TOKEN alone gets 403 from the registry).
+  if (-not $env:GH_NPM_REGISTRY_TOKEN) { throw '[repo] GH_NPM_REGISTRY_TOKEN was not injected; add the Credential asset to the process folder' }
   Write-Output '[repo] pnpm install'
   Invoke-Cmd 'corepack pnpm install --frozen-lockfile --prefer-offline' $RepoDir
   if ($LASTEXITCODE -ne 0) { throw "[repo] pnpm install failed with $LASTEXITCODE" }
