@@ -143,20 +143,15 @@ function Refresh-Repo([string]$RepoUrl, [string]$Branch) {
     git -C $RepoDir remote set-url origin $url
     git -C $RepoDir fetch origin --prune --depth 50 $Branch
     if ($LASTEXITCODE -ne 0) { throw "[repo] git fetch failed with $LASTEXITCODE" }
-    $before = git -C $RepoDir rev-parse HEAD
     git -C $RepoDir checkout -B $Branch FETCH_HEAD
     if ($LASTEXITCODE -ne 0) { throw "[repo] git checkout failed with $LASTEXITCODE" }
     git -C $RepoDir reset --hard FETCH_HEAD | Out-Null
     git -C $RepoDir clean -fdx -e node_modules | Out-Null
-    $after = git -C $RepoDir rev-parse HEAD
-    $lockChanged = $true
-    if ($before -eq $after) { $lockChanged = $false }
-    else {
-      $diff = @(git -C $RepoDir diff --name-only $before $after -- pnpm-lock.yaml package.json)
-      $lockChanged = $diff.Count -gt 0
-    }
-    if (-not $lockChanged -and (Test-Path (Join-Path $RepoDir 'node_modules'))) {
-      Write-Output '[repo] lockfile unchanged; skipping install'
+    # node_modules is a cache, never trusted on sight: a job killed mid-install leaves a partial
+    # tree that looks present. Only a stamp written after a full install, for this exact
+    # lockfile, skips the install.
+    if (Test-DepsInstalled) {
+      Write-Output '[repo] deps already installed for this lockfile; skipping install'
     } else {
       Install-Deps
     }
@@ -180,6 +175,14 @@ function Install-Deps {
   if ($LASTEXITCODE -ne 0) { throw "[repo] pnpm install failed with $LASTEXITCODE" }
   Invoke-Cmd 'corepack pnpm exec playwright install chromium' $RepoDir
   if ($LASTEXITCODE -ne 0) { throw "[repo] playwright install failed with $LASTEXITCODE" }
+  Set-Content -Path (Deps-Stamp) -Value (Lockfile-Hash) -NoNewline
+}
+
+function Deps-Stamp { Join-Path $RepoDir 'node_modules\.vm-agent-installed' }
+function Lockfile-Hash { (Get-FileHash (Join-Path $RepoDir 'pnpm-lock.yaml') -Algorithm SHA256).Hash }
+function Test-DepsInstalled {
+  $stamp = Deps-Stamp
+  (Test-Path $stamp) -and ((Get-Content $stamp -Raw).Trim() -eq (Lockfile-Hash))
 }
 
 # cmd.exe /c "set VAR=value && ..." puts the trailing space into the value; quote the whole
