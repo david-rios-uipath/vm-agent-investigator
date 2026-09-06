@@ -11,10 +11,13 @@ $script:RepoDir  = 'C:\vm-agent\repo'
 # cmd.exe children (Invoke-Cmd, the dev server) get this PATH prefix; keep it in sync with Add-ToolPath.
 $script:ToolPath = "$Bin;$NodeBin;$NodeDir"
 
+# Compare whole PATH entries, not substrings: `-like "*C:\vm-agent\node*"` matched
+# C:\vm-agent\node-global, so C:\vm-agent\node was never added and a fresh install of node
+# passed while `node` stayed not runnable.
 function Add-ToolPath {
   New-Item -ItemType Directory -Force -Path $Bin, $NodeBin | Out-Null
   foreach ($d in @($Bin, $NodeBin, $NodeDir)) {
-    if ($env:PATH -notlike "*$d*") { $env:PATH = "$d;$env:PATH" }
+    if (($env:PATH -split ';') -notcontains $d) { $env:PATH = "$d;$env:PATH" }
   }
 }
 

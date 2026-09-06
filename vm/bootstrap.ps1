@@ -24,7 +24,7 @@ function Install-MinGit {
 }
 
 $gitCmd = Join-Path $GitDir 'cmd'
-if ($env:PATH -notlike "*$gitCmd*") { $env:PATH = "$gitCmd;$env:PATH" }
+if (($env:PATH -split ';') -notcontains $gitCmd) { $env:PATH = "$gitCmd;$env:PATH" }
 if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
   Write-Output '[bootstrap] installing MinGit'
   Install-MinGit
