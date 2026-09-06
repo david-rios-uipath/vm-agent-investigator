@@ -752,7 +752,7 @@
         },
         "TimeoutMinutes": {
           "type": "literal",
-          "expression": "15",
+          "expression": "45",
           "fieldType": "number"
         },
         "MaxOutputChars": 32000
@@ -1012,7 +1012,7 @@
         },
         "TimeoutMinutes": {
           "type": "literal",
-          "expression": "20",
+          "expression": "45",
           "fieldType": "number"
         },
         "MaxOutputChars": 32000
@@ -1538,7 +1538,7 @@
         },
         "TimeoutMinutes": {
           "type": "literal",
-          "expression": "10",
+          "expression": "45",
           "fieldType": "number"
         },
         "MaxOutputChars": 32000
