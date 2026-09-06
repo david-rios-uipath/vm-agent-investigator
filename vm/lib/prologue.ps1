@@ -6,11 +6,14 @@
 $script:VmRoot   = 'C:\vm-agent'
 $script:Bin      = 'C:\vm-agent\bin'
 $script:NodeBin  = 'C:\vm-agent\node-global'
+$script:NodeDir  = 'C:\vm-agent\node'
 $script:RepoDir  = 'C:\vm-agent\repo'
+# cmd.exe children (Invoke-Cmd, the dev server) get this PATH prefix; keep it in sync with Add-ToolPath.
+$script:ToolPath = "$Bin;$NodeBin;$NodeDir"
 
 function Add-ToolPath {
   New-Item -ItemType Directory -Force -Path $Bin, $NodeBin | Out-Null
-  foreach ($d in @($Bin, $NodeBin)) {
+  foreach ($d in @($Bin, $NodeBin, $NodeDir)) {
     if ($env:PATH -notlike "*$d*") { $env:PATH = "$d;$env:PATH" }
   }
 }
@@ -40,6 +43,19 @@ function Install-GhRelease([string]$Repo, [string]$AssetPattern, [string]$ExeNam
   Copy-Item $found.FullName $Bin -Force
 }
 
+# Latest LTS from nodejs.org, unpacked whole into $NodeDir: node.exe alone is useless, npm and
+# corepack live in the zip's node_modules next to it. The standard VM image ships without node.
+function Install-Node {
+  $lts = (Invoke-RestMethod 'https://nodejs.org/dist/index.json') | Where-Object { $_.lts } | Select-Object -First 1
+  if (-not $lts) { throw '[ensure] no LTS entry in nodejs.org index' }
+  $name = "node-$($lts.version)-win-x64"
+  $zip = Join-Path $env:TEMP "$name.zip"
+  Invoke-WebRequest "https://nodejs.org/dist/$($lts.version)/$name.zip" -OutFile $zip -UseBasicParsing
+  Expand-Archive $zip -DestinationPath $env:TEMP -Force
+  if (Test-Path $NodeDir) { Remove-Item $NodeDir -Recurse -Force }
+  Move-Item (Join-Path $env:TEMP $name) $NodeDir
+}
+
 function Ensure-Tools {
   Add-ToolPath
   $missing = @()
@@ -67,7 +83,12 @@ function Ensure-Tools {
     catch { Write-Output "[ensure] ffmpeg install failed: $_ (PR videos will be skipped)" }
   }
 
-  if (-not (Test-Tool 'node')) { throw '[ensure] node is not on PATH; this VM is not provisioned' }
+  if (-not (Test-Tool 'node')) {
+    $missing += 'node'
+    Write-Output '[ensure] installing node (LTS)'
+    Install-Node
+    if (-not (Test-Tool 'node')) { throw '[ensure] node still not runnable after install' }
+  }
   if (-not (Test-Path (Join-Path $Bin 'pnpm.cmd'))) {
     $missing += 'pnpm-shim'
     Write-Output '[ensure] enabling corepack pnpm shim'
@@ -147,7 +168,7 @@ function Install-Deps {
 # cmd.exe /c "set VAR=value && ..." puts the trailing space into the value; quote the whole
 # assignment (FINDINGS-uip.md - it cost a run when E2E_STUDIO_PORT became "3000 ").
 function Invoke-Cmd([string]$CommandLine, [string]$WorkingDir = $RepoDir, [hashtable]$Env = @{}) {
-  $prefix = "set `"PATH=$Bin;$NodeBin;%PATH%`""
+  $prefix = "set `"PATH=$ToolPath;%PATH%`""
   foreach ($k in $Env.Keys) { $prefix += " && set `"$k=$($Env[$k])`"" }
   if (-not (Test-Path $WorkingDir)) { New-Item -ItemType Directory -Force -Path $WorkingDir | Out-Null }
   Push-Location $WorkingDir

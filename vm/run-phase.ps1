@@ -365,7 +365,7 @@ switch ($Phase) {
   # file in the state directory used to sink the whole archive.
   $devlog = Join-Path 'C:\vm-agent' "studio-dev-$RunId.log"
   Note '[verify] starting local studio MFE (pnpm run dev:studio)'
-  $dev = Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', "set `"PATH=$Bin;$NodeBin;%PATH%`" && corepack pnpm run dev:studio > `"$devlog`" 2>&1" -WorkingDirectory $RepoDir -PassThru -WindowStyle Hidden
+  $dev = Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', "set `"PATH=$ToolPath;%PATH%`" && corepack pnpm run dev:studio > `"$devlog`" 2>&1" -WorkingDirectory $RepoDir -PassThru -WindowStyle Hidden
   $port = ''
   foreach ($attempt in 1..60) {
     foreach ($p in 3000, 3001) {
