@@ -23,6 +23,8 @@ function Install-MinGit {
   Expand-Archive $zip -DestinationPath $GitDir -Force
 }
 
+# Never let git prompt: a rejected token then hangs until the runner timeout (it cost 15 min).
+$env:GIT_TERMINAL_PROMPT = '0'
 $gitCmd = Join-Path $GitDir 'cmd'
 if (($env:PATH -split ';') -notcontains $gitCmd) { $env:PATH = "$gitCmd;$env:PATH" }
 if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
