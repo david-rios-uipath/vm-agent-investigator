@@ -578,8 +578,8 @@
       "type": "core.logic.decision",
       "typeVersion": "1.3",
       "display": {
-        "label": "Repro needed?",
-        "subLabel": "attempt repro if test is marked 'regression', 'consistent', 'flaky'.",
+        "label": "Reproduced?",
+        "subLabel": "the runner decided whether to run the test (CI history); true = failing, investigate; false = flake or timeout, end.",
         "icon": "trending-up-down"
       },
       "inputs": {
