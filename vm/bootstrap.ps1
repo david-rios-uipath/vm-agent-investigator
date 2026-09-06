@@ -37,8 +37,7 @@ if ($GitOnly) { exit 0 }
 
 if (-not $RunnerRepoUrl) { throw '[bootstrap] RunnerRepoUrl is empty; nothing to clone' }
 $url = $RunnerRepoUrl
-$tok = if ($env:GIT_TOKEN) { $env:GIT_TOKEN } else { $env:GH_TOKEN }
-if ($tok) { $url = $url -replace '^https://', "https://x-access-token:$tok@" }
+if ($env:GH_TOKEN) { $url = $url -replace '^https://', "https://x-access-token:$($env:GH_TOKEN)@" }
 if (-not (Test-Path "$Runner\.git")) {
   git clone --depth 1 $url $Runner
   if ($LASTEXITCODE -ne 0) { throw '[bootstrap] clone of the runner repo failed' }

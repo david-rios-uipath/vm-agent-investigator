@@ -7,11 +7,11 @@ function Get-CiHistory([string]$RepoUrl, [string]$Branch, [string]$TestCommand, 
 
   # The GH_TOKEN asset may hold a placeholder; take the first token GitHub actually accepts.
   $token = $null
-  foreach ($cand in @($env:GH_TOKEN, $env:GIT_TOKEN)) {
+  foreach ($cand in @($env:GH_TOKEN)) {
     if (-not $cand) { continue }
     try { Invoke-RestMethod https://api.github.com/user -Headers @{ Authorization = "Bearer $cand"; 'User-Agent' = 'vm-agent' } | Out-Null; $token = $cand; break } catch { }
   }
-  if (-not $token) { $r.summary = 'neither GH_TOKEN nor GIT_TOKEN on the VM is accepted by GitHub; CI history unavailable'; return $r }
+  if (-not $token) { $r.summary = 'GH_TOKEN is not accepted by GitHub; CI history unavailable'; return $r }
 
   $m = [regex]::Match($RepoUrl, 'github\.com[/:]([^/]+)/([^/.]+)')
   if (-not $m.Success) { $r.summary = 'repository is not on github.com; CI history unavailable'; return $r }
