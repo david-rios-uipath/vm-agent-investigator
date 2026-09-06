@@ -436,70 +436,6 @@
       }
     },
     {
-      "id": "reportSetupFailed",
-      "type": "core.action.script",
-      "typeVersion": "1.1",
-      "display": {
-        "label": "Report setup failure",
-        "subLabel": "",
-        "icon": "code"
-      },
-      "inputs": {
-        "script": {
-          "type": "literal",
-          "expression": "// A terminate node returns no output arguments, so the diagnosis lives here, on the\n// instance trace, and the run ends as terminated rather than successful.\nreturn {\n  classification: 'infrastructure',\n  hypothesis: 'infrastructure: a phase runner job returned no STATUS_JSON line, so it broke before it could report; nothing was investigated.',\n  evidence: 'CLASSIFICATION: infrastructure\\n\\nFull exec log: ' + ((($vars.parseStatusInvestigate.output ?? {}).runnerFailed ? ($vars.parseStatusInvestigate.output ?? {}).blobPath : ($vars.parseStatusRepro.output ?? {}).blobPath) ?? '(none)'),\n  fixAttempts: $vars.fixAttempts,\n};"
-        }
-      },
-      "outputs": {
-        "output": {
-          "type": "any",
-          "description": "The return value of the script",
-          "source": "=result.response",
-          "var": "output"
-        },
-        "error": {
-          "type": "object",
-          "description": "Error information if the node fails",
-          "source": "=Error",
-          "var": "error",
-          "schema": {
-            "$schema": "http://json-schema.org/draft-07/schema#",
-            "type": "object",
-            "required": [
-              "code",
-              "message",
-              "detail",
-              "category",
-              "status"
-            ],
-            "properties": {
-              "code": {
-                "type": "string",
-                "description": "Error code as a string"
-              },
-              "message": {
-                "type": "string",
-                "description": "High-level error message"
-              },
-              "detail": {
-                "type": "string",
-                "description": "Detailed error description"
-              },
-              "category": {
-                "type": "string",
-                "description": "Error category"
-              },
-              "status": {
-                "type": "integer",
-                "description": "HTTP status code"
-              }
-            },
-            "additionalProperties": false
-          }
-        }
-      }
-    },
-    {
       "id": "terminateSetupFailed",
       "type": "core.logic.terminate",
       "typeVersion": "1.0",
@@ -508,7 +444,65 @@
         "subLabel": "",
         "icon": "circle-x"
       },
-      "inputs": {}
+      "inputs": {},
+      "outputs": {
+        "hypothesis": {
+          "source": {
+            "type": "jsExpression",
+            "expression": "'infrastructure: a phase runner job returned no STATUS_JSON line, so it broke before it could report; nothing was investigated.'",
+            "fieldType": "string"
+          },
+          "type": "string"
+        },
+        "evidence": {
+          "source": {
+            "type": "jsExpression",
+            "expression": "'CLASSIFICATION: infrastructure\\n\\nFull exec log: ' + ((($vars.parseStatusInvestigate.output ?? {}).runnerFailed ? ($vars.parseStatusInvestigate.output ?? {}).blobPath : ($vars.parseStatusRepro.output ?? {}).blobPath) ?? '(none)')",
+            "fieldType": "string"
+          },
+          "type": "string"
+        },
+        "reproduced": {
+          "source": {
+            "type": "jsExpression",
+            "expression": "false",
+            "fieldType": "boolean"
+          },
+          "type": "string"
+        },
+        "patch": {
+          "source": {
+            "type": "jsExpression",
+            "expression": "''",
+            "fieldType": "string"
+          },
+          "type": "string"
+        },
+        "fixVerified": {
+          "source": {
+            "type": "jsExpression",
+            "expression": "false",
+            "fieldType": "boolean"
+          },
+          "type": "boolean"
+        },
+        "prUrl": {
+          "source": {
+            "type": "jsExpression",
+            "expression": "''",
+            "fieldType": "string"
+          },
+          "type": "string"
+        },
+        "fixAttempts": {
+          "source": {
+            "type": "jsExpression",
+            "expression": "$vars.fixAttempts",
+            "fieldType": "number"
+          },
+          "type": "number"
+        }
+      }
     },
     {
       "id": "endNotReproduced",
@@ -1801,10 +1795,10 @@
       "targetPort": "input"
     },
     {
-      "id": "edge_decisionReproRan_false_reportSetupFailed_input",
+      "id": "edge_decisionReproRan_false_terminateSetupFailed_input",
       "sourceNodeId": "decisionReproRan",
       "sourcePort": "false",
-      "targetNodeId": "reportSetupFailed",
+      "targetNodeId": "terminateSetupFailed",
       "targetPort": "input"
     },
     {
@@ -1850,10 +1844,10 @@
       "targetPort": "input"
     },
     {
-      "id": "edge_decisionInvestigated_false_reportSetupFailed_input",
+      "id": "edge_decisionInvestigated_false_terminateSetupFailed_input",
       "sourceNodeId": "decisionInvestigated",
       "sourcePort": "false",
-      "targetNodeId": "reportSetupFailed",
+      "targetNodeId": "terminateSetupFailed",
       "targetPort": "input"
     },
     {
@@ -1938,13 +1932,6 @@
       "sourceNodeId": "parseStatusFix",
       "sourcePort": "success",
       "targetNodeId": "decisionVerify",
-      "targetPort": "input"
-    },
-    {
-      "id": "edge_reportSetupFailed_success_terminateSetupFailed_input",
-      "sourceNodeId": "reportSetupFailed",
-      "sourcePort": "success",
-      "targetNodeId": "terminateSetupFailed",
       "targetPort": "input"
     }
   ],
@@ -4201,55 +4188,59 @@
         }
       },
       {
-        "id": "reportSetupFailed.output",
-        "type": "any",
-        "description": "The return value of the script",
+        "id": "terminateSetupFailed.hypothesis",
+        "type": "string",
         "binding": {
-          "nodeId": "reportSetupFailed",
-          "outputId": "output"
+          "nodeId": "terminateSetupFailed",
+          "outputId": "hypothesis"
         }
       },
       {
-        "id": "reportSetupFailed.error",
-        "type": "object",
-        "schema": {
-          "$schema": "http://json-schema.org/draft-07/schema#",
-          "type": "object",
-          "required": [
-            "code",
-            "message",
-            "detail",
-            "category",
-            "status"
-          ],
-          "properties": {
-            "code": {
-              "type": "string",
-              "description": "Error code as a string"
-            },
-            "message": {
-              "type": "string",
-              "description": "High-level error message"
-            },
-            "detail": {
-              "type": "string",
-              "description": "Detailed error description"
-            },
-            "category": {
-              "type": "string",
-              "description": "Error category"
-            },
-            "status": {
-              "type": "integer",
-              "description": "HTTP status code"
-            }
-          },
-          "additionalProperties": false
-        },
-        "description": "Error information if the node fails",
+        "id": "terminateSetupFailed.evidence",
+        "type": "string",
         "binding": {
-          "nodeId": "reportSetupFailed",
-          "outputId": "error"
+          "nodeId": "terminateSetupFailed",
+          "outputId": "evidence"
+        }
+      },
+      {
+        "id": "terminateSetupFailed.reproduced",
+        "type": "string",
+        "binding": {
+          "nodeId": "terminateSetupFailed",
+          "outputId": "reproduced"
+        }
+      },
+      {
+        "id": "terminateSetupFailed.patch",
+        "type": "string",
+        "binding": {
+          "nodeId": "terminateSetupFailed",
+          "outputId": "patch"
+        }
+      },
+      {
+        "id": "terminateSetupFailed.fixVerified",
+        "type": "boolean",
+        "binding": {
+          "nodeId": "terminateSetupFailed",
+          "outputId": "fixVerified"
+        }
+      },
+      {
+        "id": "terminateSetupFailed.prUrl",
+        "type": "string",
+        "binding": {
+          "nodeId": "terminateSetupFailed",
+          "outputId": "prUrl"
+        }
+      },
+      {
+        "id": "terminateSetupFailed.fixAttempts",
+        "type": "number",
+        "binding": {
+          "nodeId": "terminateSetupFailed",
+          "outputId": "fixAttempts"
         }
       }
     ],
@@ -4370,17 +4361,6 @@
         "position": {
           "x": 3984,
           "y": 144
-        },
-        "size": {
-          "width": 96,
-          "height": 96
-        },
-        "collapsed": false
-      },
-      "reportSetupFailed": {
-        "position": {
-          "x": 0,
-          "y": 0
         },
         "size": {
           "width": 96,
