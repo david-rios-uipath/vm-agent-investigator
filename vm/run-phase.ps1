@@ -242,6 +242,12 @@ switch ($Phase) {
         Write-Output "[repro] artifacts are $([int]($size/1MB)) MB; kept only the .md context files"
       }
     }
+  } elseif ($ci.targetVerdict -in 'passed', 'flaky') {
+    # The spec failed in CI, but the one test this run is about ended green there: the failure
+    # belongs to another test in the file. A flake by definition; nothing to reproduce.
+    $source = 'ci'; $exit = 0
+    $stdout = "CI: the targeted test ($($ci.target)) ended $($ci.targetVerdict) in the newest nightly; the spec-level failure came from another test. Not re-run."
+    Write-Output "[repro] CI shows the targeted test $($ci.targetVerdict) in the newest nightly; flaky, not re-run"
   } else {
     $source = 'ci'; $exit = 1
     $stdout = $ci.ciFailureExcerpt
@@ -250,7 +256,8 @@ switch ($Phase) {
   }
 
   # Exit 124 is the runner's timeout, not a test verdict.
-  $reproduced = if ($source -eq 'ci') { $true } else { $exit -ne 0 -and $exit -ne 124 }
+  $reproduced = if ($source -eq 'ci') { $exit -ne 0 } else { $exit -ne 0 -and $exit -ne 124 }
+  $classification = if ($source -eq 'ci' -and $exit -eq 0) { 'flaky' } else { $ci.classification }
 
   $evidence = [ordered]@{
     source = $source
@@ -258,7 +265,7 @@ switch ($Phase) {
     reproduced = $reproduced
     excerpt = Get-Tail $stdout 8000
     ciHistory = $ciHistory
-    ciClassification = $ci.classification
+    ciClassification = $classification
     ciRuns = $ci.runs
     firstFailSha = $ci.firstFailSha
     lastPassSha = $ci.lastPassSha
@@ -269,7 +276,7 @@ switch ($Phase) {
     reproduced = $reproduced
     source = $source
     exitCode = $exit
-    classification = $ci.classification
+    classification = $classification
     excerpt = Get-Tail $stdout 3000
     ciHistory = Get-Tail $ciHistory 4000
   }
@@ -312,7 +319,7 @@ switch ($Phase) {
 'fix' {
   if (-not (Test-Path $notebook)) {
     Write-Output '[fix] no notebook.md in state; refusing to guess a fix'
-    Write-Status @{ patchWritten = $false; fixVerified = $false; fixSummary = 'no investigator notebook in state'; confidence = 'low'; attempt = $FixAttempt }
+    Write-Status @{ patchWritten = $false; fixVerified = $false; declined = $true; fixSummary = 'no investigator notebook in state'; confidence = 'low'; attempt = $FixAttempt }
     exit 0
   }
   $ev = if (Test-Path (Join-Path $notes 'evidence.json')) { Get-Content -Raw (Join-Path $notes 'evidence.json') | ConvertFrom-Json } else { $null }
@@ -348,7 +355,8 @@ switch ($Phase) {
   if (-not $patchWritten) {
     Write-Output '[fix] working tree is clean; no patch'
     & git -C $RepoDir checkout -- . 2>&1 | Out-Null
-    Write-Status @{ patchWritten = $false; fixVerified = $false; fixSummary = $fixSummary; confidence = $confidence; attempt = $FixAttempt; patch = '' }
+    # declined: a retry starts from the same notebook and code and reaches the same verdict.
+    Write-Status @{ patchWritten = $false; fixVerified = $false; declined = $true; fixSummary = $fixSummary; confidence = $confidence; attempt = $FixAttempt; patch = '' }
     exit 0
   }
   # Non-ASCII in the fixer's own edits reaches disk mangled (run 130020 committed replacement

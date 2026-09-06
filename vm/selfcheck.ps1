@@ -128,4 +128,20 @@ Assert ($s3.Length -le 72) 'an over-long model title is cut to budget'
 Assert ($s3 -notmatch '\s$') 'the cut leaves no trailing space'
 
 Write-Host ''
+
+# Get-CiMarks / Get-CiVerdict: a spec-level failure must not be pinned on a test that ended green.
+$X = [string][char]0x2718; $V = [string][char]0x2713
+$log = @(
+  "2026-09-06T03:35:58.0000000Z   $X  3 [studio-alpha] > e2e/specs/connectors/connectors.spec.ts:149:3 > DAP > configures an HTTP Request (4.1s)",
+  "2026-09-06T03:36:10.0000000Z   $V  4 [studio-alpha] > e2e/specs/connectors/connectors.spec.ts:204:3 > DAP > does not infinite re-render when the HTTP field has a validation error (36.6s)",
+  "2026-09-06T03:37:10.0000000Z   $V  5 [studio-alpha] > e2e/specs/connectors/connectors.spec.ts:149:3 > DAP > configures an HTTP Request (retry #1) (5.0s)"
+)
+$m = Get-CiMarks $log 'connectors.spec.ts' 'does not infinite re-render'
+Assert ($m.target -eq 'P') 'targeted test marks come only from lines carrying its title'
+Assert ((Get-CiVerdict @($m.target)) -eq 'passed') 'a green targeted test reads as passed'
+Assert ((Get-CiVerdict @($m.marks.Values | ForEach-Object { [string]$_ })) -eq 'flaky') 'the spec as a whole reads as flaky: 149 failed, then passed on retry'
+Assert ((Get-CiMarks $log 'connectors.spec.ts' '').target -eq '') 'no grep, no target marks'
+Assert ((Get-CiVerdict @()) -eq 'absent') 'no marks reads as absent'
+Assert ((Get-CiVerdict @('F')) -eq 'failed') 'a test that stayed red reads as failed'
+
 Write-Host 'selfcheck passed'

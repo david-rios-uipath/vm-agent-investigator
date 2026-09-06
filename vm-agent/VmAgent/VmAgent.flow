@@ -337,8 +337,8 @@
       "type": "core.logic.decision",
       "typeVersion": "1.3",
       "display": {
-        "label": "Fix verified or out of attempts?",
-        "subLabel": "",
+        "label": "Fix verified, declined, or out of attempts?",
+        "subLabel": "a declined fix (no patch) is not retried: the next attempt would start from the same notebook and reach the same verdict.",
         "icon": "trending-up-down"
       },
       "inputs": {
@@ -346,7 +346,7 @@
         "falseLabel": "False",
         "expression": {
           "type": "jsExpression",
-          "expression": "($vars.parseStatusFix.output || {})['fixVerified'] === true || $vars.fixAttempts >= $vars.start.output.maxFixAttempts",
+          "expression": "($vars.parseStatusFix.output || {})['fixVerified'] === true || ($vars.parseStatusFix.output || {})['declined'] === true || $vars.fixAttempts >= $vars.start.output.maxFixAttempts",
           "fieldType": "boolean"
         }
       }
@@ -518,7 +518,7 @@
         "hypothesis": {
           "source": {
             "type": "jsExpression",
-            "expression": "($vars.parseStatusRepro.output ?? {}).exitCode === 124 ? 'infrastructure: the test run hit the runner timeout (exit 124) on the VM; nothing was investigated.' : 'flake: the failing test passed on re-run (exit code 0); not reproduced, nothing to investigate.'",
+            "expression": "($vars.parseStatusRepro.output ?? {}).exitCode === 124 ? 'infrastructure: the test run hit the runner timeout (exit 124) on the VM; nothing was investigated.' : (($vars.parseStatusRepro.output ?? {}).source === 'ci' ? 'flake: CI history shows the targeted test ending green in the newest nightly; the spec-level failure was another test in the file. Not re-run, nothing to investigate.' : 'flake: the failing test passed on re-run (exit code 0); not reproduced, nothing to investigate.')",
             "fieldType": "string"
           },
           "type": "string"

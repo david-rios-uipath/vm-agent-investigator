@@ -3,7 +3,7 @@
 
 function Get-CiHistory([string]$RepoUrl, [string]$Branch, [string]$TestCommand, [string]$NotesDir) {
   $ErrorActionPreference = 'Continue'
-  $r = [ordered]@{ classification = 'unknown'; summary = ''; firstFailSha = ''; lastPassSha = ''; runs = @(); ciFailureExcerpt = ''; ciJobLog = '' }
+  $r = [ordered]@{ classification = 'unknown'; summary = ''; firstFailSha = ''; lastPassSha = ''; runs = @(); ciFailureExcerpt = ''; ciJobLog = ''; target = ''; targetVerdict = 'absent' }
 
   # The GH_TOKEN asset may hold a placeholder; take the first token GitHub actually accepts.
   $token = $null
@@ -21,6 +21,9 @@ function Get-CiHistory([string]$RepoUrl, [string]$Branch, [string]$TestCommand, 
   $project = [regex]::Match($TestCommand, '--project[= ]([\w-]+)').Groups[1].Value
   if (-not $specPath) { $r.summary = 'no *.spec.ts in the test command; CI history unavailable'; return $r }
   $spec = Split-Path $specPath -Leaf
+  # The --grep title names the one test this run is about; the spec can fail on a different one.
+  $gm = [regex]::Match($TestCommand, '--grep[= ]+(?:"([^"]*)"|''([^'']*)''|(\S+))')
+  $grep = if ($gm.Success) { @($gm.Groups[1].Value, $gm.Groups[2].Value, $gm.Groups[3].Value | Where-Object { $_ })[0] } else { '' }
 
   $h = @{ Authorization = "Bearer $token"; Accept = 'application/vnd.github+json'; 'User-Agent' = 'vm-agent' }
   $api = "https://api.github.com/repos/$owner/$repo"
@@ -28,12 +31,10 @@ function Get-CiHistory([string]$RepoUrl, [string]$Branch, [string]$TestCommand, 
   try { $runs = (Invoke-RestMethod "$api/actions/workflows/playwright-ci.yml/runs?event=schedule&branch=$Branch&per_page=8" -Headers $h).workflow_runs }
   catch { $r.summary = 'GitHub API error listing runs: ' + $_.Exception.Message; return $r }
 
-  $fail = [string][char]0x2718; $pass = [string][char]0x2713
-  $rx = '^(?:\S+Z )?\s*([' + $fail + $pass + '-])\s+\d+\s+\[[^\]]+\]\s+\S+\s+(\S*' + [regex]::Escape($spec) + ':\d+:\d+)'
-
   $savedLog = $false
-  $runSignals = @{}; $runExcerpts = @{}
+  $runSignals = @{}; $runExcerpts = @{}; $newestTarget = ''
   foreach ($run in $runs) {
+    $isNewest = ($run.id -eq $runs[0].id)
     $sha = $run.head_sha.Substring(0, 7); $date = ([datetime]$run.created_at).ToUniversalTime().ToString('yyyy-MM-dd')
     $marks = @{}
     try { $jobs = (Invoke-RestMethod "$api/actions/runs/$($run.id)/jobs?per_page=100" -Headers $h).jobs } catch { $jobs = @() }
@@ -42,14 +43,10 @@ function Get-CiHistory([string]$RepoUrl, [string]$Branch, [string]$TestCommand, 
     foreach ($job in $jobs) {
       $tmp = Join-Path $env:TEMP ('ci-' + $job.id + '.log')
       if (-not (Get-CiJobLog $job.id $tmp $api $h)) { continue }
-      $sawFail = $false
-      foreach ($line in [System.IO.File]::ReadLines($tmp)) {
-        $mm = [regex]::Match($line, $rx)
-        if (-not $mm.Success) { continue }
-        $k = $mm.Groups[2].Value
-        $mark = switch ($mm.Groups[1].Value) { $fail { 'F'; $sawFail = $true } $pass { 'P' } default { 'S' } }
-        $marks[$k] = [string]$marks[$k] + $mark
-      }
+      $m = Get-CiMarks ([System.IO.File]::ReadAllLines($tmp)) $spec $grep
+      foreach ($k in $m.marks.Keys) { $marks[$k] = [string]$marks[$k] + $m.marks[$k] }
+      $sawFail = @($m.marks.Values | Where-Object { ([string]$_).Contains('F') }).Count -gt 0
+      if ($isNewest) { $newestTarget += $m.target }
       # Environment signals in every sampled night, not just the newest, so a shared-environment
       # pattern (identity 429, cleanup 400s, editor load failure) shows up as a trend.
       $clean = [System.IO.File]::ReadLines($tmp) | ForEach-Object { ($_ -replace '^\S+Z ?', '') -replace '\x1b\[[0-9;]*m', '' }
@@ -83,19 +80,15 @@ function Get-CiHistory([string]$RepoUrl, [string]$Branch, [string]$TestCommand, 
       }
       Remove-Item $tmp -ErrorAction SilentlyContinue
     }
-    $verdict = 'absent'
-    if ($marks.Count -gt 0) {
-      $seqs = @($marks.Values | ForEach-Object { [string]$_ })
-      if ($seqs | Where-Object { $_.EndsWith('F') }) { $verdict = 'failed' }
-      elseif ($seqs | Where-Object { $_.EndsWith('P') -and $_.Contains('F') }) { $verdict = 'flaky' }
-      elseif ($seqs | Where-Object { $_.EndsWith('P') }) { $verdict = 'passed' }
-      else { $verdict = 'skipped' }
-    }
+    $verdict = Get-CiVerdict @($marks.Values | ForEach-Object { [string]$_ })
     $row = [ordered]@{ date = $date; sha = $sha; verdict = $verdict; url = $run.html_url }
     if ($runSignals.ContainsKey($sha)) { $row.envSignals = $runSignals[$sha] }
     if ($runExcerpts.ContainsKey($sha)) { $row.excerpt = $runExcerpts[$sha] }
     $r.runs += $row
   }
+
+  $r.target = $grep
+  if ($grep) { $r.targetVerdict = Get-CiVerdict @(@($newestTarget) | Where-Object { $_ }) }
 
   $obs = @($r.runs | Where-Object { $_.verdict -in 'failed', 'flaky', 'passed' })
   if ($obs.Count -eq 0) {
@@ -118,11 +111,39 @@ function Get-CiHistory([string]$RepoUrl, [string]$Branch, [string]$TestCommand, 
   $r.summary = "$($r.classification): $spec over the last $($r.runs.Count) nightly runs (newest first): $hist"
   if ($r.firstFailSha) { $r.summary += "; failing since $($r.firstFailSha)" }
   if ($r.lastPassSha) { $r.summary += "; last pass $($r.lastPassSha)" }
+  if ($grep) { $r.summary += "; targeted test in the newest run: $($r.targetVerdict)" }
   $sigRuns = @($r.runs | Where-Object { $_.envSignals })
   if ($sigRuns.Count -gt 0) {
     $r.summary += '; environment signals: ' + (($sigRuns | ForEach-Object { $_.sha + '=' + (($_.envSignals.GetEnumerator() | ForEach-Object { $_.Key + ':' + $_.Value }) -join ',') }) -join ' ')
   }
   return $r
+}
+
+# Pure: one job log -> per-test P/F/S sequences for the spec, plus the sequence of the one test
+# the run targets (the --grep title), so a spec-level failure is never pinned on a test that
+# ended green. Covered by vm/selfcheck.ps1.
+function Get-CiMarks([string[]]$Lines, [string]$Spec, [string]$Grep) {
+  $fail = [string][char]0x2718; $pass = [string][char]0x2713
+  $rx = '^(?:\S+Z )?\s*([' + $fail + $pass + '-])\s+\d+\s+\[[^\]]+\]\s+\S+\s+(\S*' + [regex]::Escape($Spec) + ':\d+:\d+)(.*)$'
+  $marks = @{}; $target = ''
+  foreach ($line in $Lines) {
+    $mm = [regex]::Match($line, $rx)
+    if (-not $mm.Success) { continue }
+    $mark = switch ($mm.Groups[1].Value) { $fail { 'F' } $pass { 'P' } default { 'S' } }
+    $k = $mm.Groups[2].Value
+    $marks[$k] = [string]$marks[$k] + $mark
+    if ($Grep -and $mm.Groups[3].Value -match [regex]::Escape($Grep)) { $target += $mark }
+  }
+  return @{ marks = $marks; target = $target }
+}
+
+# Playwright retries: 'FP' is a flaky test, 'F' a failed one, 'P' a pass.
+function Get-CiVerdict([string[]]$Seqs) {
+  if ($Seqs.Count -eq 0) { return 'absent' }
+  if ($Seqs | Where-Object { $_.EndsWith('F') }) { return 'failed' }
+  if ($Seqs | Where-Object { $_.EndsWith('P') -and $_.Contains('F') }) { return 'flaky' }
+  if ($Seqs | Where-Object { $_.EndsWith('P') }) { return 'passed' }
+  return 'skipped'
 }
 
 function Get-CiJobLog([string]$JobId, [string]$Path, [string]$Api, [hashtable]$Headers) {
