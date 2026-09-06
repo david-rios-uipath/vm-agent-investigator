@@ -71,19 +71,18 @@
       <Variable x:TypeArguments="ss:SecureString" Name="slackSecret" />
       <Variable x:TypeArguments="x:String" Name="slackCookieUser" />
       <Variable x:TypeArguments="ss:SecureString" Name="slackCookieSecret" />
-      <Variable x:TypeArguments="x:String" Name="npmUser" />
       <Variable x:TypeArguments="ss:SecureString" Name="npmSecret" />
     </Sequence.Variables>
     <ui:GetRobotCredential DisplayName="Get GH_TOKEN asset" sap2010:WorkflowViewState.IdRef="GetRobotCredential_1" TimeoutMS="{x:Null}" CacheStrategy="None"
-      sap2010:Annotation.AnnotationText="Credential assets GH_TOKEN, SLACK_TOKEN, SLACK_COOKIE and GH_NPM_REGISTRY_TOKEN, and the Secret asset ANTHROPIC_API_KEY, must exist in the process folder (password = token; leave the password empty to inject nothing). They are passed to the script as environment variables and redacted from output."
+      sap2010:Annotation.AnnotationText="Credential assets GH_TOKEN, SLACK_TOKEN and SLACK_COOKIE, and the Secret assets ANTHROPIC_API_KEY and GH_NPM_REGISTRY_TOKEN, must exist in the process folder (password = token; leave the password empty to inject nothing). They are passed to the script as environment variables and redacted from output."
       AssetName="[&quot;GH_TOKEN&quot;]" Username="[ghUser]" Password="[ghSecret]" />
     <ui:GetRobotCredential DisplayName="Get SLACK_TOKEN asset" sap2010:WorkflowViewState.IdRef="GetRobotCredential_2" TimeoutMS="{x:Null}" CacheStrategy="None"
       AssetName="[&quot;SLACK_TOKEN&quot;]" Username="[slackUser]" Password="[slackSecret]" />
     <ui:GetRobotCredential DisplayName="Get SLACK_COOKIE asset" sap2010:WorkflowViewState.IdRef="GetRobotCredential_3" TimeoutMS="{x:Null}" CacheStrategy="None"
       AssetName="[&quot;SLACK_COOKIE&quot;]" Username="[slackCookieUser]" Password="[slackCookieSecret]" />
-    <ui:GetRobotCredential DisplayName="Get GH_NPM_REGISTRY_TOKEN asset" sap2010:WorkflowViewState.IdRef="GetRobotCredential_4" TimeoutMS="{x:Null}" CacheStrategy="None"
-      sap2010:Annotation.AnnotationText="flow-workbench's .npmrc reads GH_NPM_REGISTRY_TOKEN for @uipath packages on npm.pkg.github.com (needs read:packages); GH_TOKEN gets 403 there."
-      AssetName="[&quot;GH_NPM_REGISTRY_TOKEN&quot;]" Username="[npmUser]" Password="[npmSecret]" />
+    <ui:GetSecret DisplayName="Get GH_NPM_REGISTRY_TOKEN asset" sap2010:WorkflowViewState.IdRef="GetSecret_2" TimeoutMS="{x:Null}" CacheStrategy="None"
+      sap2010:Annotation.AnnotationText="flow-workbench's .npmrc reads GH_NPM_REGISTRY_TOKEN for @uipath packages on npm.pkg.github.com (needs read:packages); GH_TOKEN gets 403 there. A Secret asset, like ANTHROPIC_API_KEY."
+      AssetName="[&quot;GH_NPM_REGISTRY_TOKEN&quot;]" Secret="[npmSecret]" />
     <ui:GetSecret DisplayName="Get ANTHROPIC_API_KEY asset" sap2010:WorkflowViewState.IdRef="GetSecret_1" TimeoutMS="{x:Null}" CacheStrategy="None"
       sap2010:Annotation.AnnotationText="Needed by `claude -p` on the VM. ANTHROPIC_API_KEY is a Secret asset, not a Credential, so it is read with GetSecret; both yield a SecureString, so the injection below is unchanged."
       AssetName="[&quot;ANTHROPIC_API_KEY&quot;]" Secret="[anthropicSecret]" />
