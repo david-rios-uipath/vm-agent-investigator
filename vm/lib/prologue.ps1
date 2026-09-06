@@ -146,7 +146,9 @@ function Refresh-Repo([string]$RepoUrl, [string]$Branch) {
     git -C $RepoDir checkout -B $Branch FETCH_HEAD
     if ($LASTEXITCODE -ne 0) { throw "[repo] git checkout failed with $LASTEXITCODE" }
     git -C $RepoDir reset --hard FETCH_HEAD | Out-Null
-    git -C $RepoDir clean -fdx -e node_modules | Out-Null
+    # Storage state is a login cache the fixtures regenerate whenever it is invalid; keeping it
+    # saves a cold auth per phase. node_modules is likewise a cache (see Test-DepsInstalled).
+    git -C $RepoDir clean -fdx -e node_modules -e 'e2e/*.storage-state.json' | Out-Null
     # node_modules is a cache, never trusted on sight: a job killed mid-install leaves a partial
     # tree that looks present. Only a stamp written after a full install, for this exact
     # lockfile, skips the install.

@@ -403,10 +403,21 @@ switch ($Phase) {
   } else {
     Note "[verify] studio MFE serving on port $port"
     $cmd = "$localCmd --retries=0 --reporter=line"
+    # Cold auth ("Storage state is invalid ... regenerating") runs inside the spec's own 120 s
+    # beforeEach budget and, with a cold dev server on a 2-CPU VM, times out in setup before the
+    # test reaches the step the patch is about. When there is no storage state yet, run the test
+    # once to log in and warm the server; only the second run counts.
+    $env = @{ CI = 'true'; E2E_SKIP_WEBSERVER = '1'; E2E_STUDIO_PORT = $port }
+    if (-not (Get-ChildItem (Join-Path $RepoDir 'e2e') -Filter '*.storage-state.json' -ErrorAction SilentlyContinue)) {
+      Note '[verify] no storage state on this VM: warm-up run first (logs in, warms the dev server; result not counted)'
+      $warm = @(Invoke-Cmd $cmd $RepoDir $env 2>&1)
+      Note "[verify] warm-up exit $LASTEXITCODE"
+    }
     Note "[verify] $cmd"
     # E2E_SKIP_WEBSERVER: the workbench Vite server is only for the standalone project and would
     # otherwise cost ~120 s and contend for port 3000 with the studio dev server.
-    $out = @(Invoke-Cmd $cmd $RepoDir @{ CI = 'true'; E2E_SKIP_WEBSERVER = '1'; E2E_STUDIO_PORT = $port; E2E_RECORD = '1' } 2>&1)
+    $env['E2E_RECORD'] = '1'
+    $out = @(Invoke-Cmd $cmd $RepoDir $env 2>&1)
     $exit = $LASTEXITCODE
     $out | Select-Object -Last 60 | ForEach-Object { Note "  $_" }
     Note "[verify] test exit $exit"
