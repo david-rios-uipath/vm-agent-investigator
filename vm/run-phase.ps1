@@ -407,12 +407,13 @@ switch ($Phase) {
     # beforeEach budget and, with a cold dev server on a 2-CPU VM, times out in setup before the
     # test reaches the step the patch is about. When there is no storage state yet, run the test
     # once to log in and warm the server; only the second run counts.
+    # The dev server was started seconds ago and rsbuild compiles lazily: the first visit to
+    # each route (and the first add-node search) pays that compile, on top of a cold login when
+    # there is no storage state. Always run the test once uncounted; only the second run decides.
     $env = @{ CI = 'true'; E2E_SKIP_WEBSERVER = '1'; E2E_STUDIO_PORT = $port }
-    if (-not (Get-ChildItem (Join-Path $RepoDir 'e2e') -Filter '*.storage-state.json' -ErrorAction SilentlyContinue)) {
-      Note '[verify] no storage state on this VM: warm-up run first (logs in, warms the dev server; result not counted)'
-      $warm = @(Invoke-Cmd $cmd $RepoDir $env 2>&1)
-      Note "[verify] warm-up exit $LASTEXITCODE"
-    }
+    Note '[verify] warm-up run (cold dev server, maybe cold login); result not counted'
+    $warm = @(Invoke-Cmd $cmd $RepoDir $env 2>&1)
+    Note "[verify] warm-up exit $LASTEXITCODE"
     Note "[verify] $cmd"
     # E2E_SKIP_WEBSERVER: the workbench Vite server is only for the standalone project and would
     # otherwise cost ~120 s and contend for port 3000 with the studio dev server.
@@ -421,6 +422,16 @@ switch ($Phase) {
     $exit = $LASTEXITCODE
     $out | Select-Object -Last 60 | ForEach-Object { Note "  $_" }
     Note "[verify] test exit $exit"
+    # Refresh-Repo wipes e2e\test-results before the next attempt; keep the error context and
+    # traces (not the videos) in state so the next fixer can read why this run failed.
+    $vres = Join-Path $RepoDir 'e2e\test-results'
+    if (Test-Path $vres) {
+      $vdest = Join-Path $notes "verify-attempt-$FixAttempt"
+      New-Item -ItemType Directory -Force -Path $vdest | Out-Null
+      Get-ChildItem $vres -Recurse -File | Where-Object { $_.Extension -ne '.webm' -and $_.Length -lt 5MB } |
+        ForEach-Object { Copy-Item $_.FullName (Join-Path $vdest $_.Name) -Force }
+      Note "[verify] kept $((Get-ChildItem $vdest -File).Count) artifact file(s) in state\verify-attempt-$FixAttempt"
+    }
     $fixVerified = ($exit -eq 0)
     Save-DemoVideo (Join-Path $RepoDir 'e2e\test-results') $notes 'fix-demo' ${function:Note} | Out-Null
   }
