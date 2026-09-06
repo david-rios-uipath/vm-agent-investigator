@@ -8,6 +8,32 @@ output, what changed and how it was verified, then the investigator notebook.
 Built line by line rather than from a here-string: the notebook and the logs contain `$` and
 backticks that a double-quoted here-string would interpolate.
 #>
+# The fixer is asked for bullets and sometimes returns one 250-word paragraph anyway (run
+# 130020, and again in flow-workbench#3729). Prompt wording alone has not held, so any prose
+# that arrives without bullets is packed into them here: sentences grouped to roughly $Width
+# characters, split only on ". " before a capital so `NeighborRail.test.tsx` stays whole.
+function Format-Prose([string]$Text, [int]$Width = 220) {
+  if (-not $Text) { return '' }
+  $t = $Text.Trim()
+  # Already structured (bullets, numbered list or blank-line paragraphs): leave it alone.
+  if ($t -match '(?m)^\s*([-*]|\d+\.)\s' -or $t -match "\n\s*\n") { return $t }
+  if ($t.Length -le $Width) { return $t }
+
+  $sentences = [regex]::Split($t, '(?<=[.!?])\s+(?=[A-Z(`"])') | Where-Object { $_.Trim() }
+  if ($sentences.Count -lt 2) { return $t }
+
+  $bullets = New-Object System.Collections.Generic.List[string]
+  $cur = ''
+  foreach ($sentence in $sentences) {
+    $s = $sentence.Trim()
+    if (-not $cur) { $cur = $s }
+    elseif (($cur.Length + 1 + $s.Length) -le $Width) { $cur += ' ' + $s }
+    else { $bullets.Add($cur); $cur = $s }
+  }
+  if ($cur) { $bullets.Add($cur) }
+  return (($bullets | ForEach-Object { "- $_" }) -join "`n")
+}
+
 function New-PrBody {
   param(
     [Parameter(Mandatory)][string] $Notes,
@@ -79,7 +105,7 @@ function New-PrBody {
   Add-Line '<details>'
   Add-Line '<summary>What changed, and how it was verified</summary>'
   Add-Line ''
-  if ($fixSummary) { Add-Line $fixSummary; Add-Line '' }
+  if ($fixSummary) { Add-Line (Format-Prose $fixSummary); Add-Line '' }
   if ($NumStat.Count -gt 0) {
     Add-Line 'Files changed:'
     Add-Line ''
