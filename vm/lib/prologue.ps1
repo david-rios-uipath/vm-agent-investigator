@@ -60,6 +60,15 @@ function Ensure-Tools {
   Add-ToolPath
   $missing = @()
 
+  # git is the one tool bootstrap.ps1 owns (it must exist before this repo can be cloned);
+  # only the probe-phase path, which skips the flow's bootstrap, reaches this on a fresh VM.
+  if (-not (Test-Tool 'git')) {
+    $missing += 'git'
+    Write-Output '[ensure] installing git'
+    & (Join-Path $PSScriptRoot '..\bootstrap.ps1') -GitOnly
+    if (-not (Test-Tool 'git')) { throw '[ensure] git still not runnable after install' }
+  }
+
   if (-not (Test-Tool 'rg')) {
     $missing += 'rg'
     Write-Output '[ensure] installing ripgrep'
@@ -114,7 +123,7 @@ function Ensure-Tools {
 
   if ($missing.Count -eq 0) { Write-Output '[ensure] all tools present' }
   else { Write-Output ('[ensure] installed: ' + ($missing -join ', ')) }
-  Write-Output ('[ensure] rg ' + (Test-Tool 'rg') + ' | gh ' + (Test-Tool 'gh') + ' | node ' + (Test-Tool 'node') +
+  Write-Output ('[ensure] git ' + (Test-Tool 'git') + ' | rg ' + (Test-Tool 'rg') + ' | gh ' + (Test-Tool 'gh') + ' | node ' + (Test-Tool 'node') +
     ' | claude ' + (Test-Tool 'claude') + ' | ffmpeg ' + $(if (Test-Tool 'ffmpeg' @('-version')) { 'ok' } else { 'MISSING' }))
 }
 

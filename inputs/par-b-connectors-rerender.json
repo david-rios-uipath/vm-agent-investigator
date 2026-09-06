@@ -1,0 +1,9 @@
+{
+  "repoUrl": "https://github.com/UiPath/flow-workbench",
+  "branch": "develop",
+  "testCommand": "corepack pnpm exec playwright test --config e2e/playwright.config.ts e2e/specs/connectors/connectors.spec.ts --project studio-alpha --grep \"does not infinite re-render when the HTTP field has a validation error\"",
+  "maxFixAttempts": 3,
+  "runnerRepoUrl": "https://github.com/david-rios-uipath/vm-agent-investigator",
+  "runnerRef": "master",
+  "claudeModel": ""
+}

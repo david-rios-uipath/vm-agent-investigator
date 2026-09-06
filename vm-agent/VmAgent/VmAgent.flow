@@ -112,7 +112,7 @@
       },
       "outputs": {
         "output": {
-          "type": "string",
+          "type": "any",
           "description": "The return value of the script",
           "source": "=result.response",
           "var": "output"
@@ -369,7 +369,7 @@
       },
       "outputs": {
         "output": {
-          "type": "number",
+          "type": "any",
           "description": "The return value of the script",
           "source": "=result.response",
           "var": "output"
@@ -437,14 +437,16 @@
     },
     {
       "id": "endSetupFailed",
-      "type": "core.control.end",
+      "type": "core.control.response",
       "typeVersion": "1.0",
       "display": {
-        "label": "End: setup failed",
+        "label": "Failed: setup",
         "subLabel": "",
         "icon": "circle-check"
       },
-      "inputs": {},
+      "inputs": {
+        "markJobAsFailed": true
+      },
       "outputs": {
         "hypothesis": {
           "source": {
@@ -506,14 +508,16 @@
     },
     {
       "id": "endNotReproduced",
-      "type": "core.control.end",
+      "type": "core.control.response",
       "typeVersion": "1.0",
       "display": {
         "label": "End: not reproduced / timeout",
         "subLabel": "",
         "icon": "circle-check"
       },
-      "inputs": {},
+      "inputs": {
+        "markJobAsFailed": false
+      },
       "outputs": {
         "hypothesis": {
           "source": {
@@ -667,7 +671,7 @@
       "inputs": {
         "script": {
           "type": "literal",
-          "expression": "// The VM gets the phase logic from this repo, not from the flow: a runner change is a git\n// push, not a solution release. `runnerRef` selects the ref to run.\nconst s = (v) => String(v ?? '').replace(/'/g, \"''\");\nconst runId = s($vars.deriveRunId.output);\nconst ref = s($vars.start.output.runnerRef || 'master');\nconst args = [\n  \"-Phase repro\",\n  `-RunId '${runId}'`,\n  `-RepoUrl '${s($vars.start.output.repoUrl)}'`,\n  `-Branch '${s($vars.start.output.branch)}'`,\n  `-TestCommand '${s($vars.start.output.testCommand)}'`,\n  $vars.start.output.claudeModel ? `-Model '${s($vars.start.output.claudeModel)}'` : \"\",\n  $vars.start.output.smokeOnly ? \"-SmokeOnly\" : \"\",\n].join(' ');\nreturn `$ErrorActionPreference = 'Continue'\n$runner = 'C:\\\\vm-agent\\\\runner'\n$url = '${s($vars.start.output.runnerRepoUrl)}'\nif (-not $url) { Write-Output '[bootstrap] runnerRepoUrl is empty; nothing to clone'; exit 1 }\nif ($env:GIT_TOKEN) { $url = $url -replace '^https://', \"https://x-access-token:$($env:GIT_TOKEN)@\" }\nif (-not (Test-Path \"$runner\\\\.git\")) {\n  git clone --depth 1 $url $runner\n  if ($LASTEXITCODE -ne 0) { Write-Output '[bootstrap] clone of the runner repo failed'; exit 1 }\n}\ngit -C $runner remote set-url origin $url\ngit -C $runner fetch --depth 1 origin ${ref}\nif ($LASTEXITCODE -ne 0) { Write-Output '[bootstrap] fetch of the runner repo failed'; exit 1 }\ngit -C $runner checkout -q FETCH_HEAD\ngit -C $runner remote set-url origin '${s($vars.start.output.runnerRepoUrl)}'\nWrite-Output \"[bootstrap] runner at $(git -C $runner rev-parse --short HEAD)\"\n& \"$runner\\\\vm\\\\run-phase.ps1\" ${args}\nexit $LASTEXITCODE\n`",
+          "expression": "// The VM gets the phase logic from this repo, not from the flow: a runner change is a git\n// push, not a solution release. `runnerRef` selects the ref to run.\nconst s = (v) => String(v ?? '').replace(/'/g, \"''\");\nconst runId = s($vars.deriveRunId.output);\nconst ref = s($vars.start.output.runnerRef || 'master');\nconst args = [\n  \"-Phase repro\",\n  `-RunId '${runId}'`,\n  `-RepoUrl '${s($vars.start.output.repoUrl)}'`,\n  `-Branch '${s($vars.start.output.branch)}'`,\n  `-TestCommand '${s($vars.start.output.testCommand)}'`,\n  $vars.start.output.claudeModel ? `-Model '${s($vars.start.output.claudeModel)}'` : \"\",\n  $vars.start.output.smokeOnly ? \"-SmokeOnly\" : \"\",\n].join(' ');\nconst repo = String($vars.start.output.runnerRepoUrl || '').replace(/\\.git$/, '').replace(/\\/+$/, '');\nconst rawBase = repo.replace('https://github.com/', 'https://raw.githubusercontent.com/') + '/' + ref;\nreturn `$ErrorActionPreference = 'Continue'\n$runner = 'C:\\\\vm-agent\\\\runner'\n$url = '${s(repo)}'\nif (-not $url) { Write-Output '[bootstrap] runnerRepoUrl is empty; nothing to clone'; exit 1 }\n$raw = '${s(rawBase)}/vm/bootstrap.ps1'\n$boot = Join-Path $env:TEMP 'vm-agent-bootstrap.ps1'\n$hdr = @{}\nif ($env:GIT_TOKEN) { $hdr['Authorization'] = \"token $($env:GIT_TOKEN)\" }\ntry { Invoke-WebRequest $raw -OutFile $boot -UseBasicParsing -Headers $hdr -ErrorAction Stop }\ncatch { Write-Output \"[bootstrap] could not fetch $raw : $_\"; exit 1 }\ntry { & $boot -RunnerRepoUrl $url -Ref '${ref}' -Runner $runner; if ($LASTEXITCODE -ne 0) { throw \"exit $LASTEXITCODE\" } }\ncatch { Write-Output \"[bootstrap] bootstrap.ps1 failed: $_\"; exit 1 }\n& \"$runner\\\\vm\\\\run-phase.ps1\" ${args}\nexit $LASTEXITCODE\n`",
           "fieldType": "string"
         }
       },
@@ -927,7 +931,7 @@
       "inputs": {
         "script": {
           "type": "literal",
-          "expression": "// The VM gets the phase logic from this repo, not from the flow: a runner change is a git\n// push, not a solution release. `runnerRef` selects the ref to run.\nconst s = (v) => String(v ?? '').replace(/'/g, \"''\");\nconst runId = s($vars.deriveRunId.output);\nconst ref = s($vars.start.output.runnerRef || 'master');\nconst args = [\n  \"-Phase investigate\",\n  `-RunId '${runId}'`,\n  `-RepoUrl '${s($vars.start.output.repoUrl)}'`,\n  `-Branch '${s($vars.start.output.branch)}'`,\n  `-TestCommand '${s($vars.start.output.testCommand)}'`,\n  $vars.start.output.claudeModel ? `-Model '${s($vars.start.output.claudeModel)}'` : \"\",\n\n].join(' ');\nreturn `$ErrorActionPreference = 'Continue'\n$runner = 'C:\\\\vm-agent\\\\runner'\n$url = '${s($vars.start.output.runnerRepoUrl)}'\nif (-not $url) { Write-Output '[bootstrap] runnerRepoUrl is empty; nothing to clone'; exit 1 }\nif ($env:GIT_TOKEN) { $url = $url -replace '^https://', \"https://x-access-token:$($env:GIT_TOKEN)@\" }\nif (-not (Test-Path \"$runner\\\\.git\")) {\n  git clone --depth 1 $url $runner\n  if ($LASTEXITCODE -ne 0) { Write-Output '[bootstrap] clone of the runner repo failed'; exit 1 }\n}\ngit -C $runner remote set-url origin $url\ngit -C $runner fetch --depth 1 origin ${ref}\nif ($LASTEXITCODE -ne 0) { Write-Output '[bootstrap] fetch of the runner repo failed'; exit 1 }\ngit -C $runner checkout -q FETCH_HEAD\ngit -C $runner remote set-url origin '${s($vars.start.output.runnerRepoUrl)}'\nWrite-Output \"[bootstrap] runner at $(git -C $runner rev-parse --short HEAD)\"\n& \"$runner\\\\vm\\\\run-phase.ps1\" ${args}\nexit $LASTEXITCODE\n`",
+          "expression": "// The VM gets the phase logic from this repo, not from the flow: a runner change is a git\n// push, not a solution release. `runnerRef` selects the ref to run.\nconst s = (v) => String(v ?? '').replace(/'/g, \"''\");\nconst runId = s($vars.deriveRunId.output);\nconst ref = s($vars.start.output.runnerRef || 'master');\nconst args = [\n  \"-Phase investigate\",\n  `-RunId '${runId}'`,\n  `-RepoUrl '${s($vars.start.output.repoUrl)}'`,\n  `-Branch '${s($vars.start.output.branch)}'`,\n  `-TestCommand '${s($vars.start.output.testCommand)}'`,\n  $vars.start.output.claudeModel ? `-Model '${s($vars.start.output.claudeModel)}'` : \"\",\n\n].join(' ');\nconst repo = String($vars.start.output.runnerRepoUrl || '').replace(/\\.git$/, '').replace(/\\/+$/, '');\nconst rawBase = repo.replace('https://github.com/', 'https://raw.githubusercontent.com/') + '/' + ref;\nreturn `$ErrorActionPreference = 'Continue'\n$runner = 'C:\\\\vm-agent\\\\runner'\n$url = '${s(repo)}'\nif (-not $url) { Write-Output '[bootstrap] runnerRepoUrl is empty; nothing to clone'; exit 1 }\n$raw = '${s(rawBase)}/vm/bootstrap.ps1'\n$boot = Join-Path $env:TEMP 'vm-agent-bootstrap.ps1'\n$hdr = @{}\nif ($env:GIT_TOKEN) { $hdr['Authorization'] = \"token $($env:GIT_TOKEN)\" }\ntry { Invoke-WebRequest $raw -OutFile $boot -UseBasicParsing -Headers $hdr -ErrorAction Stop }\ncatch { Write-Output \"[bootstrap] could not fetch $raw : $_\"; exit 1 }\ntry { & $boot -RunnerRepoUrl $url -Ref '${ref}' -Runner $runner; if ($LASTEXITCODE -ne 0) { throw \"exit $LASTEXITCODE\" } }\ncatch { Write-Output \"[bootstrap] bootstrap.ps1 failed: $_\"; exit 1 }\n& \"$runner\\\\vm\\\\run-phase.ps1\" ${args}\nexit $LASTEXITCODE\n`",
           "fieldType": "string"
         }
       },
@@ -1184,7 +1188,7 @@
       "inputs": {
         "script": {
           "type": "literal",
-          "expression": "// The VM gets the phase logic from this repo, not from the flow: a runner change is a git\n// push, not a solution release. `runnerRef` selects the ref to run.\nconst s = (v) => String(v ?? '').replace(/'/g, \"''\");\nconst runId = s($vars.deriveRunId.output);\nconst ref = s($vars.start.output.runnerRef || 'master');\nconst args = [\n  \"-Phase fix\",\n  `-RunId '${runId}'`,\n  `-RepoUrl '${s($vars.start.output.repoUrl)}'`,\n  `-Branch '${s($vars.start.output.branch)}'`,\n  `-TestCommand '${s($vars.start.output.testCommand)}'`,\n  $vars.start.output.claudeModel ? `-Model '${s($vars.start.output.claudeModel)}'` : \"\",\n  `-FixAttempt ${$vars.fixAttempts}`,\n  `-MaxFixAttempts ${$vars.start.output.maxFixAttempts}`,\n].join(' ');\nreturn `$ErrorActionPreference = 'Continue'\n$runner = 'C:\\\\vm-agent\\\\runner'\n$url = '${s($vars.start.output.runnerRepoUrl)}'\nif (-not $url) { Write-Output '[bootstrap] runnerRepoUrl is empty; nothing to clone'; exit 1 }\nif ($env:GIT_TOKEN) { $url = $url -replace '^https://', \"https://x-access-token:$($env:GIT_TOKEN)@\" }\nif (-not (Test-Path \"$runner\\\\.git\")) {\n  git clone --depth 1 $url $runner\n  if ($LASTEXITCODE -ne 0) { Write-Output '[bootstrap] clone of the runner repo failed'; exit 1 }\n}\ngit -C $runner remote set-url origin $url\ngit -C $runner fetch --depth 1 origin ${ref}\nif ($LASTEXITCODE -ne 0) { Write-Output '[bootstrap] fetch of the runner repo failed'; exit 1 }\ngit -C $runner checkout -q FETCH_HEAD\ngit -C $runner remote set-url origin '${s($vars.start.output.runnerRepoUrl)}'\nWrite-Output \"[bootstrap] runner at $(git -C $runner rev-parse --short HEAD)\"\n& \"$runner\\\\vm\\\\run-phase.ps1\" ${args}\nexit $LASTEXITCODE\n`",
+          "expression": "// The VM gets the phase logic from this repo, not from the flow: a runner change is a git\n// push, not a solution release. `runnerRef` selects the ref to run.\nconst s = (v) => String(v ?? '').replace(/'/g, \"''\");\nconst runId = s($vars.deriveRunId.output);\nconst ref = s($vars.start.output.runnerRef || 'master');\nconst args = [\n  \"-Phase fix\",\n  `-RunId '${runId}'`,\n  `-RepoUrl '${s($vars.start.output.repoUrl)}'`,\n  `-Branch '${s($vars.start.output.branch)}'`,\n  `-TestCommand '${s($vars.start.output.testCommand)}'`,\n  $vars.start.output.claudeModel ? `-Model '${s($vars.start.output.claudeModel)}'` : \"\",\n  `-FixAttempt ${$vars.fixAttempts}`,\n  `-MaxFixAttempts ${$vars.start.output.maxFixAttempts}`,\n].join(' ');\nconst repo = String($vars.start.output.runnerRepoUrl || '').replace(/\\.git$/, '').replace(/\\/+$/, '');\nconst rawBase = repo.replace('https://github.com/', 'https://raw.githubusercontent.com/') + '/' + ref;\nreturn `$ErrorActionPreference = 'Continue'\n$runner = 'C:\\\\vm-agent\\\\runner'\n$url = '${s(repo)}'\nif (-not $url) { Write-Output '[bootstrap] runnerRepoUrl is empty; nothing to clone'; exit 1 }\n$raw = '${s(rawBase)}/vm/bootstrap.ps1'\n$boot = Join-Path $env:TEMP 'vm-agent-bootstrap.ps1'\n$hdr = @{}\nif ($env:GIT_TOKEN) { $hdr['Authorization'] = \"token $($env:GIT_TOKEN)\" }\ntry { Invoke-WebRequest $raw -OutFile $boot -UseBasicParsing -Headers $hdr -ErrorAction Stop }\ncatch { Write-Output \"[bootstrap] could not fetch $raw : $_\"; exit 1 }\ntry { & $boot -RunnerRepoUrl $url -Ref '${ref}' -Runner $runner; if ($LASTEXITCODE -ne 0) { throw \"exit $LASTEXITCODE\" } }\ncatch { Write-Output \"[bootstrap] bootstrap.ps1 failed: $_\"; exit 1 }\n& \"$runner\\\\vm\\\\run-phase.ps1\" ${args}\nexit $LASTEXITCODE\n`",
           "fieldType": "string"
         }
       },
@@ -1453,7 +1457,7 @@
       "inputs": {
         "script": {
           "type": "literal",
-          "expression": "// The VM gets the phase logic from this repo, not from the flow: a runner change is a git\n// push, not a solution release. `runnerRef` selects the ref to run.\nconst s = (v) => String(v ?? '').replace(/'/g, \"''\");\nconst runId = s($vars.deriveRunId.output);\nconst ref = s($vars.start.output.runnerRef || 'master');\nconst args = [\n  \"-Phase pr\",\n  `-RunId '${runId}'`,\n  `-RepoUrl '${s($vars.start.output.repoUrl)}'`,\n  `-Branch '${s($vars.start.output.branch)}'`,\n  `-TestCommand '${s($vars.start.output.testCommand)}'`,\n  $vars.start.output.claudeModel ? `-Model '${s($vars.start.output.claudeModel)}'` : \"\",\n\n].join(' ');\nreturn `$ErrorActionPreference = 'Continue'\n$runner = 'C:\\\\vm-agent\\\\runner'\n$url = '${s($vars.start.output.runnerRepoUrl)}'\nif (-not $url) { Write-Output '[bootstrap] runnerRepoUrl is empty; nothing to clone'; exit 1 }\nif ($env:GIT_TOKEN) { $url = $url -replace '^https://', \"https://x-access-token:$($env:GIT_TOKEN)@\" }\nif (-not (Test-Path \"$runner\\\\.git\")) {\n  git clone --depth 1 $url $runner\n  if ($LASTEXITCODE -ne 0) { Write-Output '[bootstrap] clone of the runner repo failed'; exit 1 }\n}\ngit -C $runner remote set-url origin $url\ngit -C $runner fetch --depth 1 origin ${ref}\nif ($LASTEXITCODE -ne 0) { Write-Output '[bootstrap] fetch of the runner repo failed'; exit 1 }\ngit -C $runner checkout -q FETCH_HEAD\ngit -C $runner remote set-url origin '${s($vars.start.output.runnerRepoUrl)}'\nWrite-Output \"[bootstrap] runner at $(git -C $runner rev-parse --short HEAD)\"\n& \"$runner\\\\vm\\\\run-phase.ps1\" ${args}\nexit $LASTEXITCODE\n`",
+          "expression": "// The VM gets the phase logic from this repo, not from the flow: a runner change is a git\n// push, not a solution release. `runnerRef` selects the ref to run.\nconst s = (v) => String(v ?? '').replace(/'/g, \"''\");\nconst runId = s($vars.deriveRunId.output);\nconst ref = s($vars.start.output.runnerRef || 'master');\nconst args = [\n  \"-Phase pr\",\n  `-RunId '${runId}'`,\n  `-RepoUrl '${s($vars.start.output.repoUrl)}'`,\n  `-Branch '${s($vars.start.output.branch)}'`,\n  `-TestCommand '${s($vars.start.output.testCommand)}'`,\n  $vars.start.output.claudeModel ? `-Model '${s($vars.start.output.claudeModel)}'` : \"\",\n\n].join(' ');\nconst repo = String($vars.start.output.runnerRepoUrl || '').replace(/\\.git$/, '').replace(/\\/+$/, '');\nconst rawBase = repo.replace('https://github.com/', 'https://raw.githubusercontent.com/') + '/' + ref;\nreturn `$ErrorActionPreference = 'Continue'\n$runner = 'C:\\\\vm-agent\\\\runner'\n$url = '${s(repo)}'\nif (-not $url) { Write-Output '[bootstrap] runnerRepoUrl is empty; nothing to clone'; exit 1 }\n$raw = '${s(rawBase)}/vm/bootstrap.ps1'\n$boot = Join-Path $env:TEMP 'vm-agent-bootstrap.ps1'\n$hdr = @{}\nif ($env:GIT_TOKEN) { $hdr['Authorization'] = \"token $($env:GIT_TOKEN)\" }\ntry { Invoke-WebRequest $raw -OutFile $boot -UseBasicParsing -Headers $hdr -ErrorAction Stop }\ncatch { Write-Output \"[bootstrap] could not fetch $raw : $_\"; exit 1 }\ntry { & $boot -RunnerRepoUrl $url -Ref '${ref}' -Runner $runner; if ($LASTEXITCODE -ne 0) { throw \"exit $LASTEXITCODE\" } }\ncatch { Write-Output \"[bootstrap] bootstrap.ps1 failed: $_\"; exit 1 }\n& \"$runner\\\\vm\\\\run-phase.ps1\" ${args}\nexit $LASTEXITCODE\n`",
           "fieldType": "string"
         }
       },
@@ -2738,6 +2742,77 @@
               }
             ]
           }
+        ]
+      }
+    },
+    {
+      "nodeType": "core.control.response",
+      "version": "1.0",
+      "category": "control-flow",
+      "description": "Return the output arguments and stop the run",
+      "tags": [
+        "control-flow",
+        "end",
+        "response",
+        "return",
+        "stop"
+      ],
+      "sortOrder": 68,
+      "display": {
+        "label": "Response",
+        "icon": "circle-check",
+        "shape": "circle"
+      },
+      "handleConfiguration": [
+        {
+          "position": "left",
+          "handles": [
+            {
+              "id": "input",
+              "type": "target",
+              "handleType": "input"
+            }
+          ]
+        }
+      ],
+      "model": {
+        "type": "bpmn:EndEvent",
+        "eventDefinition": "bpmn:TerminateEventDefinition"
+      },
+      "inputDefinition": {
+        "type": "object",
+        "properties": {
+          "markJobAsFailed": {
+            "type": "boolean"
+          }
+        }
+      },
+      "inputDefaults": {
+        "markJobAsFailed": false
+      },
+      "form": {
+        "id": "response-properties",
+        "title": "Response",
+        "sections": [
+          {
+            "id": "outcome",
+            "title": "Outcome",
+            "collapsible": true,
+            "defaultExpanded": true,
+            "fields": [
+              {
+                "name": "inputs.markJobAsFailed",
+                "type": "checkbox",
+                "label": "Mark job as failed",
+                "description": "Report the run as failed instead of successful."
+              }
+            ]
+          }
+        ]
+      },
+      "runtimeConstraints": {
+        "include": [
+          "api-function"
         ]
       }
     },
