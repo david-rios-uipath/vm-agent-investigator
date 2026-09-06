@@ -436,88 +436,90 @@
       }
     },
     {
-      "id": "endSetupFailed",
-      "type": "core.control.response",
-      "typeVersion": "1.0",
+      "id": "reportSetupFailed",
+      "type": "core.action.script",
+      "typeVersion": "1.1",
       "display": {
-        "label": "Failed: setup",
+        "label": "Report setup failure",
         "subLabel": "",
-        "icon": "circle-check"
+        "icon": "code"
       },
       "inputs": {
-        "markJobAsFailed": true
+        "script": {
+          "type": "literal",
+          "expression": "// A terminate node returns no output arguments, so the diagnosis lives here, on the\n// instance trace, and the run ends as terminated rather than successful.\nreturn {\n  classification: 'infrastructure',\n  hypothesis: 'infrastructure: a phase runner job returned no STATUS_JSON line, so it broke before it could report; nothing was investigated.',\n  evidence: 'CLASSIFICATION: infrastructure\\n\\nFull exec log: ' + ((($vars.parseStatusInvestigate.output ?? {}).runnerFailed ? ($vars.parseStatusInvestigate.output ?? {}).blobPath : ($vars.parseStatusRepro.output ?? {}).blobPath) ?? '(none)'),\n  fixAttempts: $vars.fixAttempts,\n};"
+        }
       },
       "outputs": {
-        "hypothesis": {
-          "source": {
-            "type": "jsExpression",
-            "expression": "'infrastructure: a phase runner job returned no STATUS_JSON line, so it broke before it could report; nothing was investigated.'",
-            "fieldType": "string"
-          },
-          "type": "string"
+        "output": {
+          "type": "any",
+          "description": "The return value of the script",
+          "source": "=result.response",
+          "var": "output"
         },
-        "evidence": {
-          "source": {
-            "type": "jsExpression",
-            "expression": "'CLASSIFICATION: infrastructure\\n\\nFull exec log: ' + ((($vars.parseStatusInvestigate.output ?? {}).runnerFailed ? ($vars.parseStatusInvestigate.output ?? {}).blobPath : ($vars.parseStatusRepro.output ?? {}).blobPath) ?? '(none)')",
-            "fieldType": "string"
-          },
-          "type": "string"
-        },
-        "reproduced": {
-          "source": {
-            "type": "jsExpression",
-            "expression": "false",
-            "fieldType": "boolean"
-          },
-          "type": "string"
-        },
-        "patch": {
-          "source": {
-            "type": "jsExpression",
-            "expression": "''",
-            "fieldType": "string"
-          },
-          "type": "string"
-        },
-        "fixVerified": {
-          "source": {
-            "type": "jsExpression",
-            "expression": "false",
-            "fieldType": "boolean"
-          },
-          "type": "boolean"
-        },
-        "prUrl": {
-          "source": {
-            "type": "jsExpression",
-            "expression": "''",
-            "fieldType": "string"
-          },
-          "type": "string"
-        },
-        "fixAttempts": {
-          "source": {
-            "type": "jsExpression",
-            "expression": "$vars.fixAttempts",
-            "fieldType": "number"
-          },
-          "type": "number"
+        "error": {
+          "type": "object",
+          "description": "Error information if the node fails",
+          "source": "=Error",
+          "var": "error",
+          "schema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "type": "object",
+            "required": [
+              "code",
+              "message",
+              "detail",
+              "category",
+              "status"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Error code as a string"
+              },
+              "message": {
+                "type": "string",
+                "description": "High-level error message"
+              },
+              "detail": {
+                "type": "string",
+                "description": "Detailed error description"
+              },
+              "category": {
+                "type": "string",
+                "description": "Error category"
+              },
+              "status": {
+                "type": "integer",
+                "description": "HTTP status code"
+              }
+            },
+            "additionalProperties": false
+          }
         }
       }
     },
     {
+      "id": "terminateSetupFailed",
+      "type": "core.logic.terminate",
+      "typeVersion": "1.0",
+      "display": {
+        "label": "Terminate: setup failed",
+        "subLabel": "",
+        "icon": "circle-x"
+      },
+      "inputs": {}
+    },
+    {
       "id": "endNotReproduced",
-      "type": "core.control.response",
+      "type": "core.control.end",
       "typeVersion": "1.0",
       "display": {
         "label": "End: not reproduced / timeout",
         "subLabel": "",
         "icon": "circle-check"
       },
-      "inputs": {
-        "markJobAsFailed": false
-      },
+      "inputs": {},
       "outputs": {
         "hypothesis": {
           "source": {
@@ -1799,10 +1801,10 @@
       "targetPort": "input"
     },
     {
-      "id": "edge_decisionReproRan_false_endSetupFailed_input",
+      "id": "edge_decisionReproRan_false_reportSetupFailed_input",
       "sourceNodeId": "decisionReproRan",
       "sourcePort": "false",
-      "targetNodeId": "endSetupFailed",
+      "targetNodeId": "reportSetupFailed",
       "targetPort": "input"
     },
     {
@@ -1848,10 +1850,10 @@
       "targetPort": "input"
     },
     {
-      "id": "edge_decisionInvestigated_false_endSetupFailed_input",
+      "id": "edge_decisionInvestigated_false_reportSetupFailed_input",
       "sourceNodeId": "decisionInvestigated",
       "sourcePort": "false",
-      "targetNodeId": "endSetupFailed",
+      "targetNodeId": "reportSetupFailed",
       "targetPort": "input"
     },
     {
@@ -1936,6 +1938,13 @@
       "sourceNodeId": "parseStatusFix",
       "sourcePort": "success",
       "targetNodeId": "decisionVerify",
+      "targetPort": "input"
+    },
+    {
+      "id": "edge_reportSetupFailed_success_terminateSetupFailed_input",
+      "sourceNodeId": "reportSetupFailed",
+      "sourcePort": "success",
+      "targetNodeId": "terminateSetupFailed",
       "targetPort": "input"
     }
   ],
@@ -2746,21 +2755,20 @@
       }
     },
     {
-      "nodeType": "core.control.response",
+      "nodeType": "core.logic.terminate",
       "version": "1.0",
       "category": "control-flow",
-      "description": "Return the output arguments and stop the run",
+      "description": "Stop the entire process immediately",
       "tags": [
         "control-flow",
         "end",
-        "response",
-        "return",
-        "stop"
+        "stop",
+        "terminate"
       ],
-      "sortOrder": 68,
+      "sortOrder": 67,
       "display": {
-        "label": "Response",
-        "icon": "circle-check",
+        "label": "Terminate",
+        "icon": "circle-x",
         "shape": "circle"
       },
       "handleConfiguration": [
@@ -2779,39 +2787,8 @@
         "type": "bpmn:EndEvent",
         "eventDefinition": "bpmn:TerminateEventDefinition"
       },
-      "inputDefinition": {
-        "type": "object",
-        "properties": {
-          "markJobAsFailed": {
-            "type": "boolean"
-          }
-        }
-      },
-      "inputDefaults": {
-        "markJobAsFailed": false
-      },
-      "form": {
-        "id": "response-properties",
-        "title": "Response",
-        "sections": [
-          {
-            "id": "outcome",
-            "title": "Outcome",
-            "collapsible": true,
-            "defaultExpanded": true,
-            "fields": [
-              {
-                "name": "inputs.markJobAsFailed",
-                "type": "checkbox",
-                "label": "Mark job as failed",
-                "description": "Report the run as failed instead of successful."
-              }
-            ]
-          }
-        ]
-      },
       "runtimeConstraints": {
-        "include": [
+        "exclude": [
           "api-function"
         ]
       }
@@ -3462,54 +3439,6 @@
         }
       },
       {
-        "id": "endSetupFailed.hypothesis",
-        "type": "string",
-        "binding": {
-          "nodeId": "endSetupFailed",
-          "outputId": "hypothesis"
-        }
-      },
-      {
-        "id": "endSetupFailed.evidence",
-        "type": "string",
-        "binding": {
-          "nodeId": "endSetupFailed",
-          "outputId": "evidence"
-        }
-      },
-      {
-        "id": "endSetupFailed.reproduced",
-        "type": "string",
-        "binding": {
-          "nodeId": "endSetupFailed",
-          "outputId": "reproduced"
-        }
-      },
-      {
-        "id": "endSetupFailed.patch",
-        "type": "string",
-        "binding": {
-          "nodeId": "endSetupFailed",
-          "outputId": "patch"
-        }
-      },
-      {
-        "id": "endSetupFailed.fixVerified",
-        "type": "boolean",
-        "binding": {
-          "nodeId": "endSetupFailed",
-          "outputId": "fixVerified"
-        }
-      },
-      {
-        "id": "endSetupFailed.prUrl",
-        "type": "string",
-        "binding": {
-          "nodeId": "endSetupFailed",
-          "outputId": "prUrl"
-        }
-      },
-      {
         "id": "endNotReproduced.hypothesis",
         "type": "string",
         "binding": {
@@ -3571,14 +3500,6 @@
         "type": "number",
         "binding": {
           "nodeId": "end",
-          "outputId": "fixAttempts"
-        }
-      },
-      {
-        "id": "endSetupFailed.fixAttempts",
-        "type": "number",
-        "binding": {
-          "nodeId": "endSetupFailed",
           "outputId": "fixAttempts"
         }
       },
@@ -4278,6 +4199,58 @@
           "nodeId": "decisionInvestigated",
           "outputId": "matchedCaseId"
         }
+      },
+      {
+        "id": "reportSetupFailed.output",
+        "type": "any",
+        "description": "The return value of the script",
+        "binding": {
+          "nodeId": "reportSetupFailed",
+          "outputId": "output"
+        }
+      },
+      {
+        "id": "reportSetupFailed.error",
+        "type": "object",
+        "schema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "required": [
+            "code",
+            "message",
+            "detail",
+            "category",
+            "status"
+          ],
+          "properties": {
+            "code": {
+              "type": "string",
+              "description": "Error code as a string"
+            },
+            "message": {
+              "type": "string",
+              "description": "High-level error message"
+            },
+            "detail": {
+              "type": "string",
+              "description": "Detailed error description"
+            },
+            "category": {
+              "type": "string",
+              "description": "Error category"
+            },
+            "status": {
+              "type": "integer",
+              "description": "HTTP status code"
+            }
+          },
+          "additionalProperties": false
+        },
+        "description": "Error information if the node fails",
+        "binding": {
+          "nodeId": "reportSetupFailed",
+          "outputId": "error"
+        }
       }
     ],
     "variableUpdates": {
@@ -4404,10 +4377,21 @@
         },
         "collapsed": false
       },
-      "endSetupFailed": {
+      "reportSetupFailed": {
         "position": {
-          "x": 2256,
-          "y": -160
+          "x": 0,
+          "y": 0
+        },
+        "size": {
+          "width": 96,
+          "height": 96
+        },
+        "collapsed": false
+      },
+      "terminateSetupFailed": {
+        "position": {
+          "x": 0,
+          "y": 0
         },
         "size": {
           "width": 96,
@@ -4721,30 +4705,6 @@
             "id": "edge_decisionInvestigated_true_bootstrapFix_input-r1",
             "x": 2160,
             "y": 32
-          }
-        ]
-      },
-      "edge_decisionInvestigated_false_endSetupFailed_input": {
-        "waypoints": [
-          {
-            "id": "wp-423a7b6b-af61-41f3-8f49-95c2616c97d3",
-            "x": 2880,
-            "y": 207.99373797241992
-          },
-          {
-            "id": "wp-62b78ab1-fc8e-49a7-b906-fda5c2434583",
-            "x": 2880,
-            "y": -176
-          },
-          {
-            "id": "wp-39a52629-6425-4e24-8f3c-cd9cd4084c9b",
-            "x": 2224,
-            "y": -176
-          },
-          {
-            "id": "wp-d05d156e-8b7c-453e-8fe6-17e763a60930",
-            "x": 2224,
-            "y": -111.99997028560696
           }
         ]
       },
