@@ -345,6 +345,14 @@ switch ($Phase) {
     Write-Status @{ patchWritten = $false; fixVerified = $false; fixSummary = $fixSummary; confidence = $confidence; attempt = $FixAttempt; patch = '' }
     exit 0
   }
+  # Non-ASCII in the fixer's own edits reaches disk mangled (run 130020 committed replacement
+  # bytes for an em dash into product source), so say so where the run log and notebook show it.
+  $badLines = @(($diff -split "`n") | Where-Object { $_.StartsWith('+') -and $_ -match '[^\u0000-\u007f]' })
+  if ($badLines.Count -gt 0) {
+    Write-Output "[fix] WARNING: $($badLines.Count) added line(s) contain non-ASCII characters:"
+    $badLines | Select-Object -First 5 | ForEach-Object { Write-Output "  $_" }
+  }
+
   Write-Utf8Lf $patchFile $diff
   Write-Output '[fix] patch'
   Write-Output (Get-Tail $diff 4000)
