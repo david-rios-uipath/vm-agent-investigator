@@ -206,9 +206,14 @@ Sample payload: `inputs/orchestrator-34015558366.json`.
 - **`maxTests` must equal the robot pool's VM count — today that is 1.** The loop is
   `parallel: true`, so each selected test starts its own `VmAgent` job at once; with one VM the
   extra jobs queue behind the first and time out. Grow `maxTests` only when the pool grows.
+- Second reason: `recordResult` reads `$vars.callVmAgent.output`, which is node-scoped, while
+  `currentItem` is iteration-scoped; with `parallel: true` and more than one iteration,
+  cross-iteration reads are possible unless the runtime scopes node outputs per iteration.
+  Unproven — verify with 2 tests before raising `maxTests` above 1.
 - **Slack replies work through the `thread_ts` body field** of the connector's
   `send_message_to_channel_v2`. `thread_ts` is `=js:$vars.start.output.slackTs || undefined`, so
-  an empty `slackTs` posts a top-level message instead of failing. Channel `C0AH25MT3L5`,
+  an empty `slackTs` posts a top-level message instead of failing (unverified: no run has reached
+  the Slack node yet). Channel `C0AH25MT3L5`,
   connection `david.rios` (`uipath-salesforce-slack`), `send_as=bot`. The node id is
   **`replyInSlackThread1`** — `uip maestro flow node add` does not let you choose an id.
 - **CI hand-off:** flow-workbench PR
