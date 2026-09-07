@@ -1,0 +1,22 @@
+{
+  "docVersion": "1.0.0",
+  "resource": {
+    "name": "NightlyOrchestrator",
+    "kind": "package",
+    "apiVersion": "orchestrator.uipath.com/v1",
+    "projectKey": "31eb5740-29bc-40a7-a848-5ca76aba9013",
+    "dependencies": [],
+    "runtimeDependencies": [],
+    "folders": [
+      {
+        "fullyQualifiedName": "solution_folder"
+      }
+    ],
+    "spec": {
+      "name": "NightlyOrchestrator"
+    },
+    "locks": [],
+    "key": "2e4ee556-3e66-4a41-bfd5-5dae31629ed2",
+    "files": []
+  }
+}

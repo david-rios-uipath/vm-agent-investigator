@@ -1,0 +1,18 @@
+{
+  "runId": "34015558366",
+  "sha": "17321eae2d8f79f7f15610f8c8173ca824311f47",
+  "runUrl": "https://github.com/UiPath/flow-workbench/actions/runs/34015558366",
+  "reportUrl": "https://theater.uipath.co/flow/17321eae2d8f79f7f15610f8c8173ca824311f47/",
+  "slackTs": "1788680141.527759",
+  "projects": "studio-*",
+  "maxTests": 1,
+  "repoUrl": "https://github.com/UiPath/flow-workbench",
+  "branch": "develop",
+  "failedTests": [
+    { "project": "studio-alpha", "file": "specs/data-transform/data-transform.spec.ts", "title": "should add a Map operation with field mappings", "error": "locator.click: <nav class=\"neighbor-rail-downstream\"> intercepts pointer events" },
+    { "project": "studio-alpha", "file": "specs/data-transform/data-transform.spec.ts", "title": "should write a Custom Script operation in a Data Transform node", "error": "locator.click: <nav class=\"neighbor-rail-downstream\"> intercepts pointer events" },
+    { "project": "vsix-staging-linux", "file": "specs/mfe/mfe-edit.spec.ts", "title": "persists an edit", "error": "frame.evaluate: Error: no project \"poc\" in this solution" },
+    { "project": "vsix-staging-macos", "file": "specs/mfe/mfe-edit.spec.ts", "title": "persists an edit", "error": "frame.evaluate: Error: no project \"poc\" in this solution" },
+    { "project": "studio-alpha", "file": "specs/debug/debug-execution.spec.ts", "title": "should run a debug session and show execution results", "error": "429 Too Many Requests" }
+  ]
+}

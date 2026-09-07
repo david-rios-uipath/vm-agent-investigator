@@ -1,0 +1,521 @@
+{
+  "id": "5567126c-2bce-4e36-9246-ce0a46278c73",
+  "version": "1.9",
+  "name": "NightlyOrchestrator",
+  "nodes": [
+    {
+      "id": "start",
+      "type": "core.trigger.manual",
+      "typeVersion": "1.0",
+      "display": {
+        "label": "Manual trigger"
+      },
+      "inputs": {
+        "entryPointId": "e9d564fb-68e7-4326-8f6f-b9d9a8c5d326",
+        "isDefaultEntryPoint": true
+      }
+    },
+    {
+      "id": "selectTests",
+      "type": "core.action.script",
+      "typeVersion": "1.1",
+      "display": {
+        "label": "Select tests",
+        "subLabel": "filter by project, dedupe, cap at maxTests",
+        "icon": "code"
+      },
+      "inputs": {
+        "script": {
+          "type": "literal",
+          "fieldType": "string",
+          "expression": "const s = $vars.start.output;\nconst globs = String(s.projects || 'studio-*').split(',').map(g => g.trim()).filter(Boolean);\nconst matches = (p) => globs.some(g => new RegExp('^' + g.split('*').map(x => x.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')).join('.*') + '$').test(p));\nconst seen = new Set();\nconst rows = [];\nfor (const t of (s.failedTests || [])) {\n  if (!t || !matches(t.project || '')) continue;\n  const key = t.file + '::' + t.title;\n  if (seen.has(key)) continue;\n  seen.add(key);\n  rows.push(t);\n}\nrows.sort((a, b) => (a.file + a.title).localeCompare(b.file + b.title));\nconst grep = (title) => String(title).replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&').replace(/\"/g, '\\\\\"');\nconst max = Number(s.maxTests) > 0 ? Number(s.maxTests) : 1;\nconst selected = rows.slice(0, max).map(t => ({\n  project: t.project, file: t.file, title: t.title, error: t.error || '',\n  testCommand: `corepack pnpm exec playwright test --config e2e/playwright.config.ts e2e/${t.file} --project ${t.project} --grep \"${grep(t.title)}\"`\n}));\nreturn { selected, skipped: rows.length - selected.length, total: rows.length };"
+        }
+      },
+      "outputs": {
+        "output": {
+          "type": "any",
+          "description": "The return value of the script",
+          "source": "=result.response",
+          "var": "output",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "selected": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "project": {
+                      "type": "string"
+                    },
+                    "file": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "testCommand": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "skipped": {
+                "type": "number"
+              },
+              "total": {
+                "type": "number"
+              }
+            }
+          }
+        },
+        "error": {
+          "type": "object",
+          "description": "Error information if the node fails",
+          "source": "=Error",
+          "var": "error"
+        }
+      }
+    },
+    {
+      "id": "end",
+      "type": "core.control.end",
+      "typeVersion": "1.0",
+      "display": {
+        "label": "End",
+        "subLabel": "",
+        "icon": "circle-check"
+      },
+      "inputs": {},
+      "outputs": {}
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-start-selectTests",
+      "sourceNodeId": "start",
+      "sourcePort": "output",
+      "targetNodeId": "selectTests",
+      "targetPort": "input"
+    },
+    {
+      "id": "e-selectTests-end",
+      "sourceNodeId": "selectTests",
+      "sourcePort": "success",
+      "targetNodeId": "end",
+      "targetPort": "input"
+    }
+  ],
+  "definitions": [
+    {
+      "nodeType": "core.trigger.manual",
+      "version": "1.0",
+      "category": "trigger",
+      "description": "Start the process manually",
+      "tags": [
+        "trigger",
+        "start",
+        "manual"
+      ],
+      "sortOrder": 80,
+      "display": {
+        "label": "Manual trigger",
+        "icon": "play",
+        "shape": "circle"
+      },
+      "handleConfiguration": [
+        {
+          "position": "right",
+          "handles": [
+            {
+              "id": "output",
+              "type": "source",
+              "handleType": "output",
+              "showButton": true,
+              "constraints": {
+                "forbiddenTargetCategories": [
+                  "trigger"
+                ]
+              }
+            }
+          ],
+          "visible": true
+        }
+      ],
+      "model": {
+        "type": "bpmn:StartEvent",
+        "entryPointId": true
+      },
+      "outputDefinition": {
+        "output": {
+          "type": "object",
+          "description": "Data passed when manually triggering the process.",
+          "source": "null",
+          "var": "output"
+        }
+      },
+      "toolbarExtensions": {
+        "design": {
+          "actions": [
+            {
+              "id": "change-trigger-type",
+              "icon": "square-mouse-pointer",
+              "label": "Change trigger type"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "nodeType": "core.control.end",
+      "version": "1.0",
+      "category": "control-flow",
+      "description": "Mark the end of a process path",
+      "tags": [
+        "control-flow",
+        "end",
+        "finish",
+        "complete"
+      ],
+      "sortOrder": 66,
+      "display": {
+        "label": "End",
+        "icon": "circle-check",
+        "shape": "circle"
+      },
+      "handleConfiguration": [
+        {
+          "position": "left",
+          "handles": [
+            {
+              "id": "input",
+              "type": "target",
+              "handleType": "input"
+            }
+          ]
+        }
+      ],
+      "model": {
+        "type": "bpmn:EndEvent"
+      }
+    },
+    {
+      "nodeType": "core.action.script",
+      "version": "1.1",
+      "category": "data-operations",
+      "description": "Run custom JavaScript code",
+      "tags": [
+        "code",
+        "javascript",
+        "python"
+      ],
+      "sortOrder": 70,
+      "supportsErrorHandling": true,
+      "display": {
+        "label": "Script",
+        "icon": "code"
+      },
+      "handleConfiguration": [
+        {
+          "position": "left",
+          "handles": [
+            {
+              "id": "input",
+              "type": "target",
+              "handleType": "input"
+            }
+          ]
+        },
+        {
+          "position": "right",
+          "handles": [
+            {
+              "id": "success",
+              "type": "source",
+              "handleType": "output"
+            },
+            {
+              "id": "error",
+              "label": "Error",
+              "type": "source",
+              "handleType": "output",
+              "visible": "{inputs.errorHandlingEnabled}",
+              "constraints": {
+                "maxConnections": 1
+              }
+            }
+          ]
+        }
+      ],
+      "debug": {
+        "runtime": "clientScript"
+      },
+      "model": {
+        "type": "bpmn:ScriptTask"
+      },
+      "inputDefinition": {
+        "type": "object",
+        "properties": {
+          "script": {
+            "type": "string",
+            "minLength": 1,
+            "errorMessage": "Add a script function",
+            "validationSeverity": "warning"
+          }
+        },
+        "required": [
+          "script"
+        ]
+      },
+      "inputDefaults": {
+        "script": ""
+      },
+      "outputDefinition": {
+        "output": {
+          "type": "any",
+          "description": "The return value of the script",
+          "source": "=result.response",
+          "var": "output"
+        },
+        "error": {
+          "type": "object",
+          "description": "Error information if the node fails",
+          "source": "=Error",
+          "var": "error",
+          "schema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "type": "object",
+            "required": [
+              "code",
+              "message",
+              "detail",
+              "category",
+              "status"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Error code as a string"
+              },
+              "message": {
+                "type": "string",
+                "description": "High-level error message"
+              },
+              "detail": {
+                "type": "string",
+                "description": "Detailed error description"
+              },
+              "category": {
+                "type": "string",
+                "description": "Error category"
+              },
+              "status": {
+                "type": "integer",
+                "description": "HTTP status code"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "form": {
+        "id": "script-properties",
+        "title": "Script configuration",
+        "sections": [
+          {
+            "id": "script",
+            "title": "Script",
+            "collapsible": true,
+            "defaultExpanded": true,
+            "fields": [
+              {
+                "name": "inputs.script",
+                "type": "custom",
+                "component": "script-editor",
+                "componentProps": {
+                  "language": "javascript",
+                  "returnType": "any",
+                  "validationMode": "script",
+                  "minHeight": 200,
+                  "placeholder": " // Return any value\nreturn {\n  message: \"Web request response\",\n  data: $vars.httpRequest1.output\n};"
+                },
+                "label": "Code",
+                "description": "JavaScript expression that returns a result"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "variables": {
+    "globals": [
+      {
+        "id": "runId",
+        "direction": "in",
+        "type": "string",
+        "triggerNodeId": "start"
+      },
+      {
+        "id": "sha",
+        "direction": "in",
+        "type": "string",
+        "triggerNodeId": "start"
+      },
+      {
+        "id": "runUrl",
+        "direction": "in",
+        "type": "string",
+        "triggerNodeId": "start"
+      },
+      {
+        "id": "reportUrl",
+        "direction": "in",
+        "type": "string",
+        "triggerNodeId": "start"
+      },
+      {
+        "id": "slackTs",
+        "direction": "in",
+        "type": "string",
+        "defaultValue": "",
+        "triggerNodeId": "start"
+      },
+      {
+        "id": "failedTests",
+        "direction": "in",
+        "type": "array",
+        "triggerNodeId": "start"
+      },
+      {
+        "id": "projects",
+        "direction": "in",
+        "type": "string",
+        "defaultValue": "studio-*",
+        "triggerNodeId": "start"
+      },
+      {
+        "id": "maxTests",
+        "direction": "in",
+        "type": "number",
+        "defaultValue": 1,
+        "triggerNodeId": "start"
+      },
+      {
+        "id": "repoUrl",
+        "direction": "in",
+        "type": "string",
+        "defaultValue": "https://github.com/UiPath/flow-workbench",
+        "triggerNodeId": "start"
+      },
+      {
+        "id": "branch",
+        "direction": "in",
+        "type": "string",
+        "defaultValue": "develop",
+        "triggerNodeId": "start"
+      }
+    ],
+    "nodes": [
+      {
+        "id": "start.output",
+        "type": "object",
+        "description": "Data passed when manually triggering the process.",
+        "binding": {
+          "nodeId": "start",
+          "outputId": "output"
+        }
+      },
+      {
+        "id": "selectTests.output",
+        "type": "any",
+        "description": "The return value of the script",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "selected": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "project": {
+                    "type": "string"
+                  },
+                  "file": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "error": {
+                    "type": "string"
+                  },
+                  "testCommand": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "skipped": {
+              "type": "number"
+            },
+            "total": {
+              "type": "number"
+            }
+          }
+        },
+        "binding": {
+          "nodeId": "selectTests",
+          "outputId": "output"
+        }
+      },
+      {
+        "id": "selectTests.error",
+        "type": "object",
+        "description": "Error information if the node fails",
+        "binding": {
+          "nodeId": "selectTests",
+          "outputId": "error"
+        }
+      }
+    ]
+  },
+  "runtime": "maestro",
+  "layout": {
+    "nodes": {
+      "start": {
+        "position": {
+          "x": -192,
+          "y": 0
+        },
+        "size": {
+          "width": 96,
+          "height": 96
+        }
+      },
+      "selectTests": {
+        "position": {
+          "x": 192,
+          "y": -16
+        },
+        "size": {
+          "width": 96,
+          "height": 96
+        }
+      },
+      "end": {
+        "position": {
+          "x": 192,
+          "y": -16
+        },
+        "size": {
+          "width": 96,
+          "height": 96
+        }
+      }
+    }
+  }
+}

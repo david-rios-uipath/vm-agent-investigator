@@ -1,0 +1,38 @@
+{
+  "docVersion": "1.0.0",
+  "resource": {
+    "name": "NightlyOrchestrator",
+    "kind": "process",
+    "type": "flow",
+    "apiVersion": "orchestrator.uipath.com/v1",
+    "projectKey": "31eb5740-29bc-40a7-a848-5ca76aba9013",
+    "dependencies": [
+      {
+        "kind": "package",
+        "name": "NightlyOrchestrator"
+      }
+    ],
+    "runtimeDependencies": [],
+    "folders": [
+      {
+        "fullyQualifiedName": "solution_folder"
+      }
+    ],
+    "spec": {
+      "runtimeProfile": "Standard",
+      "type": "Flow",
+      "name": "NightlyOrchestrator",
+      "package": {
+        "key": "2e4ee556-3e66-4a41-bfd5-5dae31629ed2"
+      },
+      "targetFrameworkValue": "Portable",
+      "retentionAction": "Delete",
+      "retentionPeriod": 30,
+      "staleRetentionAction": "Delete",
+      "staleRetentionPeriod": 180
+    },
+    "locks": [],
+    "key": "dfa7e85b-4aa9-4549-a0f3-008bcf2dbc29",
+    "files": []
+  }
+}
