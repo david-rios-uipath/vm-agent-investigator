@@ -1,0 +1,47 @@
+{
+  "version": "2.0",
+  "resources": [
+    {
+      "resource": "process",
+      "key": "4a7879cf-7494-4ada-9e83-ea487a4b55cb",
+      "id": "process4a7879cf-7494-4ada-9e83-ea487a4b55cb",
+      "value": {
+        "folderPath": {
+          "isExpression": false,
+          "displayName": "Folder path"
+        },
+        "name": {
+          "defaultValue": "VmAgent",
+          "isExpression": false,
+          "displayName": "Process name"
+        }
+      },
+      "metadata": {
+        "ActivityName": "VmAgent",
+        "BindingsVersion": "2.2",
+        "DisplayLabel": "name",
+        "SolutionsSupport": "true",
+        "subType": "Flow"
+      }
+    },
+    {
+      "resource": "connection",
+      "key": "ccf82d4b-3c2a-492f-bf8f-939b565366a2",
+      "id": "connectionccf82d4b-3c2a-492f-bf8f-939b565366a2",
+      "value": {
+        "ConnectionId": {
+          "defaultValue": "ccf82d4b-3c2a-492f-bf8f-939b565366a2",
+          "isExpression": false,
+          "displayName": "uipath-salesforce-slack connection"
+        }
+      },
+      "metadata": {
+        "ActivityName": "Reply in Slack thread",
+        "BindingsVersion": "2.2",
+        "DisplayLabel": "uipath-salesforce-slack connection",
+        "UseConnectionService": "true",
+        "Connector": "uipath-salesforce-slack"
+      }
+    }
+  ]
+}

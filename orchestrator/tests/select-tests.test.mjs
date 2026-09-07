@@ -40,3 +40,22 @@ const input = JSON.parse(readFileSync(new URL('../../inputs/orchestrator-3401555
   assert.match(out.selected[0].testCommand, /--grep "has \\"quotes\\" and \\\(parens\\\) \\\$1"$/);
 }
 console.log('selectTests ok');
+
+// summarize: Slack mrkdwn digest
+{
+  const text = run('summarize', {
+    start: { output: input },
+    selectTests: { output: { total: 3, skipped: 2, selected: [input.failedTests[0]] } },
+    investigate: { output: [ { recordResult: { output: {
+      project: 'studio-alpha', file: 'specs/data-transform/data-transform.spec.ts',
+      title: 'should add a Map operation with field mappings', reproduced: true, fixVerified: true,
+      prUrl: 'https://github.com/UiPath/flow-workbench/pull/3729', hypothesis: 'neighbor rail intercepts click', failed: false, errorMessage: '' } } } ] },
+  }).text;
+  assert.match(text, /VmAgent investigated 1 of 3 studio-\* failures/);
+  assert.match(text, /data-transform\.spec\.ts › should add a Map operation with field mappings/);
+  assert.match(text, /reproduced, fix verified, <https:\/\/github\.com\/UiPath\/flow-workbench\/pull\/3729\|draft PR>/);
+  assert.match(text, /2 not investigated \(maxTests=1\)/);
+  const none = run('summarize', { start: { output: input }, selectTests: { output: { total: 0, skipped: 0, selected: [] } }, investigate: { output: [] } }).text;
+  assert.match(none, /no studio-\* failures to investigate/);
+  console.log('summarize ok');
+}

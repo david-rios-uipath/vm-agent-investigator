@@ -252,6 +252,45 @@
       }
     },
     {
+      "id": "summarize",
+      "type": "core.action.script",
+      "typeVersion": "1.1",
+      "display": {
+        "label": "Summarize",
+        "subLabel": "build Slack mrkdwn digest",
+        "icon": "code"
+      },
+      "inputs": {
+        "script": {
+          "type": "literal",
+          "fieldType": "string",
+          "expression": "const s = $vars.start.output;\nconst sel = $vars.selectTests.output || { total: 0, skipped: 0, selected: [] };\nconst rows = ($vars.investigate.output || []).map(i => i.recordResult && i.recordResult.output).filter(Boolean);\nconst head = `:robot_face: *VmAgent investigated ${rows.length} of ${sel.total} ${s.projects || 'studio-*'} failures* (<${s.runUrl}|run ${s.runId}>)`;\nif (sel.total === 0) return { text: `:robot_face: VmAgent: no ${s.projects || 'studio-*'} failures to investigate in <${s.runUrl}|run ${s.runId}>.` };\nconst spec = (f) => String(f).split('/').pop();\nconst lines = rows.map(r => {\n  if (r.failed) return `• \\`${spec(r.file)} › ${r.title}\\` — investigation faulted: ${r.errorMessage}`;\n  const parts = [r.reproduced ? 'reproduced' : 'not reproduced', r.fixVerified ? 'fix verified' : 'no verified fix', r.prUrl ? `<${r.prUrl}|draft PR>` : 'no PR'];\n  return `• \\`${spec(r.file)} › ${r.title}\\` — ${parts.join(', ')}` + (r.hypothesis ? `\\n    _${r.hypothesis.slice(0, 300)}_` : '');\n});\nif (sel.skipped > 0) lines.push(`_${sel.skipped} not investigated (maxTests=${s.maxTests})_`);\nreturn { text: [head, ...lines].join('\\n') };\n"
+        }
+      },
+      "outputs": {
+        "output": {
+          "type": "any",
+          "description": "The return value of the script",
+          "source": "=result.response",
+          "var": "output",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "text": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "error": {
+          "type": "object",
+          "description": "Error information if the node fails",
+          "source": "=Error",
+          "var": "error"
+        }
+      }
+    },
+    {
       "id": "end",
       "type": "core.control.end",
       "typeVersion": "1.0",
@@ -262,6 +301,38 @@
       },
       "inputs": {},
       "outputs": {}
+    },
+    {
+      "id": "replyInSlackThread1",
+      "type": "uipath.connector.uipath-salesforce-slack.send-message-to-channel",
+      "typeVersion": "1.0.0",
+      "display": {
+        "label": "Reply in Slack thread"
+      },
+      "inputs": {
+        "detail": {
+          "connector": "uipath-salesforce-slack",
+          "connectionId": "ccf82d4b-3c2a-492f-bf8f-939b565366a2",
+          "connectionResourceId": "ccf82d4b-3c2a-492f-bf8f-939b565366a2",
+          "connectionFolderKey": "0b28296b-1f4a-4ea9-a3d5-8b0abaac1cf0",
+          "method": "POST",
+          "endpoint": "/send_message_to_channel_v2",
+          "bodyParameters": {
+            "channel": "C0AH25MT3L5",
+            "messageToSend": "=js:$vars.summarize.output['text']",
+            "thread_ts": "=js:$vars.start.output.slackTs || undefined",
+            "mrkdwn": true
+          },
+          "queryParameters": {
+            "send_as": "bot"
+          },
+          "uiPathActivityTypeId": "37a305b2-89b1-315d-b73f-1778839a6c47",
+          "errorState": {
+            "issues": []
+          },
+          "configuration": "=jsonString:{\"essentialConfiguration\":{\"connectorVersion\":\"2.14.8\",\"customFieldsRequestDetails\":null,\"instanceParameters\":{\"connectorKey\":\"uipath-salesforce-slack\",\"objectName\":\"send_message_to_channel_v2\",\"httpMethod\":\"POST\",\"activityType\":\"Curated\",\"version\":\"1.0.0\",\"supportsStreaming\":false,\"subType\":\"standard\"},\"objectName\":\"send_message_to_channel_v2\",\"operation\":\"create\",\"packageVersion\":\"1.0.0\",\"httpMethod\":\"POST\",\"path\":\"/send_message_to_channel_v2\",\"unifiedTypesCompatible\":true,\"savedJitInputFieldId\":\"in_send_message_to_channel_v2\"}}"
+        }
+      }
     }
   ],
   "edges": [
@@ -311,6 +382,20 @@
       "id": "e_loop_end",
       "sourceNodeId": "investigate",
       "sourcePort": "success",
+      "targetNodeId": "summarize",
+      "targetPort": "input"
+    },
+    {
+      "id": "e_summarize_slack",
+      "sourceNodeId": "summarize",
+      "sourcePort": "success",
+      "targetNodeId": "replyInSlackThread1",
+      "targetPort": "input"
+    },
+    {
+      "id": "e_slack_end",
+      "sourceNodeId": "replyInSlackThread1",
+      "sourcePort": "output",
       "targetNodeId": "end",
       "targetPort": "input"
     }
@@ -1092,6 +1177,223 @@
       "debug": {
         "runtime": "bpmnEngine"
       }
+    },
+    {
+      "nodeType": "uipath.connector.uipath-salesforce-slack.send-message-to-channel",
+      "version": "1.0.0",
+      "category": "connector.196638",
+      "tags": [
+        "connector",
+        "activity"
+      ],
+      "sortOrder": 520,
+      "supportsErrorHandling": true,
+      "description": "Send messages to public or private Slack channels.",
+      "display": {
+        "label": "Send Message to Channel",
+        "description": "Send messages to public or private Slack channels.",
+        "icon": "https://alpha.uipath.com/bc2ddac5-57bc-40e6-93fe-3b319b60ce36/studio_/typecache/icons/8af239e6c82c1abd57622314380112d55f7e151ac4845ba018a96d70b4d92297.svg",
+        "sourceDisplayName": "Slack"
+      },
+      "handleConfiguration": [
+        {
+          "position": "left",
+          "handles": [
+            {
+              "id": "input",
+              "type": "target",
+              "handleType": "input",
+              "label": ""
+            }
+          ]
+        },
+        {
+          "position": "right",
+          "handles": [
+            {
+              "id": "output",
+              "type": "source",
+              "handleType": "output",
+              "label": ""
+            },
+            {
+              "id": "error",
+              "label": "Error",
+              "type": "source",
+              "handleType": "output",
+              "visible": "{inputs.errorHandlingEnabled}",
+              "constraints": {
+                "maxConnections": 1
+              }
+            }
+          ]
+        }
+      ],
+      "model": {
+        "type": "bpmn:SendTask",
+        "serviceType": "Intsvc.ActivityExecution",
+        "bindings": {
+          "resource": "connection",
+          "resourceKey": "",
+          "values": [
+            {
+              "name": "uipath-salesforce-slack connection",
+              "propertyAttribute": "ConnectionId"
+            },
+            {
+              "name": "FolderKey",
+              "propertyAttribute": "FolderKey"
+            }
+          ]
+        },
+        "context": [
+          {
+            "name": "connectorKey",
+            "type": "string",
+            "value": "uipath-salesforce-slack"
+          },
+          {
+            "name": "operation",
+            "type": "string"
+          },
+          {
+            "name": "objectName",
+            "value": "send_message_to_channel_v2",
+            "type": "string"
+          },
+          {
+            "name": "method",
+            "type": "string",
+            "value": "POST"
+          },
+          {
+            "name": "connection",
+            "type": "string",
+            "value": "<bindings.uipath-salesforce-slack connection>"
+          },
+          {
+            "name": "folderKey",
+            "type": "string",
+            "value": "<bindings.FolderKey>"
+          },
+          {
+            "name": "activityConfigurationVersion",
+            "type": "string",
+            "value": "v1"
+          },
+          {
+            "name": "metadata",
+            "body": {
+              "telemetryData": {
+                "connectorKey": "uipath-salesforce-slack",
+                "connectorName": "Send Message to Channel"
+              },
+              "inputMetadata": {},
+              "errorState": {
+                "hasError": true
+              }
+            },
+            "type": "json"
+          }
+        ]
+      },
+      "form": {
+        "id": "connector-properties",
+        "title": "Connector configuration",
+        "sections": [
+          {
+            "id": "connector",
+            "title": "Connector",
+            "collapsible": true,
+            "defaultExpanded": true,
+            "fields": [
+              {
+                "label": "",
+                "name": "inputs.detail",
+                "type": "custom",
+                "component": "dap-config",
+                "componentProps": {
+                  "connectorDetail": {
+                    "isAppActivity": false,
+                    "packageId": "196638",
+                    "svgIconUrl": "icons/8af239e6c82c1abd57622314380112d55f7e151ac4845ba018a96d70b4d92297.svg",
+                    "displayName": "Send Message to Channel",
+                    "assemblyQualifiedName": "UiPath.IntegrationService.Activities.Runtime.Activities.ConnectorActivity, UiPath.IntegrationService.Activities.Runtime, Version=1.33.0.0, Culture=neutral, PublicKeyToken=null",
+                    "description": "Send messages to public or private Slack channels.",
+                    "category": "",
+                    "activityColor": "#4A154B",
+                    "configuration": "{\"connectorKey\":\"uipath-salesforce-slack\",\"objectName\":\"send_message_to_channel_v2\",\"httpMethod\":\"POST\",\"activityType\":\"Curated\",\"version\":\"1.0.0\",\"supportsStreaming\":false,\"subType\":\"standard\"}",
+                    "uiPathActivityTypeId": "37a305b2-89b1-315d-b73f-1778839a6c47",
+                    "isExperimental": false,
+                    "helpUrlTemplate": "https://docs.uipath.com/{0}/activities/other/latest/integration-service/uipath-salesforce-slack-Send-Message-To-Channel",
+                    "isEnabled": true,
+                    "targetPlatform": "CrossPlatform",
+                    "isAdvanced": false,
+                    "isRestricted": false,
+                    "hasWpfOnlyDesigner": false,
+                    "tags": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "inputDefinition": {},
+      "inputDefaults": {},
+      "outputDefinition": {
+        "output": {
+          "type": "object",
+          "description": "The return value of the connector.",
+          "source": "=result.response",
+          "var": "output"
+        },
+        "error": {
+          "type": "object",
+          "description": "Error information if the node fails",
+          "source": "=Error",
+          "var": "error",
+          "schema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "type": "object",
+            "required": [
+              "code",
+              "message",
+              "detail",
+              "category",
+              "status"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Error code as a string"
+              },
+              "message": {
+                "type": "string",
+                "description": "High-level error message"
+              },
+              "detail": {
+                "type": "string",
+                "description": "Detailed error description"
+              },
+              "category": {
+                "type": "string",
+                "description": "Error category"
+              },
+              "status": {
+                "type": "integer",
+                "description": "HTTP status code"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "debug": {
+        "runtime": "bpmnEngine"
+      }
     }
   ],
   "variables": {
@@ -1394,6 +1696,84 @@
           "nodeId": "recordResult",
           "outputId": "error"
         }
+      },
+      {
+        "id": "summarize.output",
+        "type": "any",
+        "description": "The return value of the script",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string"
+            }
+          }
+        },
+        "binding": {
+          "nodeId": "summarize",
+          "outputId": "output"
+        }
+      },
+      {
+        "id": "summarize.error",
+        "type": "object",
+        "description": "Error information if the node fails",
+        "binding": {
+          "nodeId": "summarize",
+          "outputId": "error"
+        }
+      },
+      {
+        "id": "replyInSlackThread1.output",
+        "type": "object",
+        "description": "The return value of the connector.",
+        "binding": {
+          "nodeId": "replyInSlackThread1",
+          "outputId": "output"
+        }
+      },
+      {
+        "id": "replyInSlackThread1.error",
+        "type": "object",
+        "description": "Error information if the node fails",
+        "schema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "required": [
+            "code",
+            "message",
+            "detail",
+            "category",
+            "status"
+          ],
+          "properties": {
+            "code": {
+              "type": "string",
+              "description": "Error code as a string"
+            },
+            "message": {
+              "type": "string",
+              "description": "High-level error message"
+            },
+            "detail": {
+              "type": "string",
+              "description": "Detailed error description"
+            },
+            "category": {
+              "type": "string",
+              "description": "Error category"
+            },
+            "status": {
+              "type": "integer",
+              "description": "HTTP status code"
+            }
+          },
+          "additionalProperties": false
+        },
+        "binding": {
+          "nodeId": "replyInSlackThread1",
+          "outputId": "error"
+        }
       }
     ]
   },
@@ -1418,6 +1798,24 @@
       "default": "",
       "propertyAttribute": "folderPath",
       "resourceSubType": "Flow"
+    },
+    {
+      "id": "bzXawARyC",
+      "name": "uipath-salesforce-slack connection",
+      "type": "string",
+      "resource": "connection",
+      "resourceKey": "ccf82d4b-3c2a-492f-bf8f-939b565366a2",
+      "propertyAttribute": "ConnectionId",
+      "default": "ccf82d4b-3c2a-492f-bf8f-939b565366a2"
+    },
+    {
+      "id": "b7OTt3AUG",
+      "name": "FolderKey",
+      "type": "string",
+      "resource": "connection",
+      "resourceKey": "ccf82d4b-3c2a-492f-bf8f-939b565366a2",
+      "propertyAttribute": "FolderKey",
+      "default": "0b28296b-1f4a-4ea9-a3d5-8b0abaac1cf0"
     }
   ],
   "layout": {
@@ -1472,10 +1870,30 @@
           "height": 96
         }
       },
-      "end": {
+      "summarize": {
         "position": {
           "x": 848,
           "y": -64
+        },
+        "size": {
+          "width": 96,
+          "height": 96
+        }
+      },
+      "end": {
+        "position": {
+          "x": 1232,
+          "y": -96
+        },
+        "size": {
+          "width": 96,
+          "height": 96
+        }
+      },
+      "replyInSlackThread1": {
+        "position": {
+          "x": 1040,
+          "y": -80
         },
         "size": {
           "width": 96,
