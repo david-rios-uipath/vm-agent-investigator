@@ -177,6 +177,85 @@ The description is now written for a reviewer, in `vm/lib/pr-body.ps1` (`New-PrB
 again), the fenced logs carried codepage mojibake and raw ANSI escapes, and the verification
 sentence claimed a pass without reading `verified`.
 
+## NightlyOrchestrator
+
+A second flow in the same solution (`vm-agent/NightlyOrchestrator/`). It takes one nightly
+Playwright run's failures, fans the first `maxTests` of them out over `VmAgent` (one child job
+each), and posts a single summary back into the Slack thread that reported the failure.
+
+Shape: `start -> selectTests -> investigate` (parallel loop: `callVmAgent -> recordResult`)
+`-> summarize -> replyInSlackThread1 -> end`. Eight nodes.
+
+Trigger inputs:
+
+| input | type | default | what |
+|---|---|---|---|
+| `runId` | string | — | GitHub Actions run id, used in the summary and as the VmAgent runId seed |
+| `sha` | string | — | commit under test |
+| `runUrl` | string | — | link to the Actions run |
+| `reportUrl` | string | — | link to the Playwright report |
+| `slackTs` | string | `""` | `thread_ts` of the Slack message to reply under; empty posts top-level |
+| `failedTests` | array | — | `[{ project, file, title, error }]` from the nightly |
+| `projects` | string | `studio-*` | glob; `selectTests` drops tests from non-matching projects |
+| `maxTests` | number | `1` | how many of the surviving tests to investigate |
+| `repoUrl` | string | `https://github.com/UiPath/flow-workbench` | repo VmAgent checks out |
+| `branch` | string | `develop` | branch VmAgent checks out |
+
+Sample payload: `inputs/orchestrator-34015558366.json`.
+
+- **`maxTests` must equal the robot pool's VM count — today that is 1.** The loop is
+  `parallel: true`, so each selected test starts its own `VmAgent` job at once; with one VM the
+  extra jobs queue behind the first and time out. Grow `maxTests` only when the pool grows.
+- **Slack replies work through the `thread_ts` body field** of the connector's
+  `send_message_to_channel_v2`. `thread_ts` is `=js:$vars.start.output.slackTs || undefined`, so
+  an empty `slackTs` posts a top-level message instead of failing. Channel `C0AH25MT3L5`,
+  connection `david.rios` (`uipath-salesforce-slack`), `send_as=bot`. The node id is
+  **`replyInSlackThread1`** — `uip maestro flow node add` does not let you choose an id.
+- **CI hand-off:** flow-workbench PR
+  [#3756](https://github.com/UiPath/flow-workbench/pull/3756) posts this payload from the
+  nightly workflow. It resolves the release by process name `NightlyOrchestrator`, so do not
+  rename the process.
+
+Release and run it:
+
+```bash
+./release.sh 1.1.0 /tmp/orch-1.json NightlyOrchestrator
+```
+
+`release.sh` now takes an optional third argument, the process to start (default `VmAgent`);
+both processes are deployed either way. The packaged-bindings assertion covers both flows now —
+`VmAgent` must still carry `e2e-investigator.vm-exec-vm`, and `NightlyOrchestrator` must carry
+the `VmAgent` process binding `4a7879cf-7494-4ada-9e83-ea487a4b55cb`.
+
+### First deployed run (1.1.0, 2026-09-07) — blocked on the robot pool, not the flow
+
+Parent job `66304ff4-336f-467d-b346-925cdbce32e1`, instance `NightlyOrchestrator-56249860`,
+started 17:54:49 UTC. It reached `investigate` and stayed there:
+
+- `start -> selectTests -> investigate -> callVmAgent` all ran; the child `VmAgent` job
+  `58bd94d1-dbef-46b0-8f76-c1ce6622be07` started 8 s after the parent. **The in-solution process
+  binding resolves in a deployed folder** — that was the main unknown and it is settled.
+- `Incidents: null` throughout. The orchestrator has no fault of its own.
+- The child never left `repro`: its `vm-exec-vm` job `de5a3c2c-66b7-48d6-b2b6-0992c16c9b0e` sat
+  `Pending` with no host. **No robot in the `e2e test investigation` pool has sent a heartbeat
+  since 2026-09-06T21:05:12Z** — check with
+  `uip or sessions unattended list --folder-path e2e-investigator` and read `ReportingTime`.
+  A `Pending` phase job with `HostMachineName: None` means the pool, not the flow.
+- So `recordResult`, `summarize` and `replyInSlackThread1` are still unrun and no Slack reply has
+  been posted. Bring the pool back, then
+  `./release.sh 1.1.1 /tmp/orch-1.json NightlyOrchestrator`.
+
+Two deploy details that are easy to get wrong:
+
+- The orchestrator's `deploy-config.json` `packageName` is **`vm-agent.8.Flow.NightlyOrchestrator`**
+  — capital `Flow`, and `8` not `7`. `pack` derives it from the solution package name (`vm-agent 8`)
+  for projects that have no stored `spec.packageName`; the two older projects still carry the
+  `vm-agent.7.…` names they were packed with. Read the name out of the zip rather than guessing:
+  `unzip -l /tmp/vm-agent-pkg/*.zip | grep nupkg`.
+- Its `resourceKey` is `dfa7e85b-4aa9-4549-a0f3-008bcf2dbc29`, from
+  `vm-agent/resources/solution_folder/process/flow/NightlyOrchestrator.json` (`resource.key`) —
+  `project.uiproj` does not carry one.
+
 ## Current state (as released)
 
 - **Deployment:** `Shared/vm-agent 11` @ **1.0.24**, package identity `vm-agent 8`.
