@@ -27,6 +27,31 @@
     },
     {
       "kind": "process",
+      "name": "NightlyOrchestrator",
+      "resourceKey": "dfa7e85b-4aa9-4549-a0f3-008bcf2dbc29",
+      "folderPaths": [
+        "solution_folder"
+      ],
+      "configuration": {
+        "runtimeProfile": "Standard",
+        "description": null,
+        "packageName": "vm-agent.8.Flow.NightlyOrchestrator",
+        "inputArguments": null,
+        "hiddenForAttendedUser": false,
+        "alwaysRunning": false,
+        "autoStartProcess": false,
+        "retentionAction": "Delete",
+        "retentionPeriod": 30,
+        "retentionBucketRef": null,
+        "staleRetentionAction": "Delete",
+        "staleRetentionPeriod": 180,
+        "staleRetentionBucketRef": null,
+        "connections": null,
+        "tags": []
+      }
+    },
+    {
+      "kind": "process",
       "name": "vm-exec-vm",
       "resourceKey": "ca36341d-ecec-4ba6-aa76-134d0afe4ba7",
       "folderPaths": [
