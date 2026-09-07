@@ -246,9 +246,9 @@ started 17:54:49 UTC. It reached `investigate` and stayed there:
   since 2026-09-06T21:05:12Z** — check with
   `uip or sessions unattended list --folder-path e2e-investigator` and read `ReportingTime`.
   A `Pending` phase job with `HostMachineName: None` means the pool, not the flow.
-- So `recordResult`, `summarize` and `replyInSlackThread1` are still unrun and no Slack reply has
-  been posted. Bring the pool back, then
-  `./release.sh 1.1.1 /tmp/orch-1.json NightlyOrchestrator`.
+- Polled to 19:30 UTC (95 min): the three states never changed. So `recordResult`, `summarize`
+  and `replyInSlackThread1` are still unrun and no Slack reply has been posted. Bring the pool
+  back, then `./release.sh 1.1.1 /tmp/orch-1.json NightlyOrchestrator`.
 
 Two deploy details that are easy to get wrong:
 
