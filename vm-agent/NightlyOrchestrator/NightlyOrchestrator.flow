@@ -104,12 +104,12 @@
       "inputs": {
         "repoUrl": {
           "type": "jsExpression",
-          "expression": "$vars.start.output.repoUrl",
+          "expression": "$vars.start.output.repoUrl || 'https://github.com/UiPath/flow-workbench'",
           "fieldType": "string"
         },
         "branch": {
           "type": "jsExpression",
-          "expression": "$vars.start.output.branch",
+          "expression": "$vars.start.output.branch || 'develop'",
           "fieldType": "string"
         },
         "testCommand": {
@@ -201,7 +201,7 @@
         "script": {
           "type": "literal",
           "fieldType": "string",
-          "expression": "const t = $vars.investigate.currentItem;\nconst r = ($vars.callVmAgent && $vars.callVmAgent.output) || null;\nconst e = ($vars.callVmAgent && $vars.callVmAgent.error) || null;\nreturn {\n  project: t.project, file: t.file, title: t.title,\n  reproduced: !!(r && r.reproduced), fixVerified: !!(r && r.fixVerified),\n  prUrl: (r && r.prUrl) || '', hypothesis: (r && r.hypothesis) || '',\n  failed: !r, errorMessage: e ? String(e.message || e.code || 'VmAgent faulted') : ''\n};"
+          "expression": "const t = $vars.investigate.currentItem;\nconst r = ($vars.callVmAgent && $vars.callVmAgent.output) || null;\nconst e = ($vars.callVmAgent && $vars.callVmAgent.error) || null;\nreturn {\n  project: t.project, file: t.file, title: t.title,\n  reproduced: !!(r && r.reproduced), fixVerified: !!(r && r.fixVerified),\n  prUrl: (r && r.prUrl) || '', hypothesis: (r && r.hypothesis) || '',\n  failed: !r || !!e, errorMessage: e ? String(e.message || e.code || 'VmAgent faulted') : ''\n};"
         }
       },
       "outputs": {
@@ -264,7 +264,7 @@
         "script": {
           "type": "literal",
           "fieldType": "string",
-          "expression": "const s = $vars.start.output;\nconst sel = $vars.selectTests.output || { total: 0, skipped: 0, selected: [] };\nconst rows = ($vars.investigate.output || []).map(i => i.recordResult && i.recordResult.output).filter(Boolean);\nconst head = `:robot_face: *VmAgent investigated ${rows.length} of ${sel.total} ${s.projects || 'studio-*'} failures* (<${s.runUrl}|run ${s.runId}>)`;\nif (sel.total === 0) return { text: `:robot_face: VmAgent: no ${s.projects || 'studio-*'} failures to investigate in <${s.runUrl}|run ${s.runId}>.` };\nconst spec = (f) => String(f).split('/').pop();\nconst lines = rows.map(r => {\n  if (r.failed) return `• \\`${spec(r.file)} › ${r.title}\\` — investigation faulted: ${r.errorMessage}`;\n  const parts = [r.reproduced ? 'reproduced' : 'not reproduced', r.fixVerified ? 'fix verified' : 'no verified fix', r.prUrl ? `<${r.prUrl}|draft PR>` : 'no PR'];\n  return `• \\`${spec(r.file)} › ${r.title}\\` — ${parts.join(', ')}` + (r.hypothesis ? `\\n    _${r.hypothesis.slice(0, 300)}_` : '');\n});\nif (sel.skipped > 0) lines.push(`_${sel.skipped} not investigated (maxTests=${s.maxTests})_`);\nreturn { text: [head, ...lines].join('\\n') };\n"
+          "expression": "const s = $vars.start.output;\nconst sel = $vars.selectTests.output || { total: 0, skipped: 0, selected: [] };\nconst rows = ($vars.investigate.output || []).map(i => { const o = (i && i.recordResult && i.recordResult.output) || i; return o && o.title ? o : null; }).filter(Boolean);\nconst head = `:robot_face: *VmAgent investigated ${rows.length} of ${sel.total} ${s.projects || 'studio-*'} failures* (<${s.runUrl}|run ${s.runId}>)` + (s.reportUrl ? ` · <${s.reportUrl}|report>` : '');\nif (sel.total === 0) return { text: `:robot_face: VmAgent: no ${s.projects || 'studio-*'} failures to investigate in <${s.runUrl}|run ${s.runId}>.` };\nconst spec = (f) => String(f).split('/').pop();\nconst lines = rows.map(r => {\n  if (r.failed) return `• \\`${spec(r.file)} › ${r.title}\\` — investigation faulted: ${r.errorMessage}`;\n  const parts = [r.reproduced ? 'reproduced' : 'not reproduced', r.fixVerified ? 'fix verified' : 'no verified fix', r.prUrl ? `<${r.prUrl}|draft PR>` : 'no PR'];\n  return `• \\`${spec(r.file)} › ${r.title}\\` — ${parts.join(', ')}` + (r.hypothesis ? `\\n    _${r.hypothesis.slice(0, 300)}_` : '');\n});\nif (sel.skipped > 0) lines.push(`_${sel.skipped} not investigated (maxTests=${s.maxTests})_`);\nreturn { text: [head, ...lines].join('\\n') };\n"
         }
       },
       "outputs": {

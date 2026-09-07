@@ -55,7 +55,17 @@ console.log('selectTests ok');
   assert.match(text, /data-transform\.spec\.ts › should add a Map operation with field mappings/);
   assert.match(text, /reproduced, fix verified, <https:\/\/github\.com\/UiPath\/flow-workbench\/pull\/3729\|draft PR>/);
   assert.match(text, /2 not investigated \(maxTests=1\)/);
+  assert.match(text, /<https:\/\/theater\.uipath\.co\/flow\/[0-9a-f]+\/\|report>/);
   const none = run('summarize', { start: { output: input }, selectTests: { output: { total: 0, skipped: 0, selected: [] } }, investigate: { output: [] } }).text;
   assert.match(none, /no studio-\* failures to investigate/);
+  const flat = run('summarize', {
+    start: { output: input },
+    selectTests: { output: { total: 3, skipped: 2, selected: [input.failedTests[0]] } },
+    investigate: { output: [ {
+      project: 'studio-alpha', file: 'specs/data-transform/data-transform.spec.ts',
+      title: 'should add a Map operation with field mappings', reproduced: true, fixVerified: true,
+      prUrl: 'https://github.com/UiPath/flow-workbench/pull/3729', hypothesis: 'neighbor rail intercepts click', failed: false, errorMessage: '' } ] },
+  }).text;
+  assert.match(flat, /data-transform\.spec\.ts › should add a Map operation with field mappings/);
   console.log('summarize ok');
 }

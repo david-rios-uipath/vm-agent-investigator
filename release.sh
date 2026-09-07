@@ -40,7 +40,7 @@ assert 'e2e-investigator.vm-exec-vm' in vm, 'RPA node binding missing from packa
 
 orch = keys_of('Flow.NightlyOrchestrator')
 print('NightlyOrchestrator bindings_v2:', orch)
-assert '4a7879cf-7494-4ada-9e83-ea487a4b55cb' in orch or 'VmAgent' in orch, \
+assert '4a7879cf-7494-4ada-9e83-ea487a4b55cb' in orch, \
     'VmAgent flow binding missing from orchestrator package - not publishing'
 PY
 uip solution publish "$ZIP" --output json | grep '"PackageVersion"'
