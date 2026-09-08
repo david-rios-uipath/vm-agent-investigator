@@ -402,7 +402,7 @@
             "pageSize": "100"
           },
           "pathParameters": {
-            "repo": "UiPath/flow-workbench"
+            "repo": "flow-workbench"
           },
           "uiPathActivityTypeId": "5d6fae7f-1ab5-3727-8c27-6cfa57ded5ed",
           "errorState": {
@@ -438,7 +438,7 @@
             "pageSize": "100"
           },
           "pathParameters": {
-            "repo": "UiPath/flow-workbench",
+            "repo": "flow-workbench",
             "pull_number": "=js:$vars.prFiles.currentItem[\"number\"]"
           },
           "uiPathActivityTypeId": "5d6fae7f-1ab5-3727-8c27-6cfa57ded5ed",
