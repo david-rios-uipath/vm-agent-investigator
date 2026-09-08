@@ -20,7 +20,11 @@ VMEXEC=CA36341D-ECEC-4BA6-AA76-134D0AFE4BA7   # e2e-investigator/vm-exec-vm
 : "${RUNNER_REPO_URL:?export RUNNER_REPO_URL to the clone URL of this repo}"
 RUNNER_REF="${RUNNER_REF:-main}"
 SMOKE="${SMOKE_ONLY:-0}"
-MODEL="${CLAUDE_MODEL:-}"   # empty = account default; e.g. claude-haiku-4-5-20251001
+# Empty = the account default on the VM, which is Opus - expensive, and the reason the flow now
+# passes claude-sonnet-5 explicitly. When you are testing plumbing rather than reasoning, set
+# CLAUDE_MODEL=claude-haiku-4-5-20251001: the investigate and fix phases still exercise every code
+# path for a fraction of the cost.
+MODEL="${CLAUDE_MODEL:-claude-sonnet-5}"
 BRANCH="${TARGET_BRANCH:-}" # empty = the branch in inputs/debug-execution.json
 # macOS ships bash 3.2: no associative arrays.
 # TIMEOUT_MINUTES overrides the per-phase default. A cold vsix repro needs it: VS Code download

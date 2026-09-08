@@ -47,8 +47,14 @@ git push, not a solution release. Each phase prints one `STATUS_JSON=<json>` lin
 line of stdout and `parseStatus*` parses only that; its absence routes to `endSetupFailed`.
 
 New trigger inputs: `maxFixAttempts` (3), `runnerRepoUrl`, `runnerRef` (`master`), and
-`claudeModel` — empty means the account default, set it to e.g.
-`claude-haiku-4-5-20251001` to run the investigate and fix phases cheaply while testing.
+`claudeModel` — **defaults to `claude-sonnet-5`**, and `NightlyOrchestrator` passes the same value
+to every child rather than an empty string. Empty means the CLI's account default on the VM, which
+is Opus: a single investigate pass cost $4.51 and a fix pass $2.29 on 2026-09-08, which is the
+wrong default for a job that is meant to run nightly. Set `claude-haiku-4-5-20251001` when testing
+plumbing rather than reasoning — `probe-phase.sh` reads the same lever from `CLAUDE_MODEL`, and
+also defaults to Sonnet now. The summarizer agent node moved from `anthropic.claude-opus-4-8` to
+`anthropic.claude-sonnet-5`; that model lives in `VmAgent.flow` **and** in two `agent.json` copies,
+all three of which must be patched together.
 `probe-phase.sh` reads the same lever from `CLAUDE_MODEL`. `maxIterations`
 and the `iteration` global are gone with the investigator loop.
 

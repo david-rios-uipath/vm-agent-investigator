@@ -357,7 +357,7 @@
         },
         "claudeModel": {
           "type": "literal",
-          "expression": "",
+          "expression": "claude-sonnet-5",
           "fieldType": "string"
         },
         "errorHandlingEnabled": true
