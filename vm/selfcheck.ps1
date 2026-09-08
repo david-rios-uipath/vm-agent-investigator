@@ -41,6 +41,18 @@ Assert ((Get-CiJobPlatform 'e2e-vsix-alpha / E2E (vsix-alpha, Linux)') -eq 'Linu
 Assert ((Get-CiJobPlatform 'e2e-vsix-staging / E2E (vsix-staging, macOS)') -eq 'macOS') 'macOS too'
 Assert ((Get-CiJobPlatform 'e2e-studio / E2E (studio-alpha) [2/5]') -eq '') 'a studio shard has no platform'
 
+# The Windows runners print ASCII marks; taking only the Unicode pair read every Windows job as
+# `absent`. Lines are verbatim from the 2026-09-08 nightly.
+$winLines = @(
+  '  ok  1 [vsix-alpha-windows] > e2e\specs\canvas\canvas-zoom.spec.ts:16:3 > Canvas Zoom > should report initial zoom level @vsix (30.3s)',
+  '  x  55 [vsix-alpha-windows] > e2e\specs\vsix\package-nested-solution.spec.ts:48:3 > VS Code packaging > packages a solution created in-place (1.2m)'
+)
+$wm = Get-CiMarks $winLines 'package-nested-solution.spec.ts' 'packages a solution created in-place'
+Assert ((Get-CiVerdict @($wm.marks.Values | ForEach-Object { [string]$_ })) -eq 'failed') 'an ASCII x on a Windows runner reads as failed'
+Assert ($wm.target -eq 'F') 'the targeted test is marked from the ASCII line too'
+$wm2 = Get-CiMarks $winLines 'canvas-zoom.spec.ts' ''
+Assert ((Get-CiVerdict @($wm2.marks.Values | ForEach-Object { [string]$_ })) -eq 'passed') 'an ASCII ok reads as passed'
+
 # Get-Tail
 Assert ((Get-Tail 'abc' 10) -eq 'abc') 'short text is returned whole'
 Assert ((Get-Tail ('x' * 100) 10).EndsWith('x' * 10)) 'long text keeps its tail'

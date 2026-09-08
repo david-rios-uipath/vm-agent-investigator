@@ -113,7 +113,10 @@ function Get-CiHistory([string]$RepoUrl, [string]$Branch, [string]$TestCommand, 
       foreach ($plat in ($platformMarks.Keys | Sort-Object)) {
         $byPlatform[$plat] = Get-CiVerdict @($platformMarks[$plat].Values | ForEach-Object { [string]$_ })
       }
-      if (@($byPlatform.Values | Sort-Object -Unique).Count -gt 1) { $row.byPlatform = $byPlatform }
+      # `absent` is missing data, not a differing verdict: counting it as disagreement made the
+      # split fire on all 8 of 8 runs, and a signal that always fires is noise.
+      $seen = @($byPlatform.Values | Where-Object { $_ -ne 'absent' } | Sort-Object -Unique)
+      if ($seen.Count -gt 1) { $row.byPlatform = $byPlatform }
     }
     if ($runSignals.ContainsKey($sha)) { $row.envSignals = $runSignals[$sha] }
     if ($runExcerpts.ContainsKey($sha)) { $row.excerpt = $runExcerpts[$sha] }
@@ -166,13 +169,18 @@ function Get-CiHistory([string]$RepoUrl, [string]$Branch, [string]$TestCommand, 
 # the run targets (the --grep title), so a spec-level failure is never pinned on a test that
 # ended green. Covered by vm/selfcheck.ps1.
 function Get-CiMarks([string[]]$Lines, [string]$Spec, [string]$Grep) {
+  # The list reporter drops to ASCII where the terminal cannot do Unicode, which on this nightly
+  # means every Windows runner: `ok`/`x` instead of the Linux and macOS runners' checkmark and
+  # ballot-X. Matching only the Unicode pair made every Windows job read as `absent` - the spec
+  # looked like it had never run there, which is worse than no data because it reads as a
+  # platform difference that is not real.
   $fail = [string][char]0x2718; $pass = [string][char]0x2713
-  $rx = '^(?:\S+Z )?\s*([' + $fail + $pass + '-])\s+\d+\s+\[[^\]]+\]\s+\S+\s+(\S*' + [regex]::Escape($Spec) + ':\d+:\d+)(.*)$'
+  $rx = '^(?:\S+Z )?\s*(' + $fail + '|' + $pass + '|ok|x|-)\s+\d+\s+\[[^\]]+\]\s+\S+\s+(\S*' + [regex]::Escape($Spec) + ':\d+:\d+)(.*)$'
   $marks = @{}; $target = ''
   foreach ($line in $Lines) {
     $mm = [regex]::Match($line, $rx)
     if (-not $mm.Success) { continue }
-    $mark = switch ($mm.Groups[1].Value) { $fail { 'F' } $pass { 'P' } default { 'S' } }
+    $mark = switch ($mm.Groups[1].Value) { $fail { 'F' } 'x' { 'F' } $pass { 'P' } 'ok' { 'P' } default { 'S' } }
     $k = $mm.Groups[2].Value
     $marks[$k] = [string]$marks[$k] + $mark
     if ($Grep -and $mm.Groups[3].Value -match [regex]::Escape($Grep)) { $target += $mark }
