@@ -1,6 +1,14 @@
 # Nightly CI history for one spec, ported from the flow's ciHistoryInstructions node.
 # Returns a hashtable; writes the full failing job log next to it so it reaches the bucket.
 
+# Studio shards are named `E2E (studio-alpha) [2/5]`, but a vsix job carries its runner platform
+# inside the same parens: `E2E (vsix-alpha, Linux)`. Matching only `($project)` found no job for
+# any vsix spec, so every one of them classified as `absent` and the investigator got no history.
+# The trailing comma is what keeps `vsix-alpha` from also matching `vsix-alpha-cursor`.
+function Test-CiJobForProject([string]$JobName, [string]$Project) {
+  return ($JobName -like "*($Project)*") -or ($JobName -like "*($Project,*")
+}
+
 function Get-CiHistory([string]$RepoUrl, [string]$Branch, [string]$TestCommand, [string]$NotesDir) {
   $ErrorActionPreference = 'Continue'
   $r = [ordered]@{ classification = 'unknown'; summary = ''; firstFailSha = ''; lastPassSha = ''; runs = @(); ciFailureExcerpt = ''; ciJobLog = ''; target = ''; targetVerdict = 'absent' }
@@ -28,7 +36,9 @@ function Get-CiHistory([string]$RepoUrl, [string]$Branch, [string]$TestCommand, 
   $h = @{ Authorization = "Bearer $token"; Accept = 'application/vnd.github+json'; 'User-Agent' = 'vm-agent' }
   $api = "https://api.github.com/repos/$owner/$repo"
   # ponytail: nightly workflow file is fixed; make it a flow input if a second repo ever uses this
-  try { $runs = (Invoke-RestMethod "$api/actions/workflows/playwright-ci.yml/runs?event=schedule&branch=$Branch&per_page=8" -Headers $h).workflow_runs }
+  # The vsix projects run inside this same nightly, as jobs of the reusable playwright-vsix.yml.
+  $workflow = 'playwright-ci.yml'
+  try { $runs = (Invoke-RestMethod "$api/actions/workflows/$workflow/runs?event=schedule&branch=$Branch&per_page=8" -Headers $h).workflow_runs }
   catch { $r.summary = 'GitHub API error listing runs: ' + $_.Exception.Message; return $r }
 
   $savedLog = $false
@@ -39,7 +49,7 @@ function Get-CiHistory([string]$RepoUrl, [string]$Branch, [string]$TestCommand, 
     $marks = @{}
     try { $jobs = (Invoke-RestMethod "$api/actions/runs/$($run.id)/jobs?per_page=100" -Headers $h).jobs } catch { $jobs = @() }
     $jobs = @($jobs | Where-Object { $_.name -like '*E2E*' })
-    if ($project) { $jobs = @($jobs | Where-Object { $_.name -like "*($project)*" }) }
+    if ($project) { $jobs = @($jobs | Where-Object { Test-CiJobForProject $_.name $project }) }
     foreach ($job in $jobs) {
       $tmp = Join-Path $env:TEMP ('ci-' + $job.id + '.log')
       if (-not (Get-CiJobLog $job.id $tmp $api $h)) { continue }
@@ -93,7 +103,7 @@ function Get-CiHistory([string]$RepoUrl, [string]$Branch, [string]$TestCommand, 
   $obs = @($r.runs | Where-Object { $_.verdict -in 'failed', 'flaky', 'passed' })
   if ($obs.Count -eq 0) {
     $r.classification = 'absent'
-    $r.summary = "$spec did not run in the last $($r.runs.Count) scheduled runs of playwright-ci.yml on $Branch"
+    $r.summary = "$spec did not run in the last $($r.runs.Count) scheduled runs of $workflow on $Branch"
     return $r
   }
   $streak = 0; foreach ($o in $obs) { if ($o.verdict -eq 'failed') { $streak++ } else { break } }

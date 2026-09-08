@@ -29,6 +29,13 @@ Assert (-not (Test-IsVsixCommand "$base --project studio-alpha")) 'a studio comm
 Assert ((Get-VsixEnvironment "$base --project vsix-staging") -eq 'staging') 'a staging project logs in to staging'
 Assert ((Get-VsixEnvironment "$base --project vsix-alpha") -eq 'alpha') 'an alpha project logs in to alpha'
 
+# Real job names from the 2026-09-08 nightly. The vsix jobs run inside playwright-ci.yml's
+# scheduled run, as jobs of the reusable playwright-vsix.yml.
+Assert (Test-CiJobForProject 'e2e-studio / E2E (studio-alpha) [2/5]' 'studio-alpha') 'a studio shard matches its project'
+Assert (Test-CiJobForProject 'e2e-vsix-alpha / E2E (vsix-alpha, Linux)' 'vsix-alpha') 'a vsix job matches despite the platform in the parens'
+Assert (-not (Test-CiJobForProject 'e2e-vsix-alpha-cursor / E2E (vsix-alpha-cursor, Linux)' 'vsix-alpha')) 'the cursor host job is not mistaken for the default host'
+Assert (-not (Test-CiJobForProject 'e2e-vsix-staging / E2E (vsix-staging, macOS)' 'vsix-alpha')) 'a different environment does not match'
+
 # Get-Tail
 Assert ((Get-Tail 'abc' 10) -eq 'abc') 'short text is returned whole'
 Assert ((Get-Tail ('x' * 100) 10).EndsWith('x' * 10)) 'long text keeps its tail'
