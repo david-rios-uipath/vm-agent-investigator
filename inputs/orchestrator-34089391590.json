@@ -1,0 +1,49 @@
+{
+  "runId": "34089391590",
+  "sha": "7424aba81810cc26db8ae23b6c68f66e18bff1b4",
+  "runUrl": "https://github.com/UiPath/flow-workbench/actions/runs/34089391590",
+  "reportUrl": "https://theater.uipath.co/flow/7424aba81810cc26db8ae23b6c68f66e18bff1b4/",
+  "slackTs": "1788766695.830989",
+  "projects": "studio-*",
+  "maxTests": 1,
+  "repoUrl": "https://github.com/UiPath/flow-workbench",
+  "branch": "develop",
+  "failedTests": [
+    {
+      "project": "studio-alpha",
+      "file": "specs/data-transform/data-transform.spec.ts",
+      "title": "should add a Group by operation with aggregations",
+      "error": "Error: StudioProjectsPage.validate: the portal redirected to an auth error after 3 attempts (https://alpha.uipath.com/portal_/autherror?error=%20(429)). A \"(429)\" here means the identity service rate-limited us \u2014 the shared studio account is being authenticated by several shards at once."
+    },
+    {
+      "project": "studio-alpha",
+      "file": "specs/data-transform/data-transform.spec.ts",
+      "title": "should add a Map operation with field mappings",
+      "error": "TimeoutError: locator.click: Timeout 10000ms exceeded."
+    },
+    {
+      "project": "studio-alpha",
+      "file": "specs/data-transform/data-transform.spec.ts",
+      "title": "should write a Custom Script operation in a Data Transform node",
+      "error": "TimeoutError: locator.click: Timeout 10000ms exceeded."
+    },
+    {
+      "project": "studio-alpha",
+      "file": "specs/debug/debug-execution.spec.ts",
+      "title": "should run a debug session and show execution results",
+      "error": "Error: StudioCanvasPage.activateFlowFile: no `.flow` entry found in the editor tabs or the project explorer, so the flow canvas cannot be activated (Studio renders a text editor for every other file)."
+    },
+    {
+      "project": "studio-alpha",
+      "file": "specs/debug/hitl-debug-e2e.spec.ts",
+      "title": "should fill a numeric HITL field, submit, and reflect an integer-valued number downstream",
+      "error": "Error: StudioProjectsPage.validate: the portal redirected to an auth error after 3 attempts (https://alpha.uipath.com/portal_/autherror?error=%20(429)). A \"(429)\" here means the identity service rate-limited us \u2014 the shared studio account is being authenticated by several shards at once."
+    },
+    {
+      "project": "studio-alpha",
+      "file": "specs/inline-agents/agent-escalations.spec.ts",
+      "title": "escalations handle: an Action app escalation attaches and a deployed action app is selectable",
+      "error": "Error: StudioProjectsPage.validate: the portal redirected to an auth error after 3 attempts (https://alpha.uipath.com/portal_/autherror?error=%20(429)). A \"(429)\" here means the identity service rate-limited us \u2014 the shared studio account is being authenticated by several shards at once."
+    }
+  ]
+}

@@ -29,6 +29,20 @@ const input = JSON.parse(readFileSync(new URL('../../inputs/orchestrator-3401555
     'corepack pnpm exec playwright test --config e2e/playwright.config.ts e2e/specs/data-transform/data-transform.spec.ts --project studio-alpha --grep "should add a Map operation with field mappings"');
 }
 {
+  // A named Error: groups across files; the biggest group is investigated first.
+  const ft = [
+    { project: 'studio-alpha', file: 'specs/a/a.spec.ts', title: 'a1', error: 'Error: StudioProjectsPage.validate: the portal redirected to an auth error after 3 attempts (https://x/1)' },
+    { project: 'studio-alpha', file: 'specs/b/b.spec.ts', title: 'b1', error: 'Error: StudioProjectsPage.validate: the portal redirected to an auth error after 3 attempts (https://x/2)' },
+    { project: 'studio-alpha', file: 'specs/a/a.spec.ts', title: 'a2', error: 'TimeoutError: locator.click: Timeout 10000ms exceeded.' },
+    { project: 'studio-alpha', file: 'specs/b/b.spec.ts', title: 'b2', error: 'TimeoutError: locator.click: Timeout 10000ms exceeded.' },
+  ];
+  const out = run('selectTests', { start: { output: { ...input, failedTests: ft, maxTests: 10 } } });
+  assert.equal(out.total, 3, 'auth error groups across files; timeouts stay per file');
+  assert.equal(out.selected[0].title, 'a1');
+  assert.deepEqual(out.selected[0].siblings, ['b.spec.ts › b1']);
+  assert.deepEqual(out.selected.slice(1).map((s) => s.siblings), [[], []]);
+}
+{
   const out = run('selectTests', { start: { output: input } }); // maxTests 1
   assert.equal(out.selected.length, 1);
   assert.equal(out.skipped, 1);
