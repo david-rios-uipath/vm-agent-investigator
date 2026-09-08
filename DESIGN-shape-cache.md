@@ -28,33 +28,39 @@ The cache is the missing third thing: what we learned, kept.
 ## The record
 
 `cache/shapes.jsonl`, one object per line so a human diffs it and reads fifty entries in half a
-minute:
+minute. Field names say what they hold - this file is meant to be read by people, and a saved byte
+is worth nothing next to a reviewer having to look up what `k` meant.
 
 ```json
-{"k":"Error: locator.click: Timeout #ms exceeded|toolbox-item-agent.tool.#","ex":"agent-tools-vsix.spec.ts > tools handle: a published RPA workflow tool","n":4,"first":"2026-09-05","last":"2026-09-08","plat":"linux-only","fix":{"pr":3780,"merged":"2026-09-09","sha":"f77b048"},"note":"Linux Xvfb screen 1280x960 -> 1600x1200"}
+{"shape":"Error: locator.click: Timeout #ms exceeded|toolbox-item-agent.tool.#",
+ "example":"agent-tools-vsix.spec.ts > tools handle: a published RPA workflow tool",
+ "nightsSeen":4,"firstSeen":"2026-09-05","lastSeen":"2026-09-08","platform":"linux-only",
+ "fix":{"pr":3780,"mergedAt":"2026-09-09","mergeSha":"f77b048"},
+ "fixNote":"Linux Xvfb screen 1280x960 -> 1600x1200"}
 ```
 
 | field | meaning |
 |---|---|
-| `k` | shape key, as computed today |
-| `ex` | one example `spec > title` |
-| `n` `first` `last` | nights seen |
-| `plat` | platform pattern when one exists (`linux-only`) |
-| `fix` | **merged PR only** - number, merge date, sha |
-| `note` | one sentence, what the fix did |
-| `hyp` | an agent's unconfirmed conclusion + the run id that wrote it |
-| `agree` | set when a merged PR later lands on a shape that carried a `hyp`: did the PR touch what the hypothesis named |
+| `shape` | the failure-shape key, as computed today |
+| `example` | one example, `spec > test title` |
+| `nightsSeen` | how many nightlies this shape has appeared in |
+| `firstSeen` / `lastSeen` | dates of the first and most recent appearance |
+| `platform` | platform pattern when one exists (`linux-only`) |
+| `fix` | **merged PR only**: `pr`, `mergedAt`, `mergeSha` |
+| `fixNote` | one sentence, what the fix did |
+| `hypothesis` | an agent's unconfirmed conclusion: `text` plus the `runId` that wrote it |
+| `agreedWithFix` | set when a merged PR later lands on a shape that carried a `hypothesis`: did the PR touch what the hypothesis named |
 
-Caps: `note` and `hyp` one sentence each. No prose, no analysis, no model output. Reasoning stays in
-the notebook in the bucket and is referenced by path.
+Caps: `fixNote` and `hypothesis.text` one sentence each. No prose, no analysis, no model output.
+Reasoning stays in the notebook in the bucket and is referenced by path.
 
 ## Two rules
 
 1. **Only a merged PR suppresses work.** `fix` is written when the PR is approved and merged. An
-   agent's own conclusion goes in `hyp`, is advisory to the investigator's prompt, and never removes
+   agent's own conclusion goes in `hypothesis`, is advisory to the investigator's prompt, and never removes
    a group from selection.
-2. **Recurrence after merge invalidates the entry.** A shape whose `last` is later than
-   `fix.merged` is wrong by construction: it flips to stale, stops suppressing anything, and is
+2. **Recurrence after merge invalidates the entry.** A shape whose `lastSeen` is later than
+   `fix.mergedAt` is wrong by construction: it flips to stale, stops suppressing anything, and is
    surfaced. This is what stops one bad line from hiding a real regression forever.
 
 Rule 1 is a starting posture, not a law. It relaxes on evidence:
@@ -62,10 +68,10 @@ Rule 1 is a starting posture, not a law. It relaxes on evidence:
 | level | who can suppress | promotion criterion |
 |---|---|---|
 | 0 (now) | merged PRs only | - |
-| 1 | a `fixVerified=true` run a human acknowledged | `agree` true on a stated majority of shapes over a stated sample |
+| 1 | a `fixVerified=true` run a human acknowledged | `agreedWithFix` true on a stated majority of shapes over a stated sample |
 | 2 | verified fixes open PRs and suppress pending review | level 1 held for a stated period with no stale flips |
 
-`agree` is recorded from day one precisely so the promotion is an argument from data rather than a
+`agreedWithFix` is recorded from day one precisely so the promotion is an argument from data rather than a
 feeling that it seems to be working.
 
 ## Every line has a lever
@@ -75,9 +81,9 @@ Nothing is recorded that cannot be re-checked by a machine.
 | field | lever | fails when |
 |---|---|---|
 | `fix.pr` | `gh pr view <n> --json state,mergedAt,files` | not `MERGED`, or reverted |
-| `fix` + `last` | date comparison | the shape recurred after the merge |
-| `hyp` | the notebook blob still exists | the run's state was pruned |
-| `ex` | run URL + job id | - a human opens the exact log line |
+| `fix` + `lastSeen` | date comparison | the shape recurred after the merge |
+| `hypothesis` | the notebook blob still exists | the run's state was pruned |
+| `example` | run URL + job id | - a human opens the exact log line |
 
 A verifier job - same shape as `ghPrs`, so no new plumbing - re-runs every lever each night and
 reports. Anything failing stops influencing selection until a human or a merged PR restores it. The
@@ -88,8 +94,8 @@ worst a wrong entry can do is waste one night's slot.
 `pickTests`, in order:
 
 1. shapes never investigated, most tests first
-2. recurring unresolved shapes (`n >= 2`, no `fix`)
-3. shapes with a `hyp` but no `fix` - worth a second pass
+2. recurring unresolved shapes (`nightsSeen >= 2`, no `fix`)
+3. shapes with a `hypothesis` but no `fix` - worth a second pass
 4. never re-pick a shape with a live `fix`, unless rule 2 flipped it stale
 
 ## Throughput: sequential, not parallel
@@ -119,6 +125,6 @@ should be a decision, not a surprise.
 2. Write `cache/shapes.jsonl` from the last week of nightlies by hand, and read it in review. Fifty
    lines of real data will say more about the schema than more design will.
 3. Extend `ghPrs` to also emit `SHAPES_JSON=`; `pickTests` consumes it for ordering only.
-4. Write back after each run: `hyp`, `n`, `last`.
+4. Write back after each run: `hypothesis`, `nightsSeen`, `lastSeen`.
 5. Add the verifier job.
 6. Sequential budget, as its own change, once the queue has something to work through.
