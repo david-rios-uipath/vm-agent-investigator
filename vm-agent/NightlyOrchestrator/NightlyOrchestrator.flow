@@ -207,7 +207,7 @@
         "script": {
           "type": "literal",
           "fieldType": "string",
-          "expression": "const t = $vars.investigate.currentItem;\nconst r = ($vars.callVmAgent && $vars.callVmAgent.output) || null;\nconst e = ($vars.callVmAgent && $vars.callVmAgent.error) || null;\nconst base = (p) => String(p || '').split('/').pop().replace(/\\.(spec|test)?\\.?tsx?$/i, '').replace(/\\.[a-z]+$/i, '').toLowerCase();\nconst words = new Set();\nfor (const m of String((r && r.hypothesis) || '').matchAll(/\\b([A-Za-z][A-Za-z0-9-]+)\\.(tsx?|ts|css)\\b|\\b([A-Z][A-Za-z0-9]+(?:Page|Dialog|Panel|Rail|Service|Client|Store))\\b/g)) words.add((m[1] || m[3]).toLowerCase());\nconst relatedPrs = (($vars.pickTests.output || {}).prs || []).filter(pr => (pr.files || []).some(x => words.has(base(x)))).map(pr => ({ number: pr.number, title: pr.title, url: pr.url }));\nreturn {\n  project: t.project, file: t.file, title: t.title, siblings: t.siblings || [],\n  reproduced: !!(r && r.reproduced), fixVerified: !!(r && r.fixVerified),\n  prUrl: (r && r.prUrl) || '', hypothesis: (r && r.hypothesis) || '',\n  failed: !r || !!e, relatedPrs, errorMessage: e ? String(e.message || e.code || 'VmAgent faulted') : ''\n};"
+          "expression": "const t = $vars.investigate.currentItem;\nconst r = ($vars.callVmAgent && $vars.callVmAgent.output) || null;\nconst e = ($vars.callVmAgent && $vars.callVmAgent.error) || null;\nconst base = (p) => String(p || '').split('/').pop().replace(/\\.(spec|test)?\\.?tsx?$/i, '').replace(/\\.[a-z]+$/i, '').toLowerCase();\nconst words = new Set();\nfor (const m of String((r && r.hypothesis) || '').matchAll(/\\b([A-Za-z][A-Za-z0-9-]+)\\.(tsx?|ts|css)\\b|\\b([A-Z][A-Za-z0-9]+(?:Page|Dialog|Panel|Rail|Service|Client|Store))\\b/g)) words.add((m[1] || m[3]).toLowerCase());\nconst relatedPrs = (($vars.pickTests.output || {}).prs || []).filter(pr => (pr.files || []).some(x => words.has(base(x)))).map(pr => ({ number: pr.number, title: pr.title, url: pr.url, state: pr.state || 'open' }));\nreturn {\n  project: t.project, file: t.file, title: t.title, siblings: t.siblings || [],\n  reproduced: !!(r && r.reproduced), fixVerified: !!(r && r.fixVerified),\n  prUrl: (r && r.prUrl) || '', hypothesis: (r && r.hypothesis) || '',\n  failed: !r || !!e, relatedPrs, errorMessage: e ? String(e.message || e.code || 'VmAgent faulted') : ''\n};"
         }
       },
       "outputs": {
@@ -265,6 +265,9 @@
                     },
                     "url": {
                       "type": "string"
+                    },
+                    "state": {
+                      "type": "string"
                     }
                   }
                 }
@@ -293,7 +296,7 @@
         "script": {
           "type": "literal",
           "fieldType": "string",
-          "expression": "const s = $vars.start.output;\nconst sel = $vars.pickTests.output || { total: 0, skipped: 0, selected: [], covered: [] };\nconst rows = ($vars.investigate.output || []).map(i => { const o = (i && i.recordResult && i.recordResult.output) || i; return o && o.title ? o : null; }).filter(Boolean);\nconst nTests = sel.totalTests || sel.total;\nconst head = `:robot_face: *VmAgent investigated ${rows.length} of ${sel.total} ${String(s.projects || 'studio-*').replace(/-?\\*/g, '')} failure groups* (${nTests} tests, <${s.runUrl}|run ${s.runId}>)` + (s.reportUrl ? ` · <${s.reportUrl}|report>` : '');\nif (sel.total === 0) return { text: `:robot_face: VmAgent: no ${String(s.projects || 'studio-*').replace(/-?\\*/g, '')} failures to investigate in <${s.runUrl}|run ${s.runId}>.` };\nconst spec = (f) => String(f).split('/').pop();\nconst lines = rows.map(r => {\n  if (r.failed) return `• \\`${spec(r.file)} › ${r.title}\\` — investigation faulted: ${r.errorMessage}`;\n  const parts = [r.reproduced ? 'reproduced' : 'not reproduced', r.fixVerified ? 'fix verified' : 'no verified fix', r.prUrl ? `<${r.prUrl}|draft PR>` : 'no PR'];\n  for (const pr of (r.relatedPrs || [])) parts.push(`related open <${pr.url}|PR #${pr.number}>`);\n  const sib = (r.siblings && r.siblings.length) ? ` (+${r.siblings.length} same cause: ${r.siblings.map(x => '`' + x + '`').join(', ')})` : '';\n  return `• \\`${spec(r.file)} › ${r.title}\\`${sib} — ${parts.join(', ')}` + (r.hypothesis ? `\\n    _${r.hypothesis.slice(0, 300)}_` : '');\n});\nfor (const c of (sel.covered || [])) {\n  const sib = (c.siblings && c.siblings.length) ? ` (+${c.siblings.length} same cause)` : '';\n  lines.push(`• \\`${spec(c.file)} › ${c.title}\\`${sib} — not investigated: open <${c.coveredBy.url}|PR #${c.coveredBy.number}> already touches \\`${c.coveredBy.file.split('/').pop()}\\``);\n}\nif (sel.skipped > 0) lines.push(`_${sel.skipped} not investigated (maxTests=${s.maxTests})_`);\nreturn { text: [head, ...lines].join('\\n') };\n"
+          "expression": "const s = $vars.start.output;\nconst sel = $vars.pickTests.output || { total: 0, skipped: 0, selected: [], covered: [] };\nconst rows = ($vars.investigate.output || []).map(i => { const o = (i && i.recordResult && i.recordResult.output) || i; return o && o.title ? o : null; }).filter(Boolean);\nconst nTests = sel.totalTests || sel.total;\nconst head = `:robot_face: *VmAgent investigated ${rows.length} of ${sel.total} ${String(s.projects || 'studio-*').replace(/-?\\*/g, '')} failure groups* (${nTests} tests, <${s.runUrl}|run ${s.runId}>)` + (s.reportUrl ? ` · <${s.reportUrl}|report>` : '');\nif (sel.total === 0) return { text: `:robot_face: VmAgent: no ${String(s.projects || 'studio-*').replace(/-?\\*/g, '')} failures to investigate in <${s.runUrl}|run ${s.runId}>.` };\nconst spec = (f) => String(f).split('/').pop();\nconst lines = rows.map(r => {\n  if (r.failed) return `• \\`${spec(r.file)} › ${r.title}\\` — investigation faulted: ${r.errorMessage}`;\n  const parts = [r.reproduced ? 'reproduced' : 'not reproduced', r.fixVerified ? 'fix verified' : 'no verified fix', r.prUrl ? `<${r.prUrl}|draft PR>` : 'no PR'];\n  for (const pr of (r.relatedPrs || [])) parts.push(`related ${pr.state === 'merged' ? 'merged' : 'open'} <${pr.url}|PR #${pr.number}>`);\n  const sib = (r.siblings && r.siblings.length) ? ` (+${r.siblings.length} same cause: ${r.siblings.map(x => '`' + x + '`').join(', ')})` : '';\n  return `• \\`${spec(r.file)} › ${r.title}\\`${sib} — ${parts.join(', ')}` + (r.hypothesis ? `\\n    _${r.hypothesis.slice(0, 300)}_` : '');\n});\nfor (const c of (sel.covered || [])) {\n  const sib = (c.siblings && c.siblings.length) ? ` (+${c.siblings.length} same cause)` : '';\n  const verb = c.coveredBy.state === 'merged' ? 'likely already fixed by merged' : 'not investigated: open';\n  lines.push(`• \\`${spec(c.file)} › ${c.title}\\`${sib} — ${verb} <${c.coveredBy.url}|PR #${c.coveredBy.number}> (touches \\`${c.coveredBy.file.split('/').pop()}\\`)`);\n}\nif (sel.skipped > 0) lines.push(`_${sel.skipped} not investigated (maxTests=${s.maxTests})_`);\nreturn { text: [head, ...lines].join('\\n') };\n"
         }
       },
       "outputs": {
@@ -385,7 +388,7 @@
       "type": "uipath.connector.uipath-microsoft-github.list-records",
       "typeVersion": "1.0.0",
       "display": {
-        "label": "List open PRs"
+        "label": "List recent PRs"
       },
       "inputs": {
         "detail": {
@@ -396,7 +399,7 @@
           "method": "GET",
           "endpoint": "/{repo}/pulls",
           "queryParameters": {
-            "state": "open",
+            "state": "all",
             "sort": "updated",
             "direction": "desc",
             "pageSize": "100"
@@ -470,7 +473,7 @@
         "script": {
           "type": "literal",
           "fieldType": "string",
-          "expression": "const s = $vars.start.output;\nconst sel = $vars.selectTests.output || { groups: [], total: 0, totalTests: 0 };\n// Connector payloads may arrive camelCase or PascalCase; read either.\nconst g = (o, k) => (o == null ? undefined : (o[k] !== undefined ? o[k] : o[k.charAt(0).toUpperCase() + k.slice(1)]));\nconst base = (path) => String(path || '').split('/').pop().replace(/\\.(spec|test)?\\.?tsx?$/i, '').replace(/\\.[a-z]+$/i, '').toLowerCase();\nconst prList = ($vars.prFiles.output || [])\n  .map(it => (it && it.prFileNames && it.prFileNames.output) || (it && it.files ? it : null))\n  .filter(p => p && p.number)\n  .map(p => ({ number: p.number, title: p.title || '', url: p.url || '', files: (p.files || []).map(String) }));\n// A group is covered when an open PR touches its spec file or a page object named in its error.\nconst tokens = (t) => {\n  const set = new Set([base(t.file)]);\n  const first = String(t.error || '').split('\\n')[0];\n  for (const m of first.matchAll(/\\b([A-Z][A-Za-z0-9]+(?:Page|Dialog|Panel|Rail|Service|Client|Store))\\b/g)) set.add(m[1].toLowerCase());\n  return set;\n};\nconst covered = [];\nconst open = [];\nfor (const t of sel.groups || []) {\n  const tk = tokens(t);\n  let hit = null;\n  for (const pr of prList) {\n    const f = pr.files.find(x => x === t.file || x === 'e2e/' + t.file || tk.has(base(x)));\n    if (f) { hit = { number: pr.number, title: pr.title, url: pr.url, file: f }; break; }\n  }\n  if (hit) covered.push({ ...t, coveredBy: hit }); else open.push(t);\n}\nconst max = Number(s.maxTests) > 0 ? Number(s.maxTests) : 1;\nconst selected = open.slice(0, max);\nreturn { selected, covered, skipped: open.length - selected.length, total: sel.total, totalTests: sel.totalTests, prs: prList };"
+          "expression": "const s = $vars.start.output;\nconst sel = $vars.selectTests.output || { groups: [], total: 0, totalTests: 0 };\n// Connector payloads may arrive camelCase or PascalCase; read either.\nconst g = (o, k) => (o == null ? undefined : (o[k] !== undefined ? o[k] : o[k.charAt(0).toUpperCase() + k.slice(1)]));\nconst base = (path) => String(path || '').split('/').pop().replace(/\\.(spec|test)?\\.?tsx?$/i, '').replace(/\\.[a-z]+$/i, '').toLowerCase();\nconst prList = ($vars.prFiles.output || [])\n  .map(it => (it && it.prFileNames && it.prFileNames.output) || (it && it.files ? it : null))\n  .filter(p => p && p.number)\n  .map(p => ({ number: p.number, title: p.title || '', url: p.url || '', state: p.state || 'open', files: (p.files || []).map(String) }));\n// A group is covered when an open PR touches its spec file or a page object named in its error.\nconst tokens = (t) => {\n  const set = new Set([base(t.file)]);\n  const first = String(t.error || '').split('\\n')[0];\n  for (const m of first.matchAll(/\\b([A-Z][A-Za-z0-9]+(?:Page|Dialog|Panel|Rail|Service|Client|Store))\\b/g)) set.add(m[1].toLowerCase());\n  return set;\n};\nconst covered = [];\nconst open = [];\nfor (const t of sel.groups || []) {\n  const tk = tokens(t);\n  let hit = null;\n  for (const pr of prList) {\n    const f = pr.files.find(x => x === t.file || x === 'e2e/' + t.file || tk.has(base(x)));\n    if (f) { hit = { number: pr.number, title: pr.title, url: pr.url, state: pr.state, file: f }; break; }\n  }\n  if (hit) covered.push({ ...t, coveredBy: hit }); else open.push(t);\n}\nconst max = Number(s.maxTests) > 0 ? Number(s.maxTests) : 1;\nconst selected = open.slice(0, max);\nreturn { selected, covered, skipped: open.length - selected.length, total: sel.total, totalTests: sel.totalTests, prs: prList };"
         }
       },
       "outputs": {
@@ -551,6 +554,9 @@
                         },
                         "file": {
                           "type": "string"
+                        },
+                        "state": {
+                          "type": "string"
                         }
                       }
                     }
@@ -585,6 +591,9 @@
                       "items": {
                         "type": "string"
                       }
+                    },
+                    "state": {
+                      "type": "string"
                     }
                   }
                 }
@@ -610,14 +619,14 @@
       "typeVersion": "1.1",
       "display": {
         "label": "Recent open PRs",
-        "subLabel": "updated in the last 14 days, max 60",
+        "subLabel": "open (14 days) or merged (48h), max 60",
         "icon": "code"
       },
       "inputs": {
         "script": {
           "type": "literal",
           "fieldType": "string",
-          "expression": "// Connector payloads may arrive camelCase or PascalCase; read either.\nconst g = (o, k) => (o == null ? undefined : (o[k] !== undefined ? o[k] : o[k.charAt(0).toUpperCase() + k.slice(1)]));\nconst all = Array.isArray($vars.listOpenPrs1 && $vars.listOpenPrs1.output) ? $vars.listOpenPrs1.output : [];\nconst cutoff = Date.now() - 14 * 24 * 3600 * 1000;\nconst prs = all\n  .map(pr => ({ number: g(pr, 'number'), title: g(pr, 'title') || '', url: g(pr, 'html_url') || g(pr, 'htmlUrl') || '', updatedAt: g(pr, 'updated_at') || g(pr, 'updatedAt') || '' }))\n  .filter(pr => pr.number && (!pr.updatedAt || Date.parse(pr.updatedAt) >= cutoff))\n  .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)))\n  .slice(0, 60);\nreturn { prs, totalOpen: all.length };"
+          "expression": "// Connector payloads may arrive camelCase or PascalCase; read either.\nconst g = (o, k) => (o == null ? undefined : (o[k] !== undefined ? o[k] : o[k.charAt(0).toUpperCase() + k.slice(1)]));\nconst all = Array.isArray($vars.listOpenPrs1 && $vars.listOpenPrs1.output) ? $vars.listOpenPrs1.output : [];\nconst cutoff = Date.now() - 14 * 24 * 3600 * 1000;\nconst mergedCutoff = Date.now() - 48 * 3600 * 1000;\nconst prs = all\n  .map(pr => ({ number: g(pr, 'number'), title: g(pr, 'title') || '', url: g(pr, 'html_url') || g(pr, 'htmlUrl') || '', updatedAt: g(pr, 'updated_at') || g(pr, 'updatedAt') || '', mergedAt: g(pr, 'merged_at') || g(pr, 'mergedAt') || '', state: g(pr, 'state') || '' }))\n  // Open PRs may fix it; a PR merged after the nightly's commit already has. Closed-unmerged is noise.\n  .map(pr => ({ ...pr, state: pr.mergedAt ? 'merged' : pr.state }))\n  .filter(pr => pr.number && (pr.state === 'open' ? (!pr.updatedAt || Date.parse(pr.updatedAt) >= cutoff) : (pr.mergedAt && Date.parse(pr.mergedAt) >= mergedCutoff)))\n  .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)))\n  .slice(0, 60);\nreturn { prs, totalOpen: all.length };"
         }
       },
       "outputs": {
@@ -644,6 +653,12 @@
                       "type": "string"
                     },
                     "updatedAt": {
+                      "type": "string"
+                    },
+                    "mergedAt": {
+                      "type": "string"
+                    },
+                    "state": {
                       "type": "string"
                     }
                   }
@@ -680,7 +695,7 @@
         "script": {
           "type": "literal",
           "fieldType": "string",
-          "expression": "const g = (o, k) => (o == null ? undefined : (o[k] !== undefined ? o[k] : o[k.charAt(0).toUpperCase() + k.slice(1)]));\nconst pr = $vars.prFiles.currentItem || {};\nconst files = Array.isArray($vars.listPrFiles1 && $vars.listPrFiles1.output) ? $vars.listPrFiles1.output : [];\nreturn { number: pr.number, title: pr.title, url: pr.url, files: files.map(x => String(g(x, 'filename') || '')).filter(Boolean) };"
+          "expression": "const g = (o, k) => (o == null ? undefined : (o[k] !== undefined ? o[k] : o[k.charAt(0).toUpperCase() + k.slice(1)]));\nconst pr = $vars.prFiles.currentItem || {};\nconst files = Array.isArray($vars.listPrFiles1 && $vars.listPrFiles1.output) ? $vars.listPrFiles1.output : [];\nreturn { number: pr.number, title: pr.title, url: pr.url, state: pr.state || 'open', files: files.map(x => String(g(x, 'filename') || '')).filter(Boolean) };"
         }
       },
       "outputs": {
@@ -706,6 +721,9 @@
                 "items": {
                   "type": "string"
                 }
+              },
+              "state": {
+                "type": "string"
               }
             }
           }
@@ -2373,6 +2391,9 @@
                   },
                   "url": {
                     "type": "string"
+                  },
+                  "state": {
+                    "type": "string"
                   }
                 }
               }
@@ -2730,6 +2751,9 @@
                       },
                       "file": {
                         "type": "string"
+                      },
+                      "state": {
+                        "type": "string"
                       }
                     }
                   }
@@ -2764,6 +2788,9 @@
                     "items": {
                       "type": "string"
                     }
+                  },
+                  "state": {
+                    "type": "string"
                   }
                 }
               }
@@ -2806,6 +2833,12 @@
                     "type": "string"
                   },
                   "updatedAt": {
+                    "type": "string"
+                  },
+                  "mergedAt": {
+                    "type": "string"
+                  },
+                  "state": {
                     "type": "string"
                   }
                 }
@@ -2851,6 +2884,9 @@
               "items": {
                 "type": "string"
               }
+            },
+            "state": {
+              "type": "string"
             }
           }
         },

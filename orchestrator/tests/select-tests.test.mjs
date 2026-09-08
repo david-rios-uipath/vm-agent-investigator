@@ -48,21 +48,28 @@ const prs = [
   { number: 3700, title: 'chore: unrelated', html_url: 'https://github.com/UiPath/flow-workbench/pull/3700' },
 ];
 const prFilesOut = [
-  { prFileNames: { output: { number: 3758, title: 'fix(e2e): revive three closed nightly fixes', url: 'https://github.com/UiPath/flow-workbench/pull/3758', files: ['e2e/pages/StudioProjectsPage.ts', 'packages/canvas/src/components/properties-panel/neighbors/NeighborRail.tsx'] } } },
+  { prFileNames: { output: { number: 3758, title: 'fix(e2e): revive three closed nightly fixes', url: 'https://github.com/UiPath/flow-workbench/pull/3758', state: 'merged', files: ['e2e/pages/StudioProjectsPage.ts', 'packages/canvas/src/components/properties-panel/neighbors/NeighborRail.tsx'] } } },
   { prFileNames: { output: { number: 3700, title: 'chore: unrelated', url: 'https://github.com/UiPath/flow-workbench/pull/3700', files: ['README.md'] } } },
 ];
 // recentPrs: 14-day window, newest first, max 25, tolerant of PascalCase
 {
   const now = new Date().toISOString(); const old = new Date(Date.now() - 30 * 86400000).toISOString();
-  const all = [{ number: 1, title: 'a', html_url: 'u1', updated_at: old }, { Number: 2, Title: 'b', Html_url: 'u2', Updated_at: now }, ...Array.from({ length: 70 }, (_, i) => ({ number: 100 + i, title: 't', html_url: 'u', updated_at: now }))];
+  const all = [{ number: 1, title: 'a', html_url: 'u1', updated_at: old, state: 'open' }, { Number: 2, Title: 'b', Html_url: 'u2', Updated_at: now, State: 'open' },
+    { number: 3, title: 'merged recently', html_url: 'u3', updated_at: now, state: 'closed', merged_at: now },
+    { number: 4, title: 'merged long ago', html_url: 'u4', updated_at: now, state: 'closed', merged_at: old },
+    { number: 5, title: 'closed unmerged', html_url: 'u5', updated_at: now, state: 'closed', merged_at: null },
+    ...Array.from({ length: 70 }, (_, i) => ({ number: 100 + i, title: 't', html_url: 'u', updated_at: now, state: 'open' }))];
   const out = run('recentPrs', { listOpenPrs1: { output: all } });
-  assert.equal(out.totalOpen, 72); assert.equal(out.prs.length, 60); assert.ok(out.prs.every((p) => p.number !== 1), 'stale PR dropped'); assert.ok(out.prs.some((p) => p.number === 2), 'PascalCase read');
+  assert.equal(out.totalOpen, 75); assert.equal(out.prs.length, 60);
+  assert.ok(out.prs.every((p) => p.number !== 1), 'stale open PR dropped'); assert.ok(out.prs.some((p) => p.number === 2), 'PascalCase read');
+  assert.equal(out.prs.find((p) => p.number === 3).state, 'merged', 'recent merge kept as merged');
+  assert.ok(out.prs.every((p) => p.number !== 4 && p.number !== 5), 'old merge and closed-unmerged dropped');
   assert.deepEqual(run('recentPrs', { listOpenPrs1: { error: { message: 'x' } } }), { prs: [], totalOpen: 0 });
 }
 // prFileNames: keeps paths only
 {
   const out = run('prFileNames', { prFiles: { currentItem: { number: 5, title: 'x', url: 'u' } }, listPrFiles1: { output: [{ filename: 'a.ts', patch: '@@' }, { Filename: 'b.ts' }] } });
-  assert.deepEqual(out, { number: 5, title: 'x', url: 'u', files: ['a.ts', 'b.ts'] });
+  assert.deepEqual(out, { number: 5, title: 'x', url: 'u', state: 'open', files: ['a.ts', 'b.ts'] });
   assert.deepEqual(run('prFileNames', { prFiles: { currentItem: { number: 5 } }, listPrFiles1: { error: {} } }).files, []);
 }
 console.log('recentPrs/prFileNames ok');
@@ -70,7 +77,7 @@ console.log('recentPrs/prFileNames ok');
   const out = run('pickTests', { start: { output: night2 }, selectTests: { output: sel2 }, prFiles: { output: prFilesOut } });
   assert.equal(out.covered.length, 1, 'the auth-error group names StudioProjectsPage, which #3758 touches');
   assert.equal(out.covered[0].coveredBy.number, 3758);
-  assert.equal(out.covered[0].coveredBy.file, 'e2e/pages/StudioProjectsPage.ts');
+  assert.equal(out.covered[0].coveredBy.file, 'e2e/pages/StudioProjectsPage.ts'); assert.equal(out.covered[0].coveredBy.state, 'merged');
   assert.equal(out.selected.length, 1, 'maxTests 1: the slot goes to the next uncovered group');
   assert.equal(out.selected[0].title, 'should add a Map operation with field mappings');
   assert.equal(out.skipped, 1);
@@ -102,11 +109,11 @@ console.log('recordResult ok');
   const pick = run('pickTests', { start: { output: night2 }, selectTests: { output: sel2 }, prFiles: { output: prFilesOut } });
   const row = { project: 'studio-alpha', file: 'specs/data-transform/data-transform.spec.ts', title: 'should add a Map operation with field mappings',
     reproduced: true, fixVerified: true, prUrl: 'https://github.com/UiPath/flow-workbench/pull/3729', hypothesis: 'neighbor rail intercepts click', failed: false, errorMessage: '',
-    siblings: ['should write a Custom Script operation in a Data Transform node'], relatedPrs: [{ number: 3758, title: 't', url: 'https://github.com/UiPath/flow-workbench/pull/3758' }] };
+    siblings: ['should write a Custom Script operation in a Data Transform node'], relatedPrs: [{ number: 3758, title: 't', url: 'https://github.com/UiPath/flow-workbench/pull/3758', state: 'merged' }] };
   const text = run('summarize', { start: { output: night2 }, pickTests: { output: pick }, investigate: { output: [{ recordResult: { output: row } }] } }).text;
   assert.match(text, /VmAgent investigated 1 of 3 studio failure groups\* \(6 tests, <https:\/\/github\.com\/UiPath\/flow-workbench\/actions\/runs\/34089391590\|run 34089391590>\) · <https:\/\/theater\.uipath\.co\/flow\/[0-9a-f]+\/\|report>/);
-  assert.match(text, /data-transform\.spec\.ts › should add a Map operation with field mappings` \(\+1 same cause: `should write a Custom Script operation in a Data Transform node`\) — reproduced, fix verified, <https:\/\/github\.com\/UiPath\/flow-workbench\/pull\/3729\|draft PR>, related open <https:\/\/github\.com\/UiPath\/flow-workbench\/pull\/3758\|PR #3758>/);
-  assert.match(text, /should add a Group by operation with aggregations` \(\+2 same cause\) — not investigated: open <https:\/\/github\.com\/UiPath\/flow-workbench\/pull\/3758\|PR #3758> already touches `StudioProjectsPage\.ts`/);
+  assert.match(text, /data-transform\.spec\.ts › should add a Map operation with field mappings` \(\+1 same cause: `should write a Custom Script operation in a Data Transform node`\) — reproduced, fix verified, <https:\/\/github\.com\/UiPath\/flow-workbench\/pull\/3729\|draft PR>, related merged <https:\/\/github\.com\/UiPath\/flow-workbench\/pull\/3758\|PR #3758>/);
+  assert.match(text, /should add a Group by operation with aggregations` \(\+2 same cause\) — likely already fixed by merged <https:\/\/github\.com\/UiPath\/flow-workbench\/pull\/3758\|PR #3758> \(touches `StudioProjectsPage\.ts`\)/);
   assert.match(text, /1 not investigated \(maxTests=1\)/);
   const flat = run('summarize', { start: { output: night2 }, pickTests: { output: pick }, investigate: { output: [row] } }).text;
   assert.match(flat, /should add a Map operation with field mappings/);
