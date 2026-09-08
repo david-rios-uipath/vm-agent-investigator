@@ -16,7 +16,7 @@ set -euo pipefail
 VERSION="${1:?version, e.g. 1.0.19}"
 INPUT="${2:-/tmp/job-input.json}"
 PROCESS="${3:-VmAgent}"
-PKG="vm-agent 8"; DEPLOY="vm-agent 11"; FOLDER="Shared/vm-agent 11"; OUT=/tmp/vm-agent-pkg
+PKG="vm-agent 8"; DEPLOY="vm-agent 12"; FOLDER="Shared/vm-agent 12"; OUT=/tmp/vm-agent-pkg
 cd "$(dirname "$0")"
 
 mkdir -p "$OUT"

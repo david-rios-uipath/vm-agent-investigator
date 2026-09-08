@@ -179,6 +179,10 @@ sentence claimed a pass without reading `verified`.
 
 ## NightlyOrchestrator
 
+> Deployment moved to **`vm-agent 12`** (folder `Shared/vm-agent 12`) on 2026-09-08: `vm-agent 11` is wedged with three
+> Maestro jobs stuck in `Terminating` after `jobs stop --strategy Kill`, so its uninstall fails validation. Leave it; do not
+> kill Maestro flow jobs, cancel the instance instead. CI (`start-nightly-investigation.sh`) targets the new folder.
+
 A second flow in the same solution (`vm-agent/NightlyOrchestrator/`). It takes one nightly
 Playwright run's failures, fans the first `maxTests` of them out over `VmAgent` (one child job
 each), and posts a single summary back into the Slack thread that reported the failure.
@@ -272,7 +276,7 @@ Two deploy details that are easy to get wrong:
 
 ## Current state (as released)
 
-- **Deployment:** `Shared/vm-agent 11` @ **1.0.24**, package identity `vm-agent 8`.
+- **Deployment:** `Shared/vm-agent 12` @ **1.0.24**, package identity `vm-agent 8`.
 - **1.0.24 ran the whole loop including the PR, in 17 minutes** - instance
   `62b22f65-ae3f-4c80-89f2-d295eb59f104`, 17:16-17:33 UTC: smoke setup -> resume -> fixer
   (11 min) -> studio-local verify `1 passed (1.9m)` -> **draft PR
@@ -318,12 +322,12 @@ Two deploy details that are easy to get wrong:
    ```
    Only then `./release.sh <version> inputs/debug-execution.json`. `release.sh` packs, asserts
    the packaged `bindings_v2.json`, publishes, stops running jobs, uninstalls + redeploys
-   `Shared/vm-agent 11` and starts the job. **Never hand-run the pack step** — see FINDINGS.
+   `Shared/vm-agent 12` and starts the job. **Never hand-run the pack step** — see FINDINGS.
 
 4. **The old verify step**, for reference while the port is unproven:
    ```bash
    # parent + agent children
-   uip or jobs list --folder-path "Shared/vm-agent 11" --output json
+   uip or jobs list --folder-path "Shared/vm-agent 12" --output json
    # every vm_exec tool call lands here
    uip or jobs list --folder-path "e2e-investigator" --output json
    # a verify job's output contains '### patch first bytes' and FIX_VERIFIED=
@@ -337,7 +341,7 @@ Two deploy details that are easy to get wrong:
    `Running` after the instance has faulted):
    ```bash
    FK=$(uip or folders list --all --name "vm-agent 11" --output json | \
-     python3 -c "import sys,json;t=sys.stdin.read();i=t.find('{');d=json.loads(t[i:]);print(next(x['Key'] for x in d['Data'] if x['Path']=='Shared/vm-agent 11'))")
+     python3 -c "import sys,json;t=sys.stdin.read();i=t.find('{');d=json.loads(t[i:]);print(next(x['Key'] for x in d['Data'] if x['Path']=='Shared/vm-agent 12'))")
    uip maestro flow instance get       <parent-job-key> -f $FK --output json   # LatestRunStatus, Cursors
    uip maestro flow instance incidents <parent-job-key> -f $FK --output json   # the actual error
    ```
@@ -485,7 +489,7 @@ replacement.
 - `rg` is not on PATH in the agent's `vm_exec` sessions (setup only prepends
   `C:\vm-agent\bin` for its own session). The tool description now says so; better would be
   fixing the PATH or installing rg machine-wide.
-- The `Shared/vm-agent 11` folder is recreated on every redeploy, which drops machine
+- The `Shared/vm-agent 12` folder is recreated on every redeploy, which drops machine
   assignments and hand-made assets. The three placeholder credential assets
   (`GH_TOKEN`/`SLACK_TOKEN`/`SLACK_COOKIE`) and the VM machine template assignment from the
   abandoned single-folder experiment may or may not still be there; they are harmless.
