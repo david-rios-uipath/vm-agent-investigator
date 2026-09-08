@@ -150,7 +150,9 @@ function Get-CiJobLog([string]$JobId, [string]$Path, [string]$Api, [hashtable]$H
   $url = "$Api/actions/jobs/$JobId/logs"
   try { Invoke-WebRequest $url -Headers $Headers -UseBasicParsing -OutFile $Path; return $true } catch { }
   try { Invoke-WebRequest $url -Headers $Headers -UseBasicParsing -MaximumRedirection 0 -ErrorAction Stop | Out-Null } catch {
-    $loc = $_.Exception.Response.Headers['Location']
+    # Response is null for non-HTTP failures; indexing it would kill the whole phase.
+    $resp = $_.Exception.Response
+    $loc = if ($resp -and $resp.Headers) { $resp.Headers['Location'] } else { $null }
     if ($loc) { try { Invoke-WebRequest $loc -UseBasicParsing -OutFile $Path; return $true } catch { } }
   }
   Write-Output "[ci-history] could not fetch log for job $JobId"
