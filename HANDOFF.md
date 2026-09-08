@@ -254,6 +254,26 @@ both processes are deployed either way. The packaged-bindings assertion covers b
 `VmAgent` must still carry `e2e-investigator.vm-exec-vm`, and `NightlyOrchestrator` must carry
 the `VmAgent` process binding `4a7879cf-7494-4ada-9e83-ea487a4b55cb`.
 
+### Status 2026-09-08 04:15 UTC
+
+Deployed: `vm-agent 8` **1.1.12** as `vm-agent 12` (folder `Shared/vm-agent 12`). Proven end to end on the 2026-09-07
+nightly (`inputs/orchestrator-34089391590.json`, thread `1788766695.830989`): 6 failed tests -> 3 causes; 2 causes
+attributed to merged flow-workbench#3758 by the PR check; the third investigated by VmAgent (reproduced, no verified
+fix, related PR #3758 named); one Slack reply, posted as David. Runs today: 1.1.1 (Slack `channel_not_found`), 1.1.2
+(Slack OK, stale code republished), 1.1.3 (grouping OK), 1.1.4-1.1.11 (PR check via the GitHub connector: wrong
+`repo` param, loop typo, 153 PRs stall, variable-size cap), 1.1.12 (PR check on the VM, OK).
+
+Open:
+- flow-workbench PR #3756 (CI hook) is still a draft; CI vars/secrets are set (`UIPATH_INVESTIGATOR_*`). The CI
+  script has not been run against the tenant yet (token exchange unverified).
+- `vm-agent 11` deployment is wedged (three Maestro jobs `Terminating` after `jobs stop --strategy Kill`). Uninstall
+  it once Orchestrator clears them; report the Kill behaviour to the Maestro team.
+- Slack "edit one message" request: the connector has no update op; needs an HTTP `chat.update` with a token asset.
+- vsix projects: filter is `projects="studio-*"`; VmAgent cannot reproduce vsix yet.
+- `maxTests` stays 1 until the pool grows; also verify iteration scoping before raising it.
+- Slack renders `<`/`>` from the hypothesis escaped (`&lt;nav&gt;`); strip them in `summarize`.
+- VmAgent still reproduced the Map-operation failure on `develop` after #3758 merged; #3758 may not cover it.
+
 ### First deployed run (1.1.0, 2026-09-07) — blocked on the robot pool, not the flow
 
 Parent job `66304ff4-336f-467d-b346-925cdbce32e1`, instance `NightlyOrchestrator-56249860`,
