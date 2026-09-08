@@ -211,6 +211,7 @@ Trigger inputs:
 | `maxTests` | number | `1` | how many of the surviving tests to investigate |
 | `repoUrl` | string | `https://github.com/UiPath/flow-workbench` | repo VmAgent checks out |
 | `branch` | string | `develop` | branch VmAgent checks out |
+| `claudeModel` | string | `claude-sonnet-5` | model the phases pass to `claude -p` on the VM; empty would fall through to the CLI's account default, which is Opus |
 
 Sample payloads: `inputs/orchestrator-34015558366.json` (2026-09-06 nightly),
 `inputs/orchestrator-34089391590.json` (2026-09-07 nightly, 6 tests, 3 causes).

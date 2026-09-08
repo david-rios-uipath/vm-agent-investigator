@@ -356,8 +356,8 @@
           "fieldType": "string"
         },
         "claudeModel": {
-          "type": "literal",
-          "expression": "claude-sonnet-5",
+          "type": "jsExpression",
+          "expression": "$vars.start.output.claudeModel || 'claude-sonnet-5'",
           "fieldType": "string"
         },
         "errorHandlingEnabled": true
@@ -2387,6 +2387,13 @@
         "direction": "in",
         "type": "string",
         "defaultValue": "develop",
+        "triggerNodeId": "start"
+      },
+      {
+        "id": "claudeModel",
+        "direction": "in",
+        "type": "string",
+        "defaultValue": "claude-sonnet-5",
         "triggerNodeId": "start"
       }
     ],
