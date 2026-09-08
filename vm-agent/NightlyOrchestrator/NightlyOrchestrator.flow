@@ -324,7 +324,7 @@
             "mrkdwn": true
           },
           "queryParameters": {
-            "send_as": "bot"
+            "send_as": "user"
           },
           "uiPathActivityTypeId": "37a305b2-89b1-315d-b73f-1778839a6c47",
           "errorState": {
