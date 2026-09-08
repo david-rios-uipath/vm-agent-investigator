@@ -80,8 +80,16 @@ try {
   exit 1
 }
 
+# The platform segment is dropped for EXECUTION only - it names the runner that produced the
+# failure, and this VM is a different one. It stays in the evidence: "red on Linux, green on
+# macOS" is the difference between a product bug and a runner-environment one, and an
+# investigator that never sees the suffix cannot reach that conclusion.
+$RequestedProject = [regex]::Match($TestCommand, '--project[=\s]+"?([\w-]+)').Groups[1].Value
 $TestCommand = Resolve-TestCommand $TestCommand
 $IsVsix = Test-IsVsixCommand $TestCommand
+if ($RequestedProject -and $TestCommand -notmatch [regex]::Escape($RequestedProject)) {
+  Write-Output "[phase] the nightly ran this on '$RequestedProject'; running it here as '$([regex]::Match($TestCommand, '--project[=\s]+"?([\w-]+)').Groups[1].Value)'"
+}
 if ($IsVsix) {
   try {
     Set-VsixHome
@@ -275,6 +283,7 @@ switch ($Phase) {
 
   $evidence = [ordered]@{
     source = $source
+    requestedProject = $RequestedProject
     exitCode = $exit
     reproduced = $reproduced
     excerpt = Get-Tail $stdout 8000
@@ -305,7 +314,13 @@ switch ($Phase) {
   }
   $ev = Get-Content -Raw $evidenceFile | ConvertFrom-Json
 
+  # The nightly's own project name, not the one this VM ran, so a platform-specific failure is
+  # visible to the model.
+  $reqNote = if ($ev.requestedProject -and $ev.requestedProject -ne [regex]::Match($TestCommand, '--project[=\s]+"?([\w-]+)').Groups[1].Value) {
+    "$($ev.requestedProject) in CI; this VM is Windows and ran it as $([regex]::Match($TestCommand, '--project[=\s]+"?([\w-]+)').Groups[1].Value)"
+  } else { $RequestedProject }
   $prompt = New-Prompt 'investigator.md' @{
+    REQUESTED_PROJECT = $reqNote
     REPO_URL = $RepoUrl; BRANCH = $Branch; TEST_COMMAND = $TestCommand; RUN_ID = $RunId
     SOURCE = $ev.source; EXIT_CODE = $ev.exitCode; CI_HISTORY = $ev.ciHistory
     OUTPUT_TAIL = $ev.excerpt; NOTES_DIR = $notes

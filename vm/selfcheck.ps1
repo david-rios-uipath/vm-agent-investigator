@@ -36,6 +36,11 @@ Assert (Test-CiJobForProject 'e2e-vsix-alpha / E2E (vsix-alpha, Linux)' 'vsix-al
 Assert (-not (Test-CiJobForProject 'e2e-vsix-alpha-cursor / E2E (vsix-alpha-cursor, Linux)' 'vsix-alpha')) 'the cursor host job is not mistaken for the default host'
 Assert (-not (Test-CiJobForProject 'e2e-vsix-staging / E2E (vsix-staging, macOS)' 'vsix-alpha')) 'a different environment does not match'
 
+# Platform, so a Linux-only failure is not merged into one verdict per night.
+Assert ((Get-CiJobPlatform 'e2e-vsix-alpha / E2E (vsix-alpha, Linux)') -eq 'Linux') 'the platform comes out of the job name'
+Assert ((Get-CiJobPlatform 'e2e-vsix-staging / E2E (vsix-staging, macOS)') -eq 'macOS') 'macOS too'
+Assert ((Get-CiJobPlatform 'e2e-studio / E2E (studio-alpha) [2/5]') -eq '') 'a studio shard has no platform'
+
 # Get-Tail
 Assert ((Get-Tail 'abc' 10) -eq 'abc') 'short text is returned whole'
 Assert ((Get-Tail ('x' * 100) 10).EndsWith('x' * 10)) 'long text keeps its tail'

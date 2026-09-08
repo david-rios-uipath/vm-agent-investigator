@@ -19,10 +19,15 @@ save the write-up for the end.
 
 - repository: {{REPO_URL}} @ {{BRANCH}}
 - test command: {{TEST_COMMAND}}
+- Playwright project the nightly reported: {{REQUESTED_PROJECT}}
 - runId: {{RUN_ID}}
 - evidence source: {{SOURCE}}
 - test exit code: {{EXIT_CODE}}
 - CI history for this spec: {{CI_HISTORY}}
+  A `PLATFORM SPLIT` note there, or per-night verdicts that differ by platform, is a strong signal:
+  the same commit passing on one runner and failing on another points at the runner environment
+  (screen size, display server, OS path handling), not at product code. Say so explicitly in the
+  notebook when you see it, and check `.github/workflows/` for how each platform is launched.
 - state directory (evidence, logs, your notebook): {{NOTES_DIR}}
 - test output tail:
 

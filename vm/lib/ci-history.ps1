@@ -9,6 +9,16 @@ function Test-CiJobForProject([string]$JobName, [string]$Project) {
   return ($JobName -like "*($Project)*") -or ($JobName -like "*($Project,*")
 }
 
+# `E2E (vsix-alpha, Linux)` -> `Linux`. Studio shards carry no platform (`E2E (studio-alpha) [2/5]`)
+# and return ''. Which platforms agree matters: a spec red on Linux and green on macOS every night
+# is a runner-environment failure, and merging the jobs into one verdict per night hides exactly
+# that - the investigator then reasons about product code for a screen-size problem.
+function Get-CiJobPlatform([string]$JobName) {
+  $m = [regex]::Match($JobName, '\([^),]+,\s*([^)]+)\)')
+  if ($m.Success) { return $m.Groups[1].Value.Trim() }
+  return ''
+}
+
 function Get-CiHistory([string]$RepoUrl, [string]$Branch, [string]$TestCommand, [string]$NotesDir) {
   $ErrorActionPreference = 'Continue'
   $r = [ordered]@{ classification = 'unknown'; summary = ''; firstFailSha = ''; lastPassSha = ''; runs = @(); ciFailureExcerpt = ''; ciJobLog = ''; target = ''; targetVerdict = 'absent' }
@@ -47,6 +57,7 @@ function Get-CiHistory([string]$RepoUrl, [string]$Branch, [string]$TestCommand, 
     $isNewest = ($run.id -eq $runs[0].id)
     $sha = $run.head_sha.Substring(0, 7); $date = ([datetime]$run.created_at).ToUniversalTime().ToString('yyyy-MM-dd')
     $marks = @{}
+    $platformMarks = @{}
     try { $jobs = (Invoke-RestMethod "$api/actions/runs/$($run.id)/jobs?per_page=100" -Headers $h).jobs } catch { $jobs = @() }
     $jobs = @($jobs | Where-Object { $_.name -like '*E2E*' })
     if ($project) { $jobs = @($jobs | Where-Object { Test-CiJobForProject $_.name $project }) }
@@ -55,6 +66,11 @@ function Get-CiHistory([string]$RepoUrl, [string]$Branch, [string]$TestCommand, 
       if (-not (Get-CiJobLog $job.id $tmp $api $h)) { continue }
       $m = Get-CiMarks ([System.IO.File]::ReadAllLines($tmp)) $spec $grep
       foreach ($k in $m.marks.Keys) { $marks[$k] = [string]$marks[$k] + $m.marks[$k] }
+      $plat = Get-CiJobPlatform $job.name
+      if ($plat) {
+        if (-not $platformMarks.ContainsKey($plat)) { $platformMarks[$plat] = @{} }
+        foreach ($k in $m.marks.Keys) { $platformMarks[$plat][$k] = [string]$platformMarks[$plat][$k] + $m.marks[$k] }
+      }
       $sawFail = @($m.marks.Values | Where-Object { ([string]$_).Contains('F') }).Count -gt 0
       if ($isNewest) { $newestTarget += $m.target }
       # Environment signals in every sampled night, not just the newest, so a shared-environment
@@ -92,6 +108,13 @@ function Get-CiHistory([string]$RepoUrl, [string]$Branch, [string]$TestCommand, 
     }
     $verdict = Get-CiVerdict @($marks.Values | ForEach-Object { [string]$_ })
     $row = [ordered]@{ date = $date; sha = $sha; verdict = $verdict; url = $run.html_url }
+    if ($platformMarks.Count -gt 1) {
+      $byPlatform = [ordered]@{}
+      foreach ($plat in ($platformMarks.Keys | Sort-Object)) {
+        $byPlatform[$plat] = Get-CiVerdict @($platformMarks[$plat].Values | ForEach-Object { [string]$_ })
+      }
+      if (@($byPlatform.Values | Sort-Object -Unique).Count -gt 1) { $row.byPlatform = $byPlatform }
+    }
     if ($runSignals.ContainsKey($sha)) { $row.envSignals = $runSignals[$sha] }
     if ($runExcerpts.ContainsKey($sha)) { $row.excerpt = $runExcerpts[$sha] }
     $r.runs += $row
@@ -117,11 +140,21 @@ function Get-CiHistory([string]$RepoUrl, [string]$Branch, [string]$TestCommand, 
   elseif ($streak -eq 0 -and -not $hasFlaky -and -not $restHasFail) { $r.classification = 'passing' }
   else { $r.classification = 'flaky' }
 
-  $hist = ($r.runs | ForEach-Object { "$($_.date) $($_.sha) $($_.verdict)" }) -join '; '
+  $hist = ($r.runs | ForEach-Object {
+    $line = "$($_.date) $($_.sha) $($_.verdict)"
+    if ($_.byPlatform) { $line += ' (' + (($_.byPlatform.GetEnumerator() | ForEach-Object { $_.Key + ' ' + $_.Value }) -join ', ') + ')' }
+    $line
+  }) -join '; '
   $r.summary = "$($r.classification): $spec over the last $($r.runs.Count) nightly runs (newest first): $hist"
   if ($r.firstFailSha) { $r.summary += "; failing since $($r.firstFailSha)" }
   if ($r.lastPassSha) { $r.summary += "; last pass $($r.lastPassSha)" }
   if ($grep) { $r.summary += "; targeted test in the newest run: $($r.targetVerdict)" }
+  # Spelled out rather than left for the reader to infer from the per-night parentheses: a spec
+  # that fails on one platform and passes on another is about the runner, not the product.
+  $split = @($r.runs | Where-Object { $_.byPlatform })
+  if ($split.Count -gt 0) {
+    $r.summary += "; PLATFORM SPLIT in $($split.Count) of $($r.runs.Count) runs - the same commit passes on some runners and fails on others, so suspect the runner environment (screen size, display server, OS paths) before the product"
+  }
   $sigRuns = @($r.runs | Where-Object { $_.envSignals })
   if ($sigRuns.Count -gt 0) {
     $r.summary += '; environment signals: ' + (($sigRuns | ForEach-Object { $_.sha + '=' + (($_.envSignals.GetEnumerator() | ForEach-Object { $_.Key + ':' + $_.Value }) -join ',') }) -join ' ')
