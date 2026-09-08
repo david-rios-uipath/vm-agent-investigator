@@ -51,7 +51,7 @@ echo "published $VERSION"
 for k in $(uip or jobs list --folder-path "$FOLDER" --output json 2>/dev/null | python3 -c "
 import sys,json;t=sys.stdin.read();i=t.find('{');d=json.loads(t[i:])
 print(' '.join(x['Key'] for x in d['Data'] if x.get('State') in ('Running','Pending','Suspended')))"); do
-  uip or jobs stop "$k" >/dev/null 2>&1 || true
+  uip or jobs stop "$k" --strategy Kill >/dev/null 2>&1 || true
 done
 n=0; until [ $n -ge 18 ] || [ "$(uip or jobs list --folder-path "$FOLDER" --output json 2>/dev/null | python3 -c "
 import sys,json;t=sys.stdin.read();i=t.find('{');d=json.loads(t[i:]);print(len([x for x in d['Data'] if x.get('State') in ('Running','Stopping','Pending','Suspended')]))")" = "0" ]; do sleep 10; n=$((n+1)); done
