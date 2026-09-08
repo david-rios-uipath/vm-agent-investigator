@@ -15,25 +15,28 @@ const input = JSON.parse(readFileSync(new URL('../../inputs/orchestrator-3401555
 // selectTests: studio only, dedupe, cap, stable order, command shape
 {
   const out = run('selectTests', { start: { output: { ...input, maxTests: 5 } } });
-  assert.equal(out.total, 3, 'three distinct studio-* tests (vsix excluded, duplicates collapsed)');
-  assert.equal(out.selected.length, 3);
+  assert.equal(out.totalTests, 3, 'three distinct studio-* tests (vsix excluded, duplicates collapsed)');
+  assert.equal(out.total, 2, 'the two data-transform tests share a cause');
+  assert.equal(out.selected.length, 2);
+  assert.deepEqual(out.selected[0].siblings, ['should write a Custom Script operation in a Data Transform node']);
+  assert.deepEqual(out.selected[1].siblings, []);
   assert.equal(out.skipped, 0);
   assert.deepEqual(out.selected.map((t) => t.file), [
     'specs/data-transform/data-transform.spec.ts',
-    'specs/data-transform/data-transform.spec.ts',
     'specs/debug/debug-execution.spec.ts',
-  ].sort());
+  ]);
   assert.equal(out.selected[0].testCommand,
     'corepack pnpm exec playwright test --config e2e/playwright.config.ts e2e/specs/data-transform/data-transform.spec.ts --project studio-alpha --grep "should add a Map operation with field mappings"');
 }
 {
   const out = run('selectTests', { start: { output: input } }); // maxTests 1
   assert.equal(out.selected.length, 1);
-  assert.equal(out.skipped, 2);
+  assert.equal(out.skipped, 1);
 }
 {
   const out = run('selectTests', { start: { output: { ...input, projects: 'studio-*,vsix-*', maxTests: 10 } } });
-  assert.equal(out.total, 4, 'vsix rows dedupe across platforms into one');
+  assert.equal(out.totalTests, 4, 'vsix rows dedupe across platforms into one');
+  assert.equal(out.total, 3);
 }
 {
   const out = run('selectTests', { start: { output: { ...input, failedTests: [{ project: 'studio-alpha', file: 'specs/a.spec.ts', title: 'has "quotes" and (parens) $1' }] } } });
@@ -49,12 +52,13 @@ console.log('selectTests ok');
     investigate: { output: [ { recordResult: { output: {
       project: 'studio-alpha', file: 'specs/data-transform/data-transform.spec.ts',
       title: 'should add a Map operation with field mappings', reproduced: true, fixVerified: true,
-      prUrl: 'https://github.com/UiPath/flow-workbench/pull/3729', hypothesis: 'neighbor rail intercepts click', failed: false, errorMessage: '' } } } ] },
+      prUrl: 'https://github.com/UiPath/flow-workbench/pull/3729', hypothesis: 'neighbor rail intercepts click', failed: false, errorMessage: '', siblings: ['should write a Custom Script operation in a Data Transform node'] } } } ] },
   }).text;
-  assert.match(text, /VmAgent investigated 1 of 3 studio-\* failures/);
+  assert.match(text, /VmAgent investigated 1 of 3 studio-\* failure groups/);
   assert.match(text, /data-transform\.spec\.ts › should add a Map operation with field mappings/);
   assert.match(text, /reproduced, fix verified, <https:\/\/github\.com\/UiPath\/flow-workbench\/pull\/3729\|draft PR>/);
   assert.match(text, /2 not investigated \(maxTests=1\)/);
+  assert.match(text, /\(\+1 same cause: `should write a Custom Script operation in a Data Transform node`\)/);
   assert.match(text, /<https:\/\/theater\.uipath\.co\/flow\/[0-9a-f]+\/\|report>/);
   const none = run('summarize', { start: { output: input }, selectTests: { output: { total: 0, skipped: 0, selected: [] } }, investigate: { output: [] } }).text;
   assert.match(none, /no studio-\* failures to investigate/);

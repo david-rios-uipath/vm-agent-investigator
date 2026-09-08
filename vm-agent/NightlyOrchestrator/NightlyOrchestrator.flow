@@ -28,7 +28,7 @@
         "script": {
           "type": "literal",
           "fieldType": "string",
-          "expression": "const s = $vars.start.output;\nconst globs = String(s.projects || 'studio-*').split(',').map(g => g.trim()).filter(Boolean);\nconst matches = (p) => globs.some(g => new RegExp('^' + g.split('*').map(x => x.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')).join('.*') + '$').test(p));\nconst seen = new Set();\nconst rows = [];\nfor (const t of (s.failedTests || [])) {\n  if (!t || !matches(t.project || '')) continue;\n  const key = t.file + '::' + t.title;\n  if (seen.has(key)) continue;\n  seen.add(key);\n  rows.push(t);\n}\nrows.sort((a, b) => (a.file + a.title).localeCompare(b.file + b.title));\nconst grep = (title) => String(title).replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&').replace(/\"/g, '\\\\\"');\nconst max = Number(s.maxTests) > 0 ? Number(s.maxTests) : 1;\nconst selected = rows.slice(0, max).map(t => ({\n  project: t.project, file: t.file, title: t.title, error: t.error || '',\n  testCommand: `corepack pnpm exec playwright test --config e2e/playwright.config.ts e2e/${t.file} --project ${t.project} --grep \"${grep(t.title)}\"`\n}));\nreturn { selected, skipped: rows.length - selected.length, total: rows.length };"
+          "expression": "const s = $vars.start.output;\nconst globs = String(s.projects || 'studio-*').split(',').map(g => g.trim()).filter(Boolean);\nconst matches = (p) => globs.some(g => new RegExp('^' + g.split('*').map(x => x.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')).join('.*') + '$').test(p));\n// One row per distinct test (same file+title across shards/platforms collapses).\nconst seen = new Set();\nconst rows = [];\nfor (const t of (s.failedTests || [])) {\n  if (!t || !matches(t.project || '')) continue;\n  const key = t.file + '::' + t.title;\n  if (seen.has(key)) continue;\n  seen.add(key);\n  rows.push(t);\n}\nrows.sort((a, b) => (a.file + a.title).localeCompare(b.file + b.title));\n// Tests in the same spec file whose first error line matches (digits/hashes ignored) share a cause.\nconst norm = (e) => String(e || '').replace(/\\x1b\\[[0-9;]*m/g, '').split('\\n').map(l => l.trim()).find(Boolean) || '';\nconst causeKey = (t) => { const n = norm(t.error).replace(/[0-9a-f]{8,}/gi, '#').replace(/\\d+/g, '#').slice(0, 160); return t.file + '::' + (n || ('title:' + t.title)); };\nconst groups = [];\nconst byKey = new Map();\nfor (const t of rows) {\n  const k = causeKey(t);\n  if (byKey.has(k)) { byKey.get(k).siblings.push(t.title); continue; }\n  const g = { ...t, siblings: [] }; byKey.set(k, g); groups.push(g);\n}\nconst grep = (title) => String(title).replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&').replace(/\"/g, '\\\\\"');\nconst max = Number(s.maxTests) > 0 ? Number(s.maxTests) : 1;\nconst selected = groups.slice(0, max).map(t => ({\n  project: t.project, file: t.file, title: t.title, error: t.error || '', siblings: t.siblings,\n  testCommand: `corepack pnpm exec playwright test --config e2e/playwright.config.ts e2e/${t.file} --project ${t.project} --grep \"${grep(t.title)}\"`\n}));\nreturn { selected, skipped: groups.length - selected.length, total: groups.length, totalTests: rows.length };"
         }
       },
       "outputs": {
@@ -59,6 +59,12 @@
                     },
                     "testCommand": {
                       "type": "string"
+                    },
+                    "siblings": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
                     }
                   }
                 }
@@ -67,6 +73,9 @@
                 "type": "number"
               },
               "total": {
+                "type": "number"
+              },
+              "totalTests": {
                 "type": "number"
               }
             }
@@ -201,7 +210,7 @@
         "script": {
           "type": "literal",
           "fieldType": "string",
-          "expression": "const t = $vars.investigate.currentItem;\nconst r = ($vars.callVmAgent && $vars.callVmAgent.output) || null;\nconst e = ($vars.callVmAgent && $vars.callVmAgent.error) || null;\nreturn {\n  project: t.project, file: t.file, title: t.title,\n  reproduced: !!(r && r.reproduced), fixVerified: !!(r && r.fixVerified),\n  prUrl: (r && r.prUrl) || '', hypothesis: (r && r.hypothesis) || '',\n  failed: !r || !!e, errorMessage: e ? String(e.message || e.code || 'VmAgent faulted') : ''\n};"
+          "expression": "const t = $vars.investigate.currentItem;\nconst r = ($vars.callVmAgent && $vars.callVmAgent.output) || null;\nconst e = ($vars.callVmAgent && $vars.callVmAgent.error) || null;\nreturn {\n  project: t.project, file: t.file, title: t.title, siblings: t.siblings || [],\n  reproduced: !!(r && r.reproduced), fixVerified: !!(r && r.fixVerified),\n  prUrl: (r && r.prUrl) || '', hypothesis: (r && r.hypothesis) || '',\n  failed: !r || !!e, errorMessage: e ? String(e.message || e.code || 'VmAgent faulted') : ''\n};"
         }
       },
       "outputs": {
@@ -239,6 +248,12 @@
               },
               "errorMessage": {
                 "type": "string"
+              },
+              "siblings": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
               }
             }
           }
@@ -264,7 +279,7 @@
         "script": {
           "type": "literal",
           "fieldType": "string",
-          "expression": "const s = $vars.start.output;\nconst sel = $vars.selectTests.output || { total: 0, skipped: 0, selected: [] };\nconst rows = ($vars.investigate.output || []).map(i => { const o = (i && i.recordResult && i.recordResult.output) || i; return o && o.title ? o : null; }).filter(Boolean);\nconst head = `:robot_face: *VmAgent investigated ${rows.length} of ${sel.total} ${s.projects || 'studio-*'} failures* (<${s.runUrl}|run ${s.runId}>)` + (s.reportUrl ? ` · <${s.reportUrl}|report>` : '');\nif (sel.total === 0) return { text: `:robot_face: VmAgent: no ${s.projects || 'studio-*'} failures to investigate in <${s.runUrl}|run ${s.runId}>.` };\nconst spec = (f) => String(f).split('/').pop();\nconst lines = rows.map(r => {\n  if (r.failed) return `• \\`${spec(r.file)} › ${r.title}\\` — investigation faulted: ${r.errorMessage}`;\n  const parts = [r.reproduced ? 'reproduced' : 'not reproduced', r.fixVerified ? 'fix verified' : 'no verified fix', r.prUrl ? `<${r.prUrl}|draft PR>` : 'no PR'];\n  return `• \\`${spec(r.file)} › ${r.title}\\` — ${parts.join(', ')}` + (r.hypothesis ? `\\n    _${r.hypothesis.slice(0, 300)}_` : '');\n});\nif (sel.skipped > 0) lines.push(`_${sel.skipped} not investigated (maxTests=${s.maxTests})_`);\nreturn { text: [head, ...lines].join('\\n') };\n"
+          "expression": "const s = $vars.start.output;\nconst sel = $vars.selectTests.output || { total: 0, skipped: 0, selected: [] };\nconst rows = ($vars.investigate.output || []).map(i => { const o = (i && i.recordResult && i.recordResult.output) || i; return o && o.title ? o : null; }).filter(Boolean);\nconst nTests = sel.totalTests || sel.total;\nconst head = `:robot_face: *VmAgent investigated ${rows.length} of ${sel.total} ${s.projects || 'studio-*'} failure groups* (${nTests} tests, <${s.runUrl}|run ${s.runId}>)` + (s.reportUrl ? ` · <${s.reportUrl}|report>` : '');\nif (sel.total === 0) return { text: `:robot_face: VmAgent: no ${s.projects || 'studio-*'} failures to investigate in <${s.runUrl}|run ${s.runId}>.` };\nconst spec = (f) => String(f).split('/').pop();\nconst lines = rows.map(r => {\n  if (r.failed) return `• \\`${spec(r.file)} › ${r.title}\\` — investigation faulted: ${r.errorMessage}`;\n  const parts = [r.reproduced ? 'reproduced' : 'not reproduced', r.fixVerified ? 'fix verified' : 'no verified fix', r.prUrl ? `<${r.prUrl}|draft PR>` : 'no PR'];\n  const sib = (r.siblings && r.siblings.length) ? ` (+${r.siblings.length} same cause: ${r.siblings.map(x => '`' + x + '`').join(', ')})` : '';\n  return `• \\`${spec(r.file)} › ${r.title}\\`${sib} — ${parts.join(', ')}` + (r.hypothesis ? `\\n    _${r.hypothesis.slice(0, 300)}_` : '');\n});\nif (sel.skipped > 0) lines.push(`_${sel.skipped} not investigated (maxTests=${s.maxTests})_`);\nreturn { text: [head, ...lines].join('\\n') };\n"
         }
       },
       "outputs": {
@@ -1500,6 +1515,12 @@
                   },
                   "testCommand": {
                     "type": "string"
+                  },
+                  "siblings": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
                   }
                 }
               }
@@ -1508,6 +1529,9 @@
               "type": "number"
             },
             "total": {
+              "type": "number"
+            },
+            "totalTests": {
               "type": "number"
             }
           }
@@ -1680,6 +1704,12 @@
             },
             "errorMessage": {
               "type": "string"
+            },
+            "siblings": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
             }
           }
         },
