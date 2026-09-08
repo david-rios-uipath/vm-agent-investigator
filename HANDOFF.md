@@ -1,8 +1,8 @@
 # vm-agent — handoff
 
-Last updated 2026-09-04 ~19:00 UTC. Written for an agent or human with no prior context.
+Last updated 2026-09-08 ~19:45 UTC. Written for an agent or human with no prior context.
 Read this file, then `FINDINGS-uip.md` (CLI/platform traps — several will bite you), then
-`DESIGN-phase-runner.md` (the restructure that is now implemented but unreleased).
+`DESIGN-phase-runner.md` (the restructure that is now implemented and released).
 
 ## What this is
 
@@ -269,10 +269,103 @@ Open:
 - `vm-agent 11` deployment is wedged (three Maestro jobs `Terminating` after `jobs stop --strategy Kill`). Uninstall
   it once Orchestrator clears them; report the Kill behaviour to the Maestro team.
 - Slack "edit one message" request: the connector has no update op; needs an HTTP `chat.update` with a token asset.
-- vsix projects: filter is `projects="studio-*"`; VmAgent cannot reproduce vsix yet.
+- vsix runs on the VM now (see "vsix projects" below); `projects` defaults to `studio-*,vsix-*`.
 - `maxTests` stays 1 until the pool grows; also verify iteration scoping before raising it.
 - Slack renders `<`/`>` from the hypothesis escaped (`&lt;nav&gt;`); strip them in `summarize`.
 - VmAgent still reproduced the Map-operation failure on `develop` after #3758 merged; #3758 may not cover it.
+
+## vsix projects (2026-09-08)
+
+The vsix Playwright projects drive a real VS Code through `e2e/vsix/launcher.ts` rather than a
+browser. They run on this pool.
+
+**A window is not required, and that was the one thing that could have killed this.** Jobs run as
+`NT AUTHORITY\LOCAL SERVICE` in session 0: a headed VS Code never gets a window
+(`MainWindowHandle` stays 0) and `Graphics.CopyFromScreen` throws "The handle is invalid". But
+Playwright attaches over the debug port and records via CDP screencast, neither of which needs a
+desktop - `--remote-debugging-port` exposes the `workbench.html` target and `Page.captureScreenshot`
+returns a real painted frame. Established with `vm/probes/vsix-desktop.ps1` and
+`vm/probes/vsix-cdp.ps1`, run through the new **`probe-script.sh <file.ps1>`**, which sends a local
+script to `vm-exec-vm` inline - no push, no pack, no deploy. That script is the cheapest way to ask
+the VM a question.
+
+What the runner does for a vsix command:
+
+| step | where |
+|---|---|
+| drop the platform/host segments (`vsix-staging-linux` -> `vsix-staging`) | `Resolve-TestCommand`, prologue |
+| pin `HOME`/`USERPROFILE` to `C:\vm-agent\home` | `Set-VsixHome` |
+| install `@uipath/cli` through the repo's `.npmrc` | `Ensure-UipCli` |
+| write `<home>\.uipath\.auth` by running the repo's own `.github/scripts/vsix-interactive-login.mjs` | `Ensure-VsixAuth` |
+| build the extension before the repro test, and after the fixer's patch | `Build-Vsix` |
+
+- **The platform segment is dropped for execution and kept as evidence.** It names the runner that
+  produced the failure and this VM is a different one, but "red on Linux, green on macOS" is the
+  difference between a product bug and a runner-environment one. `evidence.json` carries
+  `requestedProject` and the investigator prompt states it.
+- **`Ensure-VsixAuth` picks the environment from the project name** - `vsix-staging` logs into
+  `ap4ao`/`euTenant`, `vsix-alpha` into `experiencestest`/`DefaultTenant` - and re-logs in when the
+  environment changes, since one credential file cannot serve both.
+- **Verify has no dev server on this path.** `studio-local` exists because `studio-alpha` loads a
+  deployed bundle; a vsix run already launches the extension built from the working tree, so the
+  fix phase builds after the patch and runs the command unchanged. The fixer is told which of the
+  two shapes it is looking at (`{{VERIFY_NOTE}}`).
+- **`Build-Vsix` clears `packages/vsix/.mfe-cache` and retries once.** `fetch-mfe-assets.mjs` stages
+  through renames; one EPERM leaves that cache in a state every later build trips over - the next
+  build fails at `rebuildCache`'s rename, the one after at `stageDestination`'s, so it reads as
+  permanent. Two builds failed that way on the pool VM and a third succeeded with nothing changed
+  but the cache removed. The single-VM pool means a poisoned cache outlives the job that made it.
+- **`probe-phase.sh` takes `TIMEOUT_MINUTES`.** A cold vsix repro outlasts the 15-minute default and
+  returns `exitCode 124` having proven nothing.
+
+Two ci-history bugs came out of this, both of which had been quietly wrong:
+
+- **Windows runners print ASCII marks.** Playwright's list reporter emits `ok`/`x` where the terminal
+  cannot do Unicode. The mark regex took only the checkmark and ballot-X, so **every Windows job had
+  always parsed as "the spec never ran there"** - invisible while the only jobs read were the Linux
+  studio shards.
+- **The job filter missed vsix jobs entirely.** Studio shards are `E2E (studio-alpha) [2/5]`, but a
+  vsix job carries its platform inside the same parens: `E2E (vsix-alpha, Linux)`. Matching only
+  `($project)` found nothing, so every vsix spec classified as `absent` and the investigator got no
+  history at all.
+
+Verdicts are now computed per platform as well as per night, printed when they disagree, and
+summarised as a `PLATFORM SPLIT` line. `absent` does not count as disagreement - counting it made the
+split fire on 8 of 8 runs, and a signal that always fires is noise.
+
+### Proven end to end, `vsix-pkg-3` (2026-09-08)
+
+`e2e/specs/vsix/package-nested-solution.spec.ts:48` on `vsix-alpha-windows`, one phase at a time
+through `probe-phase.sh`, no flow and no deployment:
+
+- `repro` - reproduced from CI evidence. History after the two fixes above:
+  `09-08 failed (Linux failed, macOS flaky, Windows failed); 09-07 failed (Linux failed, macOS
+  passed, Windows failed); 09-06 passed; 09-05 failed (Linux passed, macOS passed, Windows failed)`.
+  Windows broke two nights before Linux did.
+- `investigate` - four passes, 13 min, $4.51. Cause: `UiPath: Package` is contributed to the palette
+  only under `when: "uipath.authenticated"` (`packages/vsix/package.json:531-534`), false until a
+  background `uip` probe succeeds (`authService.ts:940, 954-984`); on nights carrying identity-429s
+  the row never renders and the wait at `VsixWorkbenchPage.ts:140` times out. The 429s come from
+  `playwright-vsix.yml:126-133` signing one account in from three OS legs at once. It refuted its own
+  Pass 3 claim in Pass 4 and left the Windows-only 09-05 night explicitly unexplained.
+- `fix` - `fixVerified=true` in 11 min, $2.29: patch -> build (cache recovery fired) -> real VS Code
+  run -> `1 passed (2.1m)`.
+
+**A green verify is not evidence the fix repairs the nightly.** The established cause is an identity
+429 that cannot occur on the VM, which logs in fresh as a single leg. It means the patch is sound and
+the spec passes; the fixer said `confidence: medium` and that is the honest reading.
+
+Two defects for flow-workbench found along the way, both real independent of this tooling:
+
+- `e2e/vsix/launcher.ts:191` reads the POSIX `process.env.HOME` for the `seedAuth` copy, so it is a
+  silent no-op on Windows. The same repo resolves the same path correctly with `os.homedir()` at
+  `package-nested-solution.spec.ts:3`. Not a cause - the CLI has an `os.homedir()` fallback - but a
+  portability defect.
+- The three OS legs share one tester account with no `max-parallel`, which is the environment cause
+  behind the platform split.
+
+Still unproven for vsix: the `pr` phase (platform-agnostic and proven for studio), and any run
+driven by the flow rather than by `probe-phase.sh`.
 
 ### First deployed run (1.1.0, 2026-09-07) — blocked on the robot pool, not the flow
 
@@ -400,7 +493,8 @@ uip or bucket-files list be6369c7-02a4-4b80-957b-e95d06177692 --folder-path "e2e
 ```
 
 Same trick generalises: any single flow step whose script you want to test can be run straight
-through `vm-exec-vm` this way.
+through `vm-exec-vm` this way - and `./probe-script.sh <file.ps1> [minutes]` does it for a script
+that is not a flow node at all, sending your working tree inline with no push.
 
 ## Verify now runs against a local studio bundle (1.0.24, unreleased)
 
