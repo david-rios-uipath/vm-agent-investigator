@@ -2,17 +2,89 @@
   "id": "5567126c-2bce-4e36-9246-ce0a46278c73",
   "version": "1.9",
   "name": "NightlyOrchestrator",
+  "runtime": "maestro",
   "nodes": [
     {
       "id": "start",
       "type": "core.trigger.manual",
       "typeVersion": "1.0",
       "display": {
-        "label": "Manual trigger"
+        "label": "Manual trigger",
+        "icon": "play"
       },
       "inputs": {
         "entryPointId": "e9d564fb-68e7-4326-8f6f-b9d9a8c5d326",
         "isDefaultEntryPoint": true
+      },
+      "outputs": {
+        "output": {
+          "type": "object",
+          "description": "Data passed when manually triggering the process.",
+          "source": "null",
+          "var": "output",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "runId": {
+                "type": "string"
+              },
+              "sha": {
+                "type": "string"
+              },
+              "runUrl": {
+                "type": "string"
+              },
+              "reportUrl": {
+                "type": "string"
+              },
+              "slackTs": {
+                "type": "string"
+              },
+              "projects": {
+                "type": "string"
+              },
+              "repoUrl": {
+                "type": "string"
+              },
+              "branch": {
+                "type": "string"
+              },
+              "claudeModel": {
+                "type": "string"
+              },
+              "resumeRunId": {
+                "type": "string"
+              },
+              "maxTests": {
+                "type": "number"
+              },
+              "maxFixAttempts": {
+                "type": "number"
+              },
+              "failedTests": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "project": {
+                      "type": "string"
+                    },
+                    "file": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            },
+            "additionalProperties": true
+          }
+        }
       }
     },
     {
@@ -28,7 +100,7 @@
         "script": {
           "type": "literal",
           "fieldType": "string",
-          "expression": "const s = $vars.start.output;\nconst globs = String(s.projects || 'studio-*').split(',').map(g => g.trim()).filter(Boolean);\nconst matches = (p) => globs.some(g => new RegExp('^' + g.split('*').map(x => x.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')).join('.*') + '$').test(p));\n// One row per distinct test (same file+title across shards/platforms collapses).\nconst seen = new Set();\nconst rows = [];\nfor (const t of (s.failedTests || [])) {\n  if (!t || !matches(t.project || '')) continue;\n  const key = t.file + '::' + t.title;\n  if (seen.has(key)) continue;\n  seen.add(key);\n  rows.push(t);\n}\nrows.sort((a, b) => (a.file + a.title).localeCompare(b.file + b.title));\n// Tests whose first error line matches (digits/hashes ignored) share a cause. A named `Error:` groups\n// across spec files (shared infra failure); a bare timeout/locator message only within its file.\nconst norm = (e) => String(e || '').replace(/\\x1b\\[[0-9;]*m/g, '').split('\\n').map(l => l.trim()).find(Boolean) || '';\nconst causeKey = (t) => {\n  const n = norm(t.error).replace(/[0-9a-f]{8,}/gi, '#').replace(/\\d+/g, '#').slice(0, 160);\n  if (!n) return t.file + '::title:' + t.title;\n  return /^\\w*Error: /.test(n) && !/^TimeoutError/.test(n) ? 'err::' + n : t.file + '::' + n;\n};\nconst groups = [];\nconst byKey = new Map();\nfor (const t of rows) {\n  const k = causeKey(t);\n  const g = byKey.get(k);\n  if (g) { g.siblings.push(g.file === t.file ? t.title : `${t.file.split('/').pop()} › ${t.title}`); continue; }\n  const ng = { ...t, siblings: [] }; byKey.set(k, ng); groups.push(ng);\n}\n// Biggest cause first: it explains the most red.\ngroups.sort((a, b) => b.siblings.length - a.siblings.length);\nconst grep = (title) => String(title).replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&').replace(/\"/g, '\\\\\"');\nconst groups2 = groups.map(t => ({\n  project: t.project, file: t.file, title: t.title, error: t.error || '', siblings: t.siblings,\n  testCommand: `corepack pnpm exec playwright test --config e2e/playwright.config.ts e2e/${t.file} --project ${t.project} --grep \"${grep(t.title)}\"`\n}));\nreturn { groups: groups2, total: groups2.length, totalTests: rows.length };"
+          "expression": "const s = $vars.start.output;\nconst globs = String(s.projects || 'studio-*,vsix-*').split(',').map(g => g.trim()).filter(Boolean);\nconst matches = (p) => globs.some(g => new RegExp('^' + g.split('*').map(x => x.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')).join('.*') + '$').test(p));\n// One row per distinct test (same file+title across shards/platforms collapses).\nconst seen = new Set();\nconst rows = [];\nfor (const t of (s.failedTests || [])) {\n  if (!t || !matches(t.project || '')) continue;\n  const key = t.file + '::' + t.title;\n  if (seen.has(key)) continue;\n  seen.add(key);\n  rows.push(t);\n}\nrows.sort((a, b) => (a.file + a.title).localeCompare(b.file + b.title));\n// Tests whose first error line matches (digits/hashes ignored) share a cause. A named `Error:` groups\n// across spec files (shared infra failure); a bare timeout/locator message only within its file.\nconst norm = (e) => String(e || '').replace(/\\x1b\\[[0-9;]*m/g, '').split('\\n').map(l => l.trim()).find(Boolean) || '';\nconst causeKey = (t) => {\n  const n = norm(t.error).replace(/[0-9a-f]{8,}/gi, '#').replace(/\\d+/g, '#').slice(0, 160);\n  if (!n) return t.file + '::title:' + t.title;\n  return /^\\w*Error: /.test(n) && !/^TimeoutError/.test(n) ? 'err::' + n : t.file + '::' + n;\n};\nconst groups = [];\nconst byKey = new Map();\nfor (const t of rows) {\n  const k = causeKey(t);\n  const g = byKey.get(k);\n  if (g) { g.siblings.push(g.file === t.file ? t.title : `${t.file.split('/').pop()} › ${t.title}`); continue; }\n  const ng = { ...t, siblings: [] }; byKey.set(k, ng); groups.push(ng);\n}\n// Biggest cause first: it explains the most red.\ngroups.sort((a, b) => b.siblings.length - a.siblings.length);\nconst grep = (title) => String(title).replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&').replace(/\"/g, '\\\\\"');\nconst groups2 = groups.map(t => ({\n  project: t.project, file: t.file, title: t.title, error: t.error || '', siblings: t.siblings,\n  testCommand: `corepack pnpm exec playwright test --config e2e/playwright.config.ts e2e/${t.file} --project ${t.project} --grep \"${grep(t.title)}\"`\n}));\nreturn { groups: groups2, total: groups2.length, totalTests: rows.length };"
         }
       },
       "outputs": {
@@ -92,20 +164,155 @@
       "typeVersion": "2.4",
       "display": {
         "label": "Investigate each test",
-        "subLabel": "parallel, one VmAgent per test"
+        "subLabel": "parallel, one VmAgent per test",
+        "icon": "repeat"
       },
       "inputs": {
         "collection": "=js:$vars.pickTests.output['selected']",
         "parallel": true
+      },
+      "outputs": {
+        "currentItem": {
+          "type": "any",
+          "description": "The current item being iterated in the loop",
+          "scope": "internal",
+          "source": "=loopContext.currentItem",
+          "var": "currentItem"
+        },
+        "currentIteration": {
+          "type": "number",
+          "description": "The current iteration number (1-based)",
+          "scope": "internal",
+          "source": "=loopContext.currentIteration",
+          "var": "currentIteration"
+        },
+        "collection": {
+          "type": "array",
+          "description": "The collection being iterated over",
+          "scope": "internal",
+          "source": "=loopContext.collection",
+          "var": "collection"
+        },
+        "output": {
+          "type": "array",
+          "description": "Aggregated results from all loop iterations",
+          "scope": "external",
+          "source": "=loopContext.output",
+          "var": "output",
+          "schema": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "project": {
+                  "type": "string"
+                },
+                "file": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "errorMessage": {
+                  "type": "string"
+                },
+                "hypothesis": {
+                  "type": "string"
+                },
+                "prUrl": {
+                  "type": "string"
+                },
+                "reproduced": {
+                  "type": "boolean"
+                },
+                "fixVerified": {
+                  "type": "boolean"
+                },
+                "failed": {
+                  "type": "boolean"
+                },
+                "siblings": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "relatedPrs": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "state": {
+                        "type": "string"
+                      },
+                      "url": {
+                        "type": "string"
+                      },
+                      "number": {
+                        "type": "number"
+                      }
+                    },
+                    "additionalProperties": true
+                  }
+                },
+                "recordResult": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              },
+              "additionalProperties": true
+            }
+          }
+        },
+        "error": {
+          "type": "object",
+          "description": "Error information if the node fails",
+          "schema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "type": "object",
+            "required": [
+              "code",
+              "message",
+              "detail",
+              "category",
+              "status"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Error code as a string"
+              },
+              "message": {
+                "type": "string",
+                "description": "High-level error message"
+              },
+              "detail": {
+                "type": "string",
+                "description": "Detailed error description"
+              },
+              "category": {
+                "type": "string",
+                "description": "Error category"
+              },
+              "status": {
+                "type": "integer",
+                "description": "HTTP status code"
+              }
+            },
+            "additionalProperties": false
+          },
+          "source": "=Error",
+          "var": "error"
+        }
       }
     },
     {
       "id": "callVmAgent",
       "type": "uipath.core.flow.4a7879cf-7494-4ada-9e83-ea487a4b55cb",
       "typeVersion": "1.0.0",
-      "parentId": "investigate",
       "display": {
-        "label": "VmAgent"
+        "label": "VmAgent",
+        "icon": "flow-project"
       },
       "inputs": {
         "repoUrl": {
@@ -190,15 +397,49 @@
           "type": "object",
           "description": "Error information if the flow fails",
           "source": "=Error",
-          "var": "error"
+          "var": "error",
+          "schema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "type": "object",
+            "required": [
+              "code",
+              "message",
+              "detail",
+              "category",
+              "status"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Error code as a string"
+              },
+              "message": {
+                "type": "string",
+                "description": "High-level error message"
+              },
+              "detail": {
+                "type": "string",
+                "description": "Detailed error description"
+              },
+              "category": {
+                "type": "string",
+                "description": "Error category"
+              },
+              "status": {
+                "type": "integer",
+                "description": "HTTP status code"
+              }
+            },
+            "additionalProperties": false
+          }
         }
-      }
+      },
+      "parentId": "investigate"
     },
     {
       "id": "recordResult",
       "type": "core.action.script",
       "typeVersion": "1.1",
-      "parentId": "investigate",
       "display": {
         "label": "Record result",
         "icon": "code"
@@ -281,7 +522,8 @@
           "source": "=Error",
           "var": "error"
         }
-      }
+      },
+      "parentId": "investigate"
     },
     {
       "id": "summarize",
@@ -289,14 +531,14 @@
       "typeVersion": "1.1",
       "display": {
         "label": "Summarize",
-        "subLabel": "build Slack mrkdwn digest",
+        "subLabel": "build Slack markdown digest",
         "icon": "code"
       },
       "inputs": {
         "script": {
           "type": "literal",
           "fieldType": "string",
-          "expression": "const s = $vars.start.output;\nconst sel = $vars.pickTests.output || { total: 0, skipped: 0, selected: [], covered: [] };\nconst rows = ($vars.investigate.output || []).map(i => { const o = (i && i.recordResult && i.recordResult.output) || i; return o && o.title ? o : null; }).filter(Boolean);\nconst nTests = sel.totalTests || sel.total;\nconst head = `:robot_face: *VmAgent investigated ${rows.length} of ${sel.total} ${String(s.projects || 'studio-*').replace(/-?\\*/g, '')} failure groups* (${nTests} tests, <${s.runUrl}|run ${s.runId}>)` + (s.reportUrl ? ` · <${s.reportUrl}|report>` : '');\nif (sel.total === 0) return { text: `:robot_face: VmAgent: no ${String(s.projects || 'studio-*').replace(/-?\\*/g, '')} failures to investigate in <${s.runUrl}|run ${s.runId}>.` };\nconst spec = (f) => String(f).split('/').pop();\nconst lines = rows.map(r => {\n  if (r.failed) return `• \\`${spec(r.file)} › ${r.title}\\` — investigation faulted: ${r.errorMessage}`;\n  const parts = [r.reproduced ? 'reproduced' : 'not reproduced', r.fixVerified ? 'fix verified' : 'no verified fix', r.prUrl ? `<${r.prUrl}|draft PR>` : 'no PR'];\n  for (const pr of (r.relatedPrs || [])) parts.push(`related ${pr.state === 'merged' ? 'merged' : 'open'} <${pr.url}|PR #${pr.number}>`);\n  const sib = (r.siblings && r.siblings.length) ? ` (+${r.siblings.length} same cause: ${r.siblings.map(x => '`' + x + '`').join(', ')})` : '';\n  return `• \\`${spec(r.file)} › ${r.title}\\`${sib} — ${parts.join(', ')}` + (r.hypothesis ? `\\n    _${r.hypothesis.slice(0, 300)}_` : '');\n});\nfor (const c of (sel.covered || [])) {\n  const sib = (c.siblings && c.siblings.length) ? ` (+${c.siblings.length} same cause)` : '';\n  const verb = c.coveredBy.state === 'merged' ? 'likely already fixed by merged' : 'not investigated: open';\n  lines.push(`• \\`${spec(c.file)} › ${c.title}\\`${sib} — ${verb} <${c.coveredBy.url}|PR #${c.coveredBy.number}> (touches \\`${c.coveredBy.file.split('/').pop()}\\`)`);\n}\nif (sel.skipped > 0) lines.push(`_${sel.skipped} not investigated (maxTests=${s.maxTests})_`);\nreturn { text: [head, ...lines].join('\\n') };\n"
+          "expression": "const s = $vars.start.output;\nconst sel = $vars.pickTests.output || { total: 0, totalTests: 0, skipped: 0, selected: [], covered: [] };\nconst rows = ($vars.investigate.output || []).map(i => { const o = (i && i.recordResult && i.recordResult.output) || i; return o && o.title ? o : null; }).filter(Boolean);\nconst nTests = sel.totalTests || sel.total;\nconst head = `:robot_face: *VmAgent investigated ${rows.length} of ${sel.total} ${String(s.projects || 'studio-*,vsix-*').replace(/-?\\*/g, '').replace(/,/g, '/')} failure groups* (${nTests} tests, <${s.runUrl}|run ${s.runId}>)` + (s.reportUrl ? ` · <${s.reportUrl}|report>` : '');\nif (sel.total === 0) return { text: `:robot_face: VmAgent: no ${String(s.projects || 'studio-*,vsix-*').replace(/-?\\*/g, '').replace(/,/g, '/')} failures to investigate in <${s.runUrl}|run ${s.runId}>.` };\nconst spec = (f) => String(f).split('/').pop();\nconst lines = rows.map(r => {\n  if (r.failed) return `• \\`${spec(r.file)} › ${r.title}\\` — investigation faulted: ${r.errorMessage}`;\n  const parts = [r.reproduced ? 'reproduced' : 'not reproduced', r.fixVerified ? 'fix verified' : 'no verified fix', r.prUrl ? `<${r.prUrl}|draft PR>` : 'no PR'];\n  for (const pr of (r.relatedPrs || [])) parts.push(`related ${pr.state === 'merged' ? 'merged' : 'open'} <${pr.url}|PR #${pr.number}>`);\n  const sib = (r.siblings && r.siblings.length) ? ` (+${r.siblings.length} same cause: ${r.siblings.map(x => '`' + x + '`').join(', ')})` : '';\n  return `• \\`${spec(r.file)} › ${r.title}\\`${sib} — ${parts.join(', ')}` + (r.hypothesis ? `\\n    _${r.hypothesis.slice(0, 300)}_` : '');\n});\nfor (const c of (sel.covered || [])) {\n  const sib = (c.siblings && c.siblings.length) ? ` (+${c.siblings.length} same cause)` : '';\n  const verb = c.coveredBy.state === 'merged' ? 'likely already fixed by merged' : 'not investigated: open';\n  lines.push(`• \\`${spec(c.file)} › ${c.title}\\`${sib} — ${verb} <${c.coveredBy.url}|PR #${c.coveredBy.number}> (touches \\`${c.coveredBy.file.split('/').pop()}\\`)`);\n}\nif (sel.skipped > 0) lines.push(`_${sel.skipped} not investigated (maxTests=${s.maxTests})_`);\nreturn { text: [head, ...lines].join('\\n') };\n"
         }
       },
       "outputs": {
@@ -331,38 +573,96 @@
         "subLabel": "",
         "icon": "circle-check"
       },
-      "inputs": {},
-      "outputs": {}
+      "inputs": {}
     },
     {
       "id": "replyInSlackThread1",
       "type": "uipath.connector.uipath-salesforce-slack.send-message-to-channel",
       "typeVersion": "1.0.0",
       "display": {
-        "label": "Reply in Slack thread"
+        "label": "Reply in Slack thread",
+        "subLabel": "",
+        "icon": "https://alpha.uipath.com/elements_/scaleunit_/3854d037-4ab5-4881-909b-968c433f6d88/v3/element/elements/uipath-salesforce-slack/image"
       },
       "inputs": {
         "detail": {
           "connector": "uipath-salesforce-slack",
           "connectionId": "ccf82d4b-3c2a-492f-bf8f-939b565366a2",
           "connectionResourceId": "ccf82d4b-3c2a-492f-bf8f-939b565366a2",
-          "connectionFolderKey": "0b28296b-1f4a-4ea9-a3d5-8b0abaac1cf0",
+          "connectionFolderKey": null,
           "method": "POST",
           "endpoint": "/send_message_to_channel_v2",
-          "bodyParameters": {
-            "channel": "C0AH25MT3L5",
-            "messageToSend": "=js:$vars.summarize.output['text']",
-            "thread_ts": "=js:$vars.start.output.slackTs || undefined",
-            "mrkdwn": true
-          },
           "queryParameters": {
             "send_as": "user"
           },
+          "bodyParameters": {
+            "channel": "C0AH25MT3L5",
+            "messageToSend": "=js:($vars.summarize.output['text'])",
+            "thread_ts": "=js:($vars.start.output.slackTs || undefined)",
+            "mrkdwn": true
+          },
+          "objectName": "send_message_to_channel_v2",
+          "configuration": "=jsonString:{\"essentialConfiguration\":{\"connectorVersion\":\"2.14.8\",\"executionType\":null,\"scriptRef\":null,\"customFieldsRequestDetails\":null,\"instanceParameters\":{\"connectorKey\":\"uipath-salesforce-slack\",\"objectName\":\"send_message_to_channel_v2\",\"httpMethod\":\"POST\",\"activityType\":\"Curated\",\"version\":\"1.0.0\",\"supportsStreaming\":false,\"subType\":\"standard\"},\"objectName\":\"send_message_to_channel_v2\",\"operation\":\"create\",\"packageVersion\":\"1.0.0\",\"httpMethod\":\"POST\",\"path\":\"/send_message_to_channel_v2\",\"unifiedTypesCompatible\":true,\"savedJitInputFieldId\":\"in_send_message_to_channel_v2\"},\"optionalConfiguration\":{\"_textBlocks\":[{\"name\":\"defaultMessage\",\"text\":\"Up to 5 button actions, separated by semicolons. Each button is comma-separated: action ID (unique, required), action name (required), style (primary/danger), confirmation title, confirmation text, confirm ok title, confirm deny title.\\n\\nExample: approve,Approve,primary;reject,Reject,danger and with confirmation dialog: approve,Approve,primary,Confirm,Are you sure?,Yes,No;reject,Reject,danger. Refer activity help docs for more info\"},{\"name\":\"defaultMessage\",\"text\":\"Displays name-value pairs in a two-column layout. Provide field names and values separated by a semicolon.\\n\\nExample: Name: John Doe; Age: 30; Location: New York.\"}],\"objectActions\":[],\"connectorName\":\"Slack\",\"agentIdentity\":null,\"maxPageSize\":1000,\"jobArguments\":null,\"isAutopilotInvalidConfig\":false,\"additionalHeaders\":null,\"cachedLookupValues\":[[\"send_as\",[{\"id\":\"user\",\"displayColumns\":[\"User\",\"user\"],\"stringFormatDisplayColumns\":\"{0}\"}]],[\"channel\",[{\"id\":\"C0AH25MT3L5\",\"displayColumns\":[\"flow-dev-frontend\",\"C0AH25MT3L5\"],\"stringFormatDisplayColumns\":\"\"}]]],\"cachedBrowserItems\":[],\"cachedPropertyMappings\":[],\"primaryKeys\":[],\"objectDisplayName\":\"Send message to channel\",\"baseObject\":null,\"eventMode\":null,\"eventOperation\":null,\"language\":\"en-US\",\"hasBreakingChanges\":false,\"fieldsContainer\":{\"outputTypeDefinition\":\"{\\\"app_id\\\":string;\\\"blocks\\\":{\\\"block_id\\\":string;\\\"text\\\":{\\\"emoji\\\":boolean;\\\"text\\\":string;\\\"type\\\":string};\\\"type\\\":string}[];\\\"channel\\\":string;\\\"icons\\\":{\\\"emoji\\\":string};\\\"message\\\":{\\\"app_id\\\":string;\\\"attachments\\\":{\\\"actions\\\":{\\\"confirm\\\":{\\\"dismiss_text\\\":string;\\\"ok_text\\\":string;\\\"text\\\":string;\\\"title\\\":string};\\\"id\\\":string;\\\"name\\\":string;\\\"style\\\":string;\\\"text\\\":string;\\\"type\\\":string;\\\"value\\\":string}[];\\\"callback_id\\\":string;\\\"color\\\":string;\\\"fallback\\\":string;\\\"id\\\":number;\\\"text\\\":string}[];\\\"blocks\\\":{\\\"block_id\\\":string;\\\"text\\\":{\\\"emoji\\\":boolean;\\\"text\\\":string;\\\"type\\\":string};\\\"type\\\":string}[];\\\"bot_id\\\":string;\\\"bot_profile\\\":{\\\"app_id\\\":string;\\\"deleted\\\":boolean;\\\"icons\\\":{\\\"image_36\\\":string;\\\"image_48\\\":string;\\\"image_72\\\":string};\\\"id\\\":string;\\\"name\\\":string;\\\"team_id\\\":string;\\\"updated\\\":number};\\\"icons\\\":{\\\"emoji\\\":string};\\\"metadata\\\":{\\\"event_payload\\\":{\\\"id\\\":string;\\\"title\\\":string};\\\"event_type\\\":string};\\\"root\\\":{\\\"app_id\\\":string;\\\"blocks\\\":{\\\"block_id\\\":string;\\\"elements\\\":{\\\"elements\\\":{\\\"text\\\":string;\\\"type\\\":string}[];\\\"type\\\":string}[];\\\"type\\\":string}[];\\\"bot_id\\\":string;\\\"icons\\\":{\\\"emoji\\\":string};\\\"is_locked\\\":boolean;\\\"latest_reply\\\":string;\\\"metadata\\\":{\\\"event_type\\\":string};\\\"reply_count\\\":number;\\\"reply_users\\\":string[];\\\"reply_users_count\\\":number;\\\"subscribed\\\":boolean;\\\"subtype\\\":string;\\\"text\\\":string;\\\"thread_ts\\\":string;\\\"ts\\\":string;\\\"type\\\":string;\\\"username\\\":string};\\\"subtype\\\":string;\\\"team\\\":string;\\\"text\\\":string;\\\"thread_ts\\\":string;\\\"ts\\\":string;\\\"type\\\":string;\\\"user\\\":string;\\\"username\\\":string};\\\"metadata\\\":{\\\"event_payload\\\":{\\\"id\\\":string;\\\"title\\\":string};\\\"event_type\\\":string};\\\"ok\\\":boolean;\\\"response_metadata\\\":{\\\"warnings\\\":string[]};\\\"root\\\":{\\\"app_id\\\":string;\\\"blocks\\\":{\\\"block_id\\\":string;\\\"elements\\\":{\\\"elements\\\":{\\\"text\\\":string;\\\"type\\\":string}[];\\\"type\\\":string}[];\\\"type\\\":string}[];\\\"bot_id\\\":string;\\\"icons\\\":{\\\"emoji\\\":string};\\\"is_locked\\\":boolean;\\\"latest_reply\\\":string;\\\"metadata\\\":{\\\"event_type\\\":string};\\\"reply_count\\\":number;\\\"reply_users\\\":string[];\\\"reply_users_count\\\":number;\\\"subscribed\\\":boolean;\\\"subtype\\\":string;\\\"text\\\":string;\\\"thread_ts\\\":string;\\\"ts\\\":string;\\\"type\\\":string;\\\"username\\\":string};\\\"subtype\\\":string;\\\"thread_ts\\\":string;\\\"ts\\\":string;\\\"username\\\":string}\",\"outputJsonSchema\":{\"$schema\":\"http://json-schema.org/draft-07/schema#\",\"type\":\"object\",\"properties\":{\"app_id\":{\"title\":\"App ID\",\"type\":\"string\"},\"blocks[*]\":{\"title\":\"Blocks\",\"type\":\"array\",\"items\":{\"$ref\":\"#/definitions/blocks[*]\"}},\"channel\":{\"title\":\"Channel name/id\",\"type\":\"string\",\"description\":\"Select the channel from the dropdown or pass channel ID. ID can be retrieved from Slack →  Right click the channel → View channel details → Copy channel ID (under “About”)\"},\"icons\":{\"title\":\"Icons\",\"$ref\":\"#/definitions/icons\"},\"message\":{\"title\":\"Message\",\"$ref\":\"#/definitions/message\"},\"metadata\":{\"title\":\"Metadata\",\"$ref\":\"#/definitions/metadata\"},\"ok\":{\"title\":\"Ok\",\"type\":\"boolean\"},\"response_metadata\":{\"title\":\"Response metadata\",\"$ref\":\"#/definitions/response_metadata\"},\"root\":{\"title\":\"Root\",\"$ref\":\"#/definitions/root\"},\"subtype\":{\"title\":\"Subtype\",\"type\":\"string\"},\"thread_ts\":{\"title\":\"Message timestamp\",\"type\":\"string\",\"description\":\"The ID (timestamp) of the message sent\"},\"ts\":{\"title\":\"Message timestamp\",\"type\":\"string\",\"description\":\"The ID (timestamp) of the message sent\"},\"username\":{\"title\":\"Bot name\",\"type\":\"string\",\"description\":\"Only supported for “Bot”. Customize the bot name while sending messages else ‘UiPath’ will be defaulted\"}},\"definitions\":{\"blocks[*]\":{\"type\":\"object\",\"properties\":{\"block_id\":{\"title\":\"Blocks block ID\",\"type\":\"string\"},\"text\":{\"title\":\"Text\",\"$ref\":\"#/definitions/blocks[*]Text\"},\"type\":{\"title\":\"Blocks type\",\"type\":\"string\"}}},\"blocks[*]Text\":{\"type\":\"object\",\"properties\":{\"emoji\":{\"title\":\"Blocks text emoji\",\"type\":\"boolean\"},\"text\":{\"title\":\"Blocks text text\",\"type\":\"string\"},\"type\":{\"title\":\"Type\",\"type\":\"string\"}}},\"icons\":{\"type\":\"object\",\"properties\":{\"emoji\":{\"title\":\"Icons emoji\",\"type\":\"string\"}}},\"message\":{\"type\":\"object\",\"properties\":{\"app_id\":{\"title\":\"Message app ID\",\"type\":\"string\"},\"attachments[*]\":{\"title\":\"Attachments\",\"type\":\"array\",\"items\":{\"$ref\":\"#/definitions/messageAttachments[*]\"}},\"blocks[*]\":{\"title\":\"Blocks\",\"type\":\"array\",\"items\":{\"$ref\":\"#/definitions/messageBlocks[*]\"}},\"bot_id\":{\"title\":\"Bot ID\",\"type\":\"string\"},\"bot_profile\":{\"title\":\"Bot profile\",\"$ref\":\"#/definitions/messageBot_profile\"},\"icons\":{\"title\":\"Icons\",\"$ref\":\"#/definitions/messageIcons\"},\"metadata\":{\"title\":\"Metadata\",\"$ref\":\"#/definitions/messageMetadata\"},\"root\":{\"title\":\"Root\",\"$ref\":\"#/definitions/messageRoot\"},\"subtype\":{\"title\":\"Message subtype\",\"type\":\"string\"},\"team\":{\"title\":\"Team\",\"type\":\"string\"},\"text\":{\"title\":\"Message text\",\"type\":\"string\"},\"thread_ts\":{\"title\":\"Message thread ts\",\"type\":\"string\"},\"ts\":{\"title\":\"Message ts\",\"type\":\"string\"},\"type\":{\"title\":\"Message type\",\"type\":\"string\"},\"user\":{\"title\":\"User\",\"type\":\"string\"},\"username\":{\"title\":\"Message username\",\"type\":\"string\"}}},\"messageAttachments[*]\":{\"type\":\"object\",\"properties\":{\"actions[*]\":{\"title\":\"Actions\",\"type\":\"array\",\"items\":{\"$ref\":\"#/definitions/messageAttachments[*]Actions[*]\"}},\"callback_id\":{\"title\":\"Call back ID\",\"type\":\"string\"},\"color\":{\"title\":\"Color\",\"type\":\"string\"},\"fallback\":{\"title\":\"Fall back\",\"type\":\"string\"},\"id\":{\"title\":\"Id\",\"type\":\"integer\"},\"text\":{\"title\":\"Message attachments text\",\"type\":\"string\"}}},\"messageAttachments[*]Actions[*]\":{\"type\":\"object\",\"properties\":{\"confirm\":{\"title\":\"Confirm\",\"$ref\":\"#/definitions/messageAttachments[*]Actions[*]Confirm\"},\"id\":{\"title\":\"Message attachments actions ID\",\"type\":\"string\"},\"name\":{\"title\":\"Name\",\"type\":\"string\"},\"style\":{\"title\":\"Style\",\"type\":\"string\"},\"text\":{\"title\":\"Message attachments actions text\",\"type\":\"string\"},\"type\":{\"title\":\"Message attachments actions type\",\"type\":\"string\"},\"value\":{\"title\":\"Value\",\"type\":\"string\"}}},\"messageAttachments[*]Actions[*]Confirm\":{\"type\":\"object\",\"properties\":{\"dismiss_text\":{\"title\":\"Dismiss text\",\"type\":\"string\"},\"ok_text\":{\"title\":\"Ok text\",\"type\":\"string\"},\"text\":{\"title\":\"Message attachments actions confirm text\",\"type\":\"string\"},\"title\":{\"title\":\"Title\",\"type\":\"string\"}}},\"messageBlocks[*]\":{\"type\":\"object\",\"properties\":{\"block_id\":{\"title\":\"Message blocks block ID\",\"type\":\"string\"},\"text\":{\"title\":\"Text\",\"$ref\":\"#/definitions/messageBlocks[*]Text\"},\"type\":{\"title\":\"Message blocks type\",\"type\":\"string\"}}},\"messageBlocks[*]Text\":{\"type\":\"object\",\"properties\":{\"emoji\":{\"title\":\"Message blocks text emoji\",\"type\":\"boolean\"},\"text\":{\"title\":\"Message blocks text\",\"type\":\"string\"},\"type\":{\"title\":\"Message blocks text type\",\"type\":\"string\"}}},\"messageBot_profile\":{\"type\":\"object\",\"properties\":{\"app_id\":{\"title\":\"Application ID\",\"type\":\"string\"},\"deleted\":{\"title\":\"Deleted\",\"type\":\"boolean\"},\"icons\":{\"title\":\"Icons\",\"$ref\":\"#/definitions/messageBot_profileIcons\"},\"id\":{\"title\":\"Message bot profile ID\",\"type\":\"string\"},\"name\":{\"title\":\"Message bot profile name\",\"type\":\"string\"},\"team_id\":{\"title\":\"Team ID\",\"type\":\"string\"},\"updated\":{\"title\":\"Updated\",\"type\":\"integer\"}}},\"messageBot_profileIcons\":{\"type\":\"object\",\"properties\":{\"image_36\":{\"title\":\"Image 3 6\",\"type\":\"string\"},\"image_48\":{\"title\":\"Image 4 8\",\"type\":\"string\"},\"image_72\":{\"title\":\"Image 7 2\",\"type\":\"string\"}}},\"messageIcons\":{\"type\":\"object\",\"properties\":{\"emoji\":{\"title\":\"Message icons emoji\",\"type\":\"string\"}}},\"messageMetadata\":{\"type\":\"object\",\"properties\":{\"event_payload\":{\"title\":\"Event payload\",\"$ref\":\"#/definitions/messageMetadataEvent_payload\"},\"event_type\":{\"title\":\"Message metadata event type\",\"type\":\"string\"}}},\"messageMetadataEvent_payload\":{\"type\":\"object\",\"properties\":{\"id\":{\"title\":\"Message metadata event payload ID\",\"type\":\"string\"},\"title\":{\"title\":\"Message metadata event payload title\",\"type\":\"string\"}}},\"messageRoot\":{\"type\":\"object\",\"properties\":{\"app_id\":{\"title\":\"Message root app ID\",\"type\":\"string\"},\"blocks[*]\":{\"title\":\"Blocks\",\"type\":\"array\",\"items\":{\"$ref\":\"#/definitions/messageRootBlocks[*]\"}},\"bot_id\":{\"title\":\"Message root bot ID\",\"type\":\"string\"},\"icons\":{\"title\":\"Icons\",\"$ref\":\"#/definitions/messageRootIcons\"},\"is_locked\":{\"title\":\"Message root is locked\",\"type\":\"boolean\"},\"latest_reply\":{\"title\":\"Message root latest reply\",\"type\":\"string\"},\"metadata\":{\"title\":\"Metadata\",\"$ref\":\"#/definitions/messageRootMetadata\"},\"reply_count\":{\"title\":\"Message root reply count\",\"type\":\"integer\"},\"reply_users[*]\":{\"title\":\"Message root reply users\",\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"reply_users_count\":{\"title\":\"Message root reply users count\",\"type\":\"integer\"},\"subscribed\":{\"title\":\"Message root subscribed\",\"type\":\"boolean\"},\"subtype\":{\"title\":\"Message root subtype\",\"type\":\"string\"},\"text\":{\"title\":\"Message root text\",\"type\":\"string\"},\"thread_ts\":{\"title\":\"Message root thread ts\",\"type\":\"string\"},\"ts\":{\"title\":\"Message root ts\",\"type\":\"string\"},\"type\":{\"title\":\"Message root type\",\"type\":\"string\"},\"username\":{\"title\":\"Message root username\",\"type\":\"string\"}}},\"messageRootBlocks[*]\":{\"type\":\"object\",\"properties\":{\"block_id\":{\"title\":\"Message root blocks block ID\",\"type\":\"string\"},\"elements[*]\":{\"title\":\"Elements\",\"type\":\"array\",\"items\":{\"$ref\":\"#/definitions/messageRootBlocks[*]Elements[*]\"}},\"type\":{\"title\":\"Message root blocks type\",\"type\":\"string\"}}},\"messageRootBlocks[*]Elements[*]\":{\"type\":\"object\",\"properties\":{\"elements[*]\":{\"title\":\"Elements\",\"type\":\"array\",\"items\":{\"$ref\":\"#/definitions/messageRootBlocks[*]Elements[*]Elements[*]\"}},\"type\":{\"title\":\"Message root blocks elements type\",\"type\":\"string\"}}},\"messageRootBlocks[*]Elements[*]Elements[*]\":{\"type\":\"object\",\"properties\":{\"text\":{\"title\":\"Message root blocks elements text\",\"type\":\"string\"},\"type\":{\"title\":\"Message root blocks elements elements type\",\"type\":\"string\"}}},\"messageRootIcons\":{\"type\":\"object\",\"properties\":{\"emoji\":{\"title\":\"Message root icons emoji\",\"type\":\"string\"}}},\"messageRootMetadata\":{\"type\":\"object\",\"properties\":{\"event_type\":{\"title\":\"Message root metadata event type\",\"type\":\"string\"}}},\"metadata\":{\"type\":\"object\",\"properties\":{\"event_payload\":{\"title\":\"Event payload\",\"$ref\":\"#/definitions/metadataEvent_payload\"},\"event_type\":{\"title\":\"Metadata event type\",\"type\":\"string\"}}},\"metadataEvent_payload\":{\"type\":\"object\",\"properties\":{\"id\":{\"title\":\"Metadata event payload ID\",\"type\":\"string\"},\"title\":{\"title\":\"Metadata event payload title\",\"type\":\"string\"}}},\"response_metadata\":{\"type\":\"object\",\"properties\":{\"warnings[*]\":{\"title\":\"Response metadata warnings\",\"type\":\"array\",\"items\":{\"type\":\"string\"}}}},\"root\":{\"type\":\"object\",\"properties\":{\"app_id\":{\"title\":\"Root app ID\",\"type\":\"string\"},\"blocks[*]\":{\"title\":\"Blocks\",\"type\":\"array\",\"items\":{\"$ref\":\"#/definitions/rootBlocks[*]\"}},\"bot_id\":{\"title\":\"Root bot ID\",\"type\":\"string\"},\"icons\":{\"title\":\"Icons\",\"$ref\":\"#/definitions/rootIcons\"},\"is_locked\":{\"title\":\"Root is locked\",\"type\":\"boolean\"},\"latest_reply\":{\"title\":\"Root latest reply\",\"type\":\"string\"},\"metadata\":{\"title\":\"Metadata\",\"$ref\":\"#/definitions/rootMetadata\"},\"reply_count\":{\"title\":\"Root reply count\",\"type\":\"integer\"},\"reply_users[*]\":{\"title\":\"Root reply users\",\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"reply_users_count\":{\"title\":\"Root reply users count\",\"type\":\"integer\"},\"subscribed\":{\"title\":\"Root subscribed\",\"type\":\"boolean\"},\"subtype\":{\"title\":\"Root subtype\",\"type\":\"string\"},\"text\":{\"title\":\"Root text\",\"type\":\"string\"},\"thread_ts\":{\"title\":\"Root thread ts\",\"type\":\"string\"},\"ts\":{\"title\":\"Root ts\",\"type\":\"string\"},\"type\":{\"title\":\"Root type\",\"type\":\"string\"},\"username\":{\"title\":\"Root username\",\"type\":\"string\"}}},\"rootBlocks[*]\":{\"type\":\"object\",\"properties\":{\"block_id\":{\"title\":\"Root blocks block ID\",\"type\":\"string\"},\"elements[*]\":{\"title\":\"Elements\",\"type\":\"array\",\"items\":{\"$ref\":\"#/definitions/rootBlocks[*]Elements[*]\"}},\"type\":{\"title\":\"Root blocks type\",\"type\":\"string\"}}},\"rootBlocks[*]Elements[*]\":{\"type\":\"object\",\"properties\":{\"elements[*]\":{\"title\":\"Elements\",\"type\":\"array\",\"items\":{\"$ref\":\"#/definitions/rootBlocks[*]Elements[*]Elements[*]\"}},\"type\":{\"title\":\"Root blocks elements type\",\"type\":\"string\"}}},\"rootBlocks[*]Elements[*]Elements[*]\":{\"type\":\"object\",\"properties\":{\"text\":{\"title\":\"Root blocks elements text\",\"type\":\"string\"},\"type\":{\"title\":\"Root blocks elements elements type\",\"type\":\"string\"}}},\"rootIcons\":{\"type\":\"object\",\"properties\":{\"emoji\":{\"title\":\"Root icons emoji\",\"type\":\"string\"}}},\"rootMetadata\":{\"type\":\"object\",\"properties\":{\"event_type\":{\"title\":\"Root metadata event type\",\"type\":\"string\"}}}}},\"hasFileOutput\":false,\"populateOutputFields\":true,\"inputFields\":[{\"typeScriptDefinition\":null,\"useUrlInput\":false,\"id\":\"channel\",\"name\":\"channel\",\"displayName\":\"Channel name/ID\",\"description\":\"Select the channel from the dropdown or pass channel ID. ID can be retrieved from Slack →  Right click the channel → View channel details → Copy channel ID (under “About”)\",\"type\":\"string\",\"sortOrder\":1,\"primaryKey\":false,\"lookup\":{\"objectName\":\"curated_channels?types=public_channel,private_channel\",\"lookupNames\":[\"name\",\"id\"],\"lookupValue\":\"id\",\"path\":\"/curated_channels?fields=id,name\"},\"design\":{\"description\":\"Select the channel from the dropdown or pass channel ID. ID can be retrieved from Slack →  Right click the channel → View channel details → Copy channel ID (under “About”)\",\"isMultiSelect\":false,\"loadByDefault\":true,\"enableUserOverride\":false,\"isHidden\":false,\"position\":\"primary\",\"textBlocks\":null,\"dictionaryWidget\":null,\"selection\":null,\"solutionResourceKind\":null,\"solutionResourceSubTypes\":null,\"exposeAsSubBinding\":null,\"enableURLInput\":null},\"fieldActions\":[],\"searchable\":false,\"searchableJoins\":null,\"required\":true,\"request\":true,\"response\":true,\"responseCurated\":false,\"fieldLocation\":\"body\",\"onCanvas\":null,\"isJitField\":false,\"isFieldActionParent\":false,\"isMainResponseField\":false,\"isMethodParameter\":false,\"isBackgroundField\":false,\"filterTree\":null,\"filterNeedsRefresh\":null,\"arrayInputPaths\":null,\"clrType\":{\"_elementType\":null,\"_isNullable\":false,\"isArray\":false,\"genericTypeArguments\":[],\"fullName\":null,\"name\":\"String\",\"assemblyQualifiedName\":\"String\",\"isValueType\":true},\"forceExpressionEditor\":false,\"requiredGroups\":null,\"disableExpressions\":false,\"backingField\":null,\"searchableDisplayName\":null,\"selectedResourceId\":null,\"sampleValue\":\"C02CAP3LAAG\"},{\"typeScriptDefinition\":null,\"useUrlInput\":false,\"id\":\"messageToSend\",\"name\":\"messageToSend\",\"displayName\":\"Message\",\"description\":\"This is the main text that people will see in the message. It's also used for notifications and in places where rich formatting isn't supported.\",\"type\":\"string\",\"sortOrder\":2,\"primaryKey\":false,\"design\":{\"component\":\"RichTextEditorMarkdown\",\"loadByDefault\":false,\"isMultiSelect\":false,\"enableUserOverride\":false,\"isHidden\":false,\"position\":\"primary\",\"validation\":false},\"fieldActions\":null,\"searchable\":false,\"searchableJoins\":null,\"required\":true,\"request\":true,\"response\":false,\"responseCurated\":false,\"fieldLocation\":\"body\",\"onCanvas\":null,\"isJitField\":false,\"isFieldActionParent\":false,\"isMainResponseField\":false,\"isMethodParameter\":false,\"isBackgroundField\":false,\"filterTree\":null,\"filterNeedsRefresh\":null,\"arrayInputPaths\":null,\"clrType\":{\"_elementType\":null,\"_isNullable\":false,\"isArray\":false,\"genericTypeArguments\":[],\"fullName\":null,\"name\":\"String\",\"assemblyQualifiedName\":\"String\",\"isValueType\":true},\"forceExpressionEditor\":false,\"requiredGroups\":null,\"disableExpressions\":false,\"backingField\":null,\"searchableDisplayName\":null,\"selectedResourceId\":null,\"sampleValue\":\"string\"},{\"typeScriptDefinition\":null,\"useUrlInput\":false,\"id\":\"send_as\",\"name\":\"send_as\",\"displayName\":\"Send as\",\"description\":\"Whether to send the message as the App bot i.e. using Bot token or yourself i.e. using User token?\",\"type\":\"string\",\"sortOrder\":3,\"defaultValue\":\"bot\",\"primaryKey\":false,\"lookup\":{\"objectName\":\"available_tokens\",\"lookupNames\":[\"name\",\"value\"],\"lookupValue\":\"value\",\"path\":\"/available_tokens\"},\"design\":{\"loadByDefault\":true,\"isMultiSelect\":false,\"enableUserOverride\":false,\"displayPattern\":\"{name}\",\"isHidden\":false,\"position\":\"primary\",\"validation\":false},\"fieldActions\":[],\"searchable\":false,\"searchableOperators\":null,\"searchableNames\":null,\"required\":true,\"request\":true,\"response\":false,\"responseCurated\":false,\"fieldLocation\":\"query\",\"onCanvas\":null,\"isJitField\":false,\"isFieldActionParent\":false,\"isMainResponseField\":false,\"isMethodParameter\":true,\"isBackgroundField\":false,\"filterTree\":null,\"filterNeedsRefresh\":null,\"arrayInputPaths\":null,\"clrType\":{\"_elementType\":null,\"_isNullable\":false,\"isArray\":false,\"genericTypeArguments\":[],\"fullName\":null,\"name\":\"String\",\"assemblyQualifiedName\":\"String\",\"isValueType\":true},\"forceExpressionEditor\":false,\"requiredGroups\":null,\"disableExpressions\":false,\"backingField\":null,\"searchableDisplayName\":null,\"selectedResourceId\":null},{\"typeScriptDefinition\":null,\"useUrlInput\":false,\"id\":\"fields\",\"name\":\"fields\",\"displayName\":\"Message fields\",\"description\":\"Fields to be displayed below the message. Can be used to pass variables such as ID, name, event trigger output etc\",\"type\":\"string\",\"sortOrder\":4,\"primaryKey\":false,\"design\":{\"loadByDefault\":false,\"isMultiSelect\":false,\"enableUserOverride\":false,\"description\":\"Fields to be displayed below the message. Can be used to pass variables such as ID, name, event trigger output etc\",\"isHidden\":false,\"fieldActions\":[{\"actionType\":\"showMessages\",\"rules\":[{\"refFieldName\":\"fields\",\"refFieldValues\":[\"*\"],\"isCleared\":true,\"isVariable\":false,\"isWorkflowExpression\":true,\"isConstantValue\":true}],\"messages\":[\"defaultMessage\"]}],\"position\":\"primary\",\"textBlocks\":[{\"name\":\"defaultMessage\",\"text\":\"Displays name-value pairs in a two-column layout. Provide field names and values separated by a semicolon.\\n\\nExample: Name: John Doe; Age: 30; Location: New York.\"}],\"validation\":false},\"fieldActions\":[{\"actionType\":\"showMessages\",\"rules\":[{\"refFieldName\":\"fields\",\"refFieldValues\":[\"*\"],\"isCleared\":true,\"isVariable\":false,\"isWorkflowExpression\":true,\"isConstantValue\":true}],\"messages\":[\"defaultMessage\"]}],\"searchable\":false,\"searchableJoins\":null,\"required\":false,\"request\":true,\"response\":false,\"responseCurated\":false,\"fieldLocation\":\"body\",\"onCanvas\":null,\"isJitField\":false,\"isFieldActionParent\":true,\"isMainResponseField\":false,\"isMethodParameter\":false,\"isBackgroundField\":false,\"filterTree\":null,\"filterNeedsRefresh\":null,\"arrayInputPaths\":null,\"clrType\":{\"_elementType\":null,\"_isNullable\":false,\"isArray\":false,\"genericTypeArguments\":[],\"fullName\":null,\"name\":\"String\",\"assemblyQualifiedName\":\"String\",\"isValueType\":true},\"forceExpressionEditor\":false,\"requiredGroups\":null,\"disableExpressions\":false,\"backingField\":null,\"searchableDisplayName\":null,\"selectedResourceId\":null,\"sampleValue\":\"string\"},{\"typeScriptDefinition\":null,\"useUrlInput\":false,\"id\":\"buttons\",\"name\":\"buttons\",\"displayName\":\"Button actions\",\"description\":\"Button actions to be displayed below the message. Ex: action1,Approve,primary; action2,Reject,danger,Confirm,Sure?,Yes,No. Refer activity help docs for more info\",\"type\":\"string\",\"sortOrder\":5,\"primaryKey\":false,\"design\":{\"loadByDefault\":false,\"isMultiSelect\":false,\"enableUserOverride\":false,\"description\":\"Button actions to be displayed below the message. Ex: action1,Approve,primary; action2,Reject,danger,Confirm,Sure?,Yes,No. Refer activity help docs for more info\",\"isHidden\":false,\"fieldActions\":[{\"actionType\":\"showMessages\",\"rules\":[{\"refFieldName\":\"buttons\",\"refFieldValues\":[\"*\"],\"isCleared\":true,\"isVariable\":false,\"isWorkflowExpression\":true,\"isConstantValue\":true}],\"messages\":[\"defaultMessage\"]}],\"position\":\"primary\",\"textBlocks\":[{\"name\":\"defaultMessage\",\"text\":\"Up to 5 button actions, separated by semicolons. Each button is comma-separated: action ID (unique, required), action name (required), style (primary/danger), confirmation title, confirmation text, confirm ok title, confirm deny title.\\n\\nExample: approve,Approve,primary;reject,Reject,danger and with confirmation dialog: approve,Approve,primary,Confirm,Are you sure?,Yes,No;reject,Reject,danger. Refer activity help docs for more info\"}],\"validation\":false},\"fieldActions\":[{\"actionType\":\"showMessages\",\"rules\":[{\"refFieldName\":\"buttons\",\"refFieldValues\":[\"*\"],\"isCleared\":true,\"isVariable\":false,\"isWorkflowExpression\":true,\"isConstantValue\":true}],\"messages\":[\"defaultMessage\"]}],\"searchable\":false,\"searchableJoins\":null,\"required\":false,\"request\":true,\"response\":false,\"responseCurated\":false,\"fieldLocation\":\"body\",\"onCanvas\":null,\"isJitField\":false,\"isFieldActionParent\":true,\"isMainResponseField\":false,\"isMethodParameter\":false,\"isBackgroundField\":false,\"filterTree\":null,\"filterNeedsRefresh\":null,\"arrayInputPaths\":null,\"clrType\":{\"_elementType\":null,\"_isNullable\":false,\"isArray\":false,\"genericTypeArguments\":[],\"fullName\":null,\"name\":\"String\",\"assemblyQualifiedName\":\"String\",\"isValueType\":true},\"forceExpressionEditor\":false,\"requiredGroups\":null,\"disableExpressions\":false,\"backingField\":null,\"searchableDisplayName\":null,\"selectedResourceId\":null,\"sampleValue\":\"string\"},{\"typeScriptDefinition\":null,\"useUrlInput\":false,\"id\":\"image\",\"name\":\"image\",\"displayName\":\"Image URL\",\"description\":\"The URL of the secondary image attachment to be shared as part of the message. The image will always be at the bottom of the entire message block\",\"type\":\"string\",\"sortOrder\":6,\"primaryKey\":false,\"design\":{\"displayPattern\":null,\"isMultiSelect\":null,\"loadByDefault\":null,\"enableUserOverride\":null,\"isHidden\":null,\"position\":\"primary\",\"requiredGroups\":null,\"textBlocks\":null,\"dictionaryWidget\":null,\"selection\":null,\"solutionResourceKind\":null,\"solutionResourceSubTypes\":null,\"exposeAsSubBinding\":null,\"enableURLInput\":null},\"fieldActions\":null,\"searchable\":false,\"searchableJoins\":null,\"required\":false,\"request\":true,\"response\":false,\"responseCurated\":false,\"fieldLocation\":\"body\",\"onCanvas\":true,\"isJitField\":false,\"isFieldActionParent\":false,\"isMainResponseField\":false,\"isMethodParameter\":false,\"isBackgroundField\":false,\"filterTree\":null,\"filterNeedsRefresh\":null,\"arrayInputPaths\":null,\"clrType\":{\"_elementType\":null,\"_isNullable\":false,\"isArray\":false,\"genericTypeArguments\":[],\"fullName\":null,\"name\":\"String\",\"assemblyQualifiedName\":\"String\",\"isValueType\":true},\"forceExpressionEditor\":false,\"requiredGroups\":null,\"disableExpressions\":false,\"backingField\":null,\"searchableDisplayName\":null,\"selectedResourceId\":null,\"sampleValue\":\"string\"},{\"typeScriptDefinition\":null,\"useUrlInput\":false,\"id\":\"parse\",\"name\":\"parse\",\"displayName\":\"Formatting options (parse)\",\"description\":\"Change how messages are treated. Pass 'none' for removing hyperlinks and pass 'full' to ignore slack's default formatting\",\"type\":\"string\",\"sortOrder\":7,\"primaryKey\":false,\"enum\":[{\"value\":\"none\"},{\"value\":\"full\"}],\"design\":{\"isMultiSelect\":false,\"loadByDefault\":false,\"enableUserOverride\":false,\"isHidden\":false,\"position\":\"secondary\",\"textBlocks\":null,\"dictionaryWidget\":null,\"selection\":null,\"solutionResourceKind\":null,\"solutionResourceSubTypes\":null,\"exposeAsSubBinding\":null,\"enableURLInput\":null},\"fieldActions\":null,\"searchable\":false,\"searchableJoins\":null,\"required\":false,\"request\":true,\"response\":false,\"responseCurated\":false,\"fieldLocation\":\"body\",\"onCanvas\":true,\"isJitField\":false,\"isFieldActionParent\":false,\"isMainResponseField\":false,\"isMethodParameter\":false,\"isBackgroundField\":false,\"filterTree\":null,\"filterNeedsRefresh\":null,\"arrayInputPaths\":null,\"clrType\":{\"_elementType\":null,\"_isNullable\":false,\"isArray\":false,\"genericTypeArguments\":[],\"fullName\":null,\"name\":\"String\",\"assemblyQualifiedName\":\"String\",\"isValueType\":true},\"forceExpressionEditor\":false,\"requiredGroups\":null,\"disableExpressions\":false,\"backingField\":null,\"searchableDisplayName\":null,\"selectedResourceId\":null,\"sampleValue\":\"none\"},{\"typeScriptDefinition\":null,\"useUrlInput\":false,\"id\":\"link_names\",\"name\":\"link_names\",\"displayName\":\"Link names\",\"description\":\"Whether to link and mention all the user groups automatically if the respective names are mentioned in the text message?\",\"type\":\"boolean\",\"sortOrder\":8,\"primaryKey\":false,\"design\":{\"isMultiSelect\":false,\"loadByDefault\":false,\"enableUserOverride\":false,\"isHidden\":false,\"position\":\"secondary\",\"textBlocks\":null,\"dictionaryWidget\":null,\"selection\":null,\"solutionResourceKind\":null,\"solutionResourceSubTypes\":null,\"exposeAsSubBinding\":null,\"enableURLInput\":null},\"fieldActions\":null,\"searchable\":false,\"searchableJoins\":null,\"required\":false,\"request\":true,\"response\":false,\"responseCurated\":false,\"fieldLocation\":\"body\",\"onCanvas\":true,\"isJitField\":false,\"isFieldActionParent\":false,\"isMainResponseField\":false,\"isMethodParameter\":false,\"isBackgroundField\":false,\"filterTree\":null,\"filterNeedsRefresh\":null,\"arrayInputPaths\":null,\"clrType\":{\"_elementType\":null,\"_isNullable\":false,\"isArray\":false,\"genericTypeArguments\":[],\"fullName\":null,\"name\":\"Boolean\",\"assemblyQualifiedName\":\"Boolean\",\"isValueType\":true},\"forceExpressionEditor\":false,\"requiredGroups\":null,\"disableExpressions\":false,\"backingField\":null,\"searchableDisplayName\":null,\"selectedResourceId\":null,\"sampleValue\":true},{\"typeScriptDefinition\":null,\"useUrlInput\":false,\"id\":\"unfurl_links\",\"name\":\"unfurl_links\",\"displayName\":\"Unfurl links\",\"description\":\"Whether to display the preview of the links mentioned in the text message?\",\"type\":\"boolean\",\"sortOrder\":9,\"primaryKey\":false,\"design\":{\"isMultiSelect\":false,\"loadByDefault\":false,\"enableUserOverride\":false,\"isHidden\":false,\"position\":\"secondary\",\"textBlocks\":null,\"dictionaryWidget\":null,\"selection\":null,\"solutionResourceKind\":null,\"solutionResourceSubTypes\":null,\"exposeAsSubBinding\":null,\"enableURLInput\":null},\"fieldActions\":null,\"searchable\":false,\"searchableJoins\":null,\"required\":false,\"request\":true,\"response\":false,\"responseCurated\":false,\"fieldLocation\":\"body\",\"onCanvas\":true,\"isJitField\":false,\"isFieldActionParent\":false,\"isMainResponseField\":false,\"isMethodParameter\":false,\"isBackgroundField\":false,\"filterTree\":null,\"filterNeedsRefresh\":null,\"arrayInputPaths\":null,\"clrType\":{\"_elementType\":null,\"_isNullable\":false,\"isArray\":false,\"genericTypeArguments\":[],\"fullName\":null,\"name\":\"Boolean\",\"assemblyQualifiedName\":\"Boolean\",\"isValueType\":true},\"forceExpressionEditor\":false,\"requiredGroups\":null,\"disableExpressions\":false,\"backingField\":null,\"searchableDisplayName\":null,\"selectedResourceId\":null,\"sampleValue\":true},{\"typeScriptDefinition\":null,\"useUrlInput\":false,\"id\":\"username\",\"name\":\"username\",\"displayName\":\"Bot name\",\"description\":\"Only supported for “Bot”. Customize the bot name while sending messages else ‘UiPath’ will be defaulted\",\"type\":\"string\",\"sortOrder\":10,\"primaryKey\":false,\"design\":{\"description\":\"Only supported for “Bot”. Customize the bot name while sending messages else ‘UiPath’ will be defaulted\",\"isMultiSelect\":false,\"loadByDefault\":false,\"enableUserOverride\":false,\"isHidden\":false,\"position\":\"secondary\",\"textBlocks\":null,\"dictionaryWidget\":null,\"selection\":null,\"solutionResourceKind\":null,\"solutionResourceSubTypes\":null,\"exposeAsSubBinding\":null,\"enableURLInput\":null},\"fieldActions\":null,\"searchable\":false,\"searchableJoins\":null,\"required\":false,\"request\":true,\"response\":true,\"responseCurated\":false,\"fieldLocation\":\"body\",\"onCanvas\":true,\"isJitField\":false,\"isFieldActionParent\":false,\"isMainResponseField\":false,\"isMethodParameter\":false,\"isBackgroundField\":false,\"filterTree\":null,\"filterNeedsRefresh\":null,\"arrayInputPaths\":null,\"clrType\":{\"_elementType\":null,\"_isNullable\":false,\"isArray\":false,\"genericTypeArguments\":[],\"fullName\":null,\"name\":\"String\",\"assemblyQualifiedName\":\"String\",\"isValueType\":true},\"forceExpressionEditor\":false,\"requiredGroups\":null,\"disableExpressions\":false,\"backingField\":null,\"searchableDisplayName\":null,\"selectedResourceId\":null,\"sampleValue\":\"My Bot lalitha new\"},{\"typeScriptDefinition\":null,\"useUrlInput\":false,\"id\":\"icon_emoji\",\"name\":\"icon_emoji\",\"displayName\":\"Bot icon\",\"description\":\"Only supported for “Bot”. Customize the bot icon with an emoji of the current workspace. For example :chart_with_upwards_trend:\",\"type\":\"string\",\"sortOrder\":11,\"primaryKey\":false,\"design\":{\"description\":\"Only supported for “Bot”. Customize the bot icon with an emoji of the current workspace. For example :chart_with_upwards_trend:\",\"isMultiSelect\":false,\"loadByDefault\":false,\"enableUserOverride\":false,\"isHidden\":false,\"position\":\"secondary\",\"textBlocks\":null,\"dictionaryWidget\":null,\"selection\":null,\"solutionResourceKind\":null,\"solutionResourceSubTypes\":null,\"exposeAsSubBinding\":null,\"enableURLInput\":null},\"fieldActions\":null,\"searchable\":false,\"searchableJoins\":null,\"required\":false,\"request\":true,\"response\":false,\"responseCurated\":false,\"fieldLocation\":\"body\",\"onCanvas\":true,\"isJitField\":false,\"isFieldActionParent\":false,\"isMainResponseField\":false,\"isMethodParameter\":false,\"isBackgroundField\":false,\"filterTree\":null,\"filterNeedsRefresh\":null,\"arrayInputPaths\":null,\"clrType\":{\"_elementType\":null,\"_isNullable\":false,\"isArray\":false,\"genericTypeArguments\":[],\"fullName\":null,\"name\":\"String\",\"assemblyQualifiedName\":\"String\",\"isValueType\":true},\"forceExpressionEditor\":false,\"requiredGroups\":null,\"disableExpressions\":false,\"backingField\":null,\"searchableDisplayName\":null,\"selectedResourceId\":null},{\"typeScriptDefinition\":null,\"useUrlInput\":false,\"id\":\"attachment_sub_color\",\"name\":\"attachment.color\",\"displayName\":\"Attachment color\",\"description\":\"Determines the vertical bar color. Red for danger, orange for warning, green for good\",\"type\":\"string\",\"primaryKey\":false,\"fieldActions\":null,\"searchable\":false,\"searchableJoins\":null,\"required\":false,\"request\":true,\"response\":false,\"responseCurated\":false,\"fieldLocation\":\"body\",\"onCanvas\":null,\"isJitField\":false,\"isFieldActionParent\":false,\"isMainResponseField\":false,\"isMethodParameter\":false,\"isBackgroundField\":false,\"filterTree\":null,\"filterNeedsRefresh\":null,\"arrayInputPaths\":null,\"clrType\":{\"_elementType\":null,\"_isNullable\":false,\"isArray\":false,\"genericTypeArguments\":[],\"fullName\":null,\"name\":\"String\",\"assemblyQualifiedName\":\"String\",\"isValueType\":true},\"forceExpressionEditor\":false,\"requiredGroups\":null,\"disableExpressions\":false,\"backingField\":null,\"searchableDisplayName\":null,\"selectedResourceId\":null},{\"typeScriptDefinition\":null,\"useUrlInput\":false,\"id\":\"attachment_sub_image_url\",\"name\":\"attachment.image_url\",\"displayName\":\"Attachment image URL\",\"description\":\"URL to image file that will be displayed below attachment message. Add `Attachment title` along with image URL\",\"type\":\"string\",\"primaryKey\":false,\"fieldActions\":null,\"searchable\":false,\"searchableJoins\":null,\"required\":false,\"request\":true,\"response\":false,\"responseCurated\":false,\"fieldLocation\":\"body\",\"onCanvas\":null,\"isJitField\":false,\"isFieldActionParent\":false,\"isMainResponseField\":false,\"isMethodParameter\":false,\"isBackgroundField\":false,\"filterTree\":null,\"filterNeedsRefresh\":null,\"arrayInputPaths\":null,\"clrType\":{\"_elementType\":null,\"_isNullable\":false,\"isArray\":false,\"genericTypeArguments\":[],\"fullName\":null,\"name\":\"String\",\"assemblyQualifiedName\":\"String\",\"isValueType\":true},\"forceExpressionEditor\":false,\"requiredGroups\":null,\"disableExpressions\":false,\"backingField\":null,\"searchableDisplayName\":null,\"selectedResourceId\":null,\"sampleValue\":\"https://example.com/image.png\"},{\"typeScriptDefinition\":null,\"useUrlInput\":false,\"id\":\"attachment_sub_text\",\"name\":\"attachment.text\",\"displayName\":\"Attachment text\",\"description\":\"Text that appears within the attachment block\",\"type\":\"string\",\"primaryKey\":false,\"design\":{\"loadByDefault\":false,\"isMultiSelect\":false,\"enableUserOverride\":false,\"isHidden\":true,\"validation\":false},\"fieldActions\":null,\"searchable\":false,\"searchableJoins\":null,\"required\":false,\"request\":true,\"response\":false,\"responseCurated\":false,\"fieldLocation\":\"body\",\"onCanvas\":null,\"isJitField\":false,\"isFieldActionParent\":false,\"isMainResponseField\":false,\"isMethodParameter\":false,\"isBackgroundField\":false,\"filterTree\":null,\"filterNeedsRefresh\":null,\"arrayInputPaths\":null,\"clrType\":{\"_elementType\":null,\"_isNullable\":false,\"isArray\":false,\"genericTypeArguments\":[],\"fullName\":null,\"name\":\"String\",\"assemblyQualifiedName\":\"String\",\"isValueType\":true},\"forceExpressionEditor\":false,\"requiredGroups\":null,\"disableExpressions\":false,\"backingField\":null,\"searchableDisplayName\":null,\"selectedResourceId\":null,\"sampleValue\":\"Attachment text\"},{\"typeScriptDefinition\":null,\"useUrlInput\":false,\"id\":\"attachment_sub_title\",\"name\":\"attachment.title\",\"displayName\":\"Attachment title\",\"description\":\"Title of the Slack message attachment\",\"type\":\"string\",\"primaryKey\":false,\"fieldActions\":null,\"searchable\":false,\"searchableJoins\":null,\"required\":false,\"request\":true,\"response\":false,\"responseCurated\":false,\"fieldLocation\":\"body\",\"onCanvas\":null,\"isJitField\":false,\"isFieldActionParent\":false,\"isMainResponseField\":false,\"isMethodParameter\":false,\"isBackgroundField\":false,\"filterTree\":null,\"filterNeedsRefresh\":null,\"arrayInputPaths\":null,\"clrType\":{\"_elementType\":null,\"_isNullable\":false,\"isArray\":false,\"genericTypeArguments\":[],\"fullName\":null,\"name\":\"String\",\"assemblyQualifiedName\":\"String\",\"isValueType\":true},\"forceExpressionEditor\":false,\"requiredGroups\":null,\"disableExpressions\":false,\"backingField\":null,\"searchableDisplayName\":null,\"selectedResourceId\":null,\"sampleValue\":\"Attachment title\"},{\"typeScriptDefinition\":null,\"useUrlInput\":false,\"id\":\"attachment_sub_title_link\",\"name\":\"attachment.title_link\",\"displayName\":\"Attachment title link\",\"description\":\"Attachment titles are clickable. Provide URL of page to direct users when clicked\",\"type\":\"string\",\"primaryKey\":false,\"fieldActions\":null,\"searchable\":false,\"searchableJoins\":null,\"required\":false,\"request\":true,\"response\":false,\"responseCurated\":false,\"fieldLocation\":\"body\",\"onCanvas\":null,\"isJitField\":false,\"isFieldActionParent\":false,\"isMainResponseField\":false,\"isMethodParameter\":false,\"isBackgroundField\":false,\"filterTree\":null,\"filterNeedsRefresh\":null,\"arrayInputPaths\":null,\"clrType\":{\"_elementType\":null,\"_isNullable\":false,\"isArray\":false,\"genericTypeArguments\":[],\"fullName\":null,\"name\":\"String\",\"assemblyQualifiedName\":\"String\",\"isValueType\":true},\"forceExpressionEditor\":false,\"requiredGroups\":null,\"disableExpressions\":false,\"backingField\":null,\"searchableDisplayName\":null,\"selectedResourceId\":null,\"sampleValue\":\"https://example.com/image.png\"},{\"typeScriptDefinition\":null,\"useUrlInput\":false,\"id\":\"icon_url\",\"name\":\"icon_url\",\"displayName\":\"Icon url\",\"description\":\"URL to an image to use as the icon for this message\",\"type\":\"string\",\"primaryKey\":false,\"fieldActions\":null,\"searchable\":false,\"searchableJoins\":null,\"required\":false,\"request\":true,\"response\":false,\"responseCurated\":false,\"fieldLocation\":\"body\",\"onCanvas\":null,\"isJitField\":false,\"isFieldActionParent\":false,\"isMainResponseField\":false,\"isMethodParameter\":false,\"isBackgroundField\":false,\"filterTree\":null,\"filterNeedsRefresh\":null,\"arrayInputPaths\":null,\"clrType\":{\"_elementType\":null,\"_isNullable\":false,\"isArray\":false,\"genericTypeArguments\":[],\"fullName\":null,\"name\":\"String\",\"assemblyQualifiedName\":\"String\",\"isValueType\":true},\"forceExpressionEditor\":false,\"requiredGroups\":null,\"disableExpressions\":false,\"backingField\":null,\"searchableDisplayName\":null,\"selectedResourceId\":null,\"sampleValue\":\"https://a.slack-edge.com/production-standard-emoji-assets/14.0/apple-medium/0032-fe0f-20e3@2x.png\"},{\"typeScriptDefinition\":null,\"useUrlInput\":false,\"id\":\"thread_ts\",\"name\":\"thread_ts\",\"displayName\":\"Message timestamp\",\"description\":\"The ID (timestamp) of the message sent\",\"type\":\"string\",\"primaryKey\":false,\"fieldActions\":null,\"searchable\":false,\"searchableJoins\":null,\"required\":false,\"request\":true,\"response\":true,\"responseCurated\":false,\"fieldLocation\":\"body\",\"onCanvas\":true,\"isJitField\":false,\"isFieldActionParent\":false,\"isMainResponseField\":false,\"isMethodParameter\":false,\"isBackgroundField\":false,\"filterTree\":null,\"filterNeedsRefresh\":null,\"arrayInputPaths\":null,\"clrType\":{\"_elementType\":null,\"_isNullable\":false,\"isArray\":false,\"genericTypeArguments\":[],\"fullName\":null,\"name\":\"String\",\"assemblyQualifiedName\":\"String\",\"isValueType\":true},\"forceExpressionEditor\":false,\"requiredGroups\":null,\"disableExpressions\":false,\"backingField\":null,\"searchableDisplayName\":null,\"selectedResourceId\":null,\"sampleValue\":\"1675217357.904929\"},{\"typeScriptDefinition\":null,\"useUrlInput\":false,\"id\":\"metadata_sub_event_payload_sub_id\",\"name\":\"metadata.event_payload.id\",\"displayName\":\"Metadata event payload ID\",\"type\":\"string\",\"primaryKey\":false,\"fieldActions\":null,\"searchable\":false,\"searchableJoins\":null,\"required\":false,\"request\":true,\"response\":true,\"responseCurated\":false,\"fieldLocation\":\"body\",\"onCanvas\":null,\"isJitField\":false,\"isFieldActionParent\":false,\"isMainResponseField\":false,\"isMethodParameter\":false,\"isBackgroundField\":false,\"filterTree\":null,\"filterNeedsRefresh\":null,\"arrayInputPaths\":null,\"clrType\":{\"_elementType\":null,\"_isNullable\":false,\"isArray\":false,\"genericTypeArguments\":[],\"fullName\":null,\"name\":\"String\",\"assemblyQualifiedName\":\"String\",\"isValueType\":true},\"forceExpressionEditor\":false,\"requiredGroups\":null,\"disableExpressions\":false,\"backingField\":null,\"searchableDisplayName\":null,\"selectedResourceId\":null,\"sampleValue\":\"11223\"},{\"typeScriptDefinition\":null,\"useUrlInput\":false,\"id\":\"metadata_sub_event_payload_sub_title\",\"name\":\"metadata.event_payload.title\",\"displayName\":\"Metadata event payload title\",\"type\":\"string\",\"primaryKey\":false,\"fieldActions\":null,\"searchable\":false,\"searchableJoins\":null,\"required\":false,\"request\":true,\"response\":true,\"responseCurated\":false,\"fieldLocation\":\"body\",\"onCanvas\":null,\"isJitField\":false,\"isFieldActionParent\":false,\"isMainResponseField\":false,\"isMethodParameter\":false,\"isBackgroundField\":false,\"filterTree\":null,\"filterNeedsRefresh\":null,\"arrayInputPaths\":null,\"clrType\":{\"_elementType\":null,\"_isNullable\":false,\"isArray\":false,\"genericTypeArguments\":[],\"fullName\":null,\"name\":\"String\",\"assemblyQualifiedName\":\"String\",\"isValueType\":true},\"forceExpressionEditor\":false,\"requiredGroups\":null,\"disableExpressions\":false,\"backingField\":null,\"searchableDisplayName\":null,\"selectedResourceId\":null,\"sampleValue\":\"Redesign Homepage\"},{\"typeScriptDefinition\":null,\"useUrlInput\":false,\"id\":\"metadata_sub_event_type\",\"name\":\"metadata.event_type\",\"displayName\":\"Metadata event type\",\"type\":\"string\",\"primaryKey\":false,\"fieldActions\":null,\"searchable\":false,\"searchableJoins\":null,\"required\":false,\"request\":true,\"response\":true,\"responseCurated\":false,\"fieldLocation\":\"body\",\"onCanvas\":null,\"isJitField\":false,\"isFieldActionParent\":false,\"isMainResponseField\":false,\"isMethodParameter\":false,\"isBackgroundField\":false,\"filterTree\":null,\"filterNeedsRefresh\":null,\"arrayInputPaths\":null,\"clrType\":{\"_elementType\":null,\"_isNullable\":false,\"isArray\":false,\"genericTypeArguments\":[],\"fullName\":null,\"name\":\"String\",\"assemblyQualifiedName\":\"String\",\"isValueType\":true},\"forceExpressionEditor\":false,\"requiredGroups\":null,\"disableExpressions\":false,\"backingField\":null,\"searchableDisplayName\":null,\"selectedResourceId\":null,\"sampleValue\":\"task_created\"},{\"typeScriptDefinition\":null,\"useUrlInput\":false,\"id\":\"mrkdwn\",\"name\":\"mrkdwn\",\"displayName\":\"Mrkdwn\",\"type\":\"boolean\",\"primaryKey\":false,\"fieldActions\":null,\"searchable\":false,\"searchableJoins\":null,\"required\":false,\"request\":true,\"response\":false,\"responseCurated\":false,\"fieldLocation\":\"body\",\"onCanvas\":true,\"isJitField\":false,\"isFieldActionParent\":false,\"isMainResponseField\":false,\"isMethodParameter\":false,\"isBackgroundField\":false,\"filterTree\":null,\"filterNeedsRefresh\":null,\"arrayInputPaths\":null,\"clrType\":{\"_elementType\":null,\"_isNullable\":false,\"isArray\":false,\"genericTypeArguments\":[],\"fullName\":null,\"name\":\"Boolean\",\"assemblyQualifiedName\":\"Boolean\",\"isValueType\":true},\"forceExpressionEditor\":false,\"requiredGroups\":null,\"disableExpressions\":false,\"backingField\":null,\"searchableDisplayName\":null,\"selectedResourceId\":null,\"sampleValue\":true},{\"typeScriptDefinition\":null,\"useUrlInput\":false,\"id\":\"reply_broadcast\",\"name\":\"reply_broadcast\",\"displayName\":\"Reply broadcast\",\"type\":\"boolean\",\"primaryKey\":false,\"fieldActions\":null,\"searchable\":false,\"searchableJoins\":null,\"required\":false,\"request\":true,\"response\":false,\"responseCurated\":false,\"fieldLocation\":\"body\",\"onCanvas\":null,\"isJitField\":false,\"isFieldActionParent\":false,\"isMainResponseField\":false,\"isMethodParameter\":false,\"isBackgroundField\":false,\"filterTree\":null,\"filterNeedsRefresh\":null,\"arrayInputPaths\":null,\"clrType\":{\"_elementType\":null,\"_isNullable\":false,\"isArray\":false,\"genericTypeArguments\":[],\"fullName\":null,\"name\":\"Boolean\",\"assemblyQualifiedName\":\"Boolean\",\"isValueType\":true},\"forceExpressionEditor\":false,\"requiredGroups\":null,\"disableExpressions\":false,\"backingField\":null,\"searchableDisplayName\":null,\"selectedResourceId\":null,\"sampleValue\":true},{\"typeScriptDefinition\":null,\"useUrlInput\":false,\"id\":\"unfurl_media\",\"name\":\"unfurl_media\",\"displayName\":\"Unfurl media\",\"type\":\"boolean\",\"primaryKey\":false,\"fieldActions\":null,\"searchable\":false,\"searchableJoins\":null,\"required\":false,\"request\":true,\"response\":false,\"responseCurated\":false,\"fieldLocation\":\"body\",\"onCanvas\":null,\"isJitField\":false,\"isFieldActionParent\":false,\"isMainResponseField\":false,\"isMethodParameter\":false,\"isBackgroundField\":false,\"filterTree\":null,\"filterNeedsRefresh\":null,\"arrayInputPaths\":null,\"clrType\":{\"_elementType\":null,\"_isNullable\":false,\"isArray\":false,\"genericTypeArguments\":[],\"fullName\":null,\"name\":\"Boolean\",\"assemblyQualifiedName\":\"Boolean\",\"isValueType\":true},\"forceExpressionEditor\":false,\"requiredGroups\":null,\"disableExpressions\":false,\"backingField\":null,\"searchableDisplayName\":null,\"selectedResourceId\":null,\"sampleValue\":false},{\"typeScriptDefinition\":null,\"useUrlInput\":false,\"id\":\"attachments_array\",\"name\":\"attachments[*]\",\"displayName\":\"\",\"description\":\"\",\"type\":\"Generatedsend_message_to_channel_v2\",\"sortOrder\":null,\"format\":null,\"mask\":null,\"primaryKey\":false,\"lookup\":null,\"enum\":null,\"design\":null,\"fieldActions\":null,\"searchable\":false,\"searchableOperators\":null,\"searchableNames\":null,\"searchableJoins\":null,\"required\":false,\"request\":true,\"response\":false,\"responseCurated\":false,\"fieldLocation\":\"body\",\"onCanvas\":null,\"isJitField\":true,\"isFieldActionParent\":false,\"isMainResponseField\":false,\"isMethodParameter\":false,\"isBackgroundField\":true,\"filterTree\":null,\"filterNeedsRefresh\":null,\"arrayInputPaths\":[{\"path\":\"attachments[*].actions[*].confirm.dismiss_text\",\"required\":false},{\"path\":\"attachments[*].actions[*].confirm.ok_text\",\"required\":false},{\"path\":\"attachments[*].actions[*].confirm.text\",\"required\":false},{\"path\":\"attachments[*].actions[*].confirm.title\",\"required\":false},{\"path\":\"attachments[*].actions[*].name\",\"required\":false},{\"path\":\"attachments[*].actions[*].style\",\"required\":false},{\"path\":\"attachments[*].actions[*].text\",\"required\":false},{\"path\":\"attachments[*].actions[*].type\",\"required\":false},{\"path\":\"attachments[*].actions[*].value\",\"required\":false},{\"path\":\"attachments[*].attachment_type\",\"required\":false},{\"path\":\"attachments[*].callback_id\",\"required\":false},{\"path\":\"attachments[*].color\",\"required\":false},{\"path\":\"attachments[*].fallback\",\"required\":false},{\"path\":\"attachments[*].text\",\"required\":false}],\"clrType\":{\"_elementType\":null,\"_isNullable\":false,\"isArray\":true,\"genericTypeArguments\":[],\"fullName\":null,\"name\":\"Object\",\"assemblyQualifiedName\":\"Object[*]\",\"isValueType\":false},\"forceExpressionEditor\":false,\"requiredGroups\":null,\"disableExpressions\":false,\"backingField\":null,\"searchableDisplayName\":null,\"selectedResourceId\":null}],\"outputFields\":[{\"typeScriptDefinition\":null,\"useUrlInput\":false,\"id\":\"out_ts\",\"name\":\"ts\",\"displayName\":\"Message timestamp\",\"description\":\"The ID (timestamp) of the message sent\",\"type\":\"string\",\"primaryKey\":false,\"design\":{\"loadByDefault\":false,\"isMultiSelect\":false,\"enableUserOverride\":false,\"isHidden\":false,\"validation\":false},\"fieldActions\":null,\"searchable\":false,\"searchableJoins\":null,\"required\":false,\"request\":false,\"response\":true,\"responseCurated\":true,\"fieldLocation\":\"output\",\"onCanvas\":null,\"isJitField\":false,\"isFieldActionParent\":false,\"isMainResponseField\":false,\"isMethodParameter\":false,\"isBackgroundField\":false,\"filterTree\":null,\"filterNeedsRefresh\":null,\"arrayInputPaths\":null,\"clrType\":{\"_elementType\":null,\"_isNullable\":true,\"isArray\":false,\"genericTypeArguments\":[],\"fullName\":null,\"name\":\"String\",\"assemblyQualifiedName\":\"String\",\"isValueType\":true},\"forceExpressionEditor\":false,\"requiredGroups\":null,\"disableExpressions\":false,\"backingField\":null,\"searchableDisplayName\":null,\"selectedResourceId\":null,\"sampleValue\":\"1631092102.000400\"},{\"typeScriptDefinition\":null,\"useUrlInput\":false,\"id\":\"send_message_to_channel_v2\",\"name\":\"send_message_to_channel_v2\",\"displayName\":\"Channel\",\"description\":\"The output send chat message\",\"type\":\"Generatedsend_message_to_channel_v2\",\"sortOrder\":null,\"format\":null,\"mask\":null,\"defaultValue\":null,\"primaryKey\":false,\"lookup\":null,\"enum\":null,\"design\":null,\"fieldActions\":null,\"searchable\":false,\"searchableOperators\":null,\"searchableNames\":null,\"searchableJoins\":null,\"required\":false,\"request\":false,\"response\":true,\"responseCurated\":false,\"fieldLocation\":\"output\",\"onCanvas\":null,\"isJitField\":true,\"isFieldActionParent\":false,\"isMainResponseField\":false,\"isMethodParameter\":false,\"isBackgroundField\":false,\"filterTree\":null,\"filterNeedsRefresh\":null,\"arrayInputPaths\":null,\"clrType\":{\"_elementType\":null,\"_isNullable\":false,\"isArray\":false,\"genericTypeArguments\":[],\"fullName\":null,\"name\":\"Object\",\"assemblyQualifiedName\":\"Object\",\"isValueType\":false},\"forceExpressionEditor\":false,\"requiredGroups\":null,\"disableExpressions\":false,\"backingField\":null,\"searchableDisplayName\":null,\"selectedResourceId\":null}],\"jitTypeNeedsRefresh\":false,\"jitInputField\":{\"typeScriptDefinition\":\"{\\\"attachment\\\":{\\\"color\\\":string;\\\"image_url\\\":string;\\\"text\\\":string;\\\"title\\\":string;\\\"title_link\\\":string};\\\"attachments\\\":{\\\"actions\\\":{\\\"confirm\\\":{\\\"dismiss_text\\\":string;\\\"ok_text\\\":string;\\\"text\\\":string;\\\"title\\\":string};\\\"name\\\":string;\\\"style\\\":string;\\\"text\\\":string;\\\"type\\\":string;\\\"value\\\":string}[];\\\"attachment_type\\\":string;\\\"callback_id\\\":string;\\\"color\\\":string;\\\"fallback\\\":string;\\\"text\\\":string}[];\\\"buttons\\\":string;\\\"channel\\\":string;\\\"fields\\\":string;\\\"icon_emoji\\\":string;\\\"icon_url\\\":string;\\\"image\\\":string;\\\"link_names\\\":boolean;\\\"messageToSend\\\":string;\\\"metadata\\\":{\\\"event_payload\\\":{\\\"id\\\":string;\\\"title\\\":string};\\\"event_type\\\":string};\\\"mrkdwn\\\":boolean;\\\"parse\\\":string;\\\"reply_broadcast\\\":boolean;\\\"thread_ts\\\":string;\\\"unfurl_links\\\":boolean;\\\"unfurl_media\\\":boolean;\\\"username\\\":string}\",\"useUrlInput\":false,\"id\":\"in_send_message_to_channel_v2\",\"name\":\"send_message_to_channel_v2\",\"displayName\":\"Channel\",\"description\":\"'Channel' input object\",\"type\":\"Generatedsend_message_to_channel_v2\",\"sortOrder\":null,\"format\":null,\"mask\":null,\"defaultValue\":\"{\\n  \\\"attachment\\\": {\\n    \\\"color\\\": null,\\n    \\\"image_url\\\": null,\\n    \\\"text\\\": null,\\n    \\\"title\\\": null,\\n    \\\"title_link\\\": null\\n  },\\n  \\\"attachments\\\": [\\n    {\\n      \\\"actions\\\": [\\n        {\\n          \\\"confirm\\\": {\\n            \\\"dismiss_text\\\": null,\\n            \\\"ok_text\\\": null,\\n            \\\"text\\\": null,\\n            \\\"title\\\": null\\n          },\\n          \\\"name\\\": null,\\n          \\\"style\\\": null,\\n          \\\"text\\\": null,\\n          \\\"type\\\": null,\\n          \\\"value\\\": null\\n        }\\n      ],\\n      \\\"attachment_type\\\": null,\\n      \\\"callback_id\\\": null,\\n      \\\"color\\\": null,\\n      \\\"fallback\\\": null,\\n      \\\"text\\\": null\\n    }\\n  ],\\n  \\\"buttons\\\": null,\\n  \\\"channel\\\": null,\\n  \\\"fields\\\": null,\\n  \\\"icon_emoji\\\": null,\\n  \\\"icon_url\\\": null,\\n  \\\"image\\\": null,\\n  \\\"link_names\\\": null,\\n  \\\"messageToSend\\\": null,\\n  \\\"metadata\\\": {\\n    \\\"event_payload\\\": {\\n      \\\"id\\\": null,\\n      \\\"title\\\": null\\n    },\\n    \\\"event_type\\\": null\\n  },\\n  \\\"mrkdwn\\\": null,\\n  \\\"parse\\\": null,\\n  \\\"reply_broadcast\\\": null,\\n  \\\"thread_ts\\\": null,\\n  \\\"unfurl_links\\\": null,\\n  \\\"unfurl_media\\\": null,\\n  \\\"username\\\": null\\n}\",\"primaryKey\":false,\"lookup\":null,\"enum\":null,\"design\":null,\"fieldActions\":null,\"searchable\":false,\"searchableOperators\":null,\"searchableNames\":null,\"searchableJoins\":null,\"required\":true,\"request\":false,\"response\":false,\"responseCurated\":false,\"fieldLocation\":\"jitObjectInput\",\"onCanvas\":null,\"isJitField\":true,\"isFieldActionParent\":false,\"isMainResponseField\":false,\"isMethodParameter\":false,\"isBackgroundField\":false,\"filterTree\":null,\"filterNeedsRefresh\":null,\"arrayInputPaths\":null,\"clrType\":{\"_elementType\":null,\"_isNullable\":false,\"isArray\":false,\"genericTypeArguments\":[],\"fullName\":null,\"name\":\"Object\",\"assemblyQualifiedName\":\"Object\",\"isValueType\":false},\"forceExpressionEditor\":false,\"requiredGroups\":null,\"disableExpressions\":false,\"backingField\":null,\"searchableDisplayName\":null,\"selectedResourceId\":null},\"inputMode\":null,\"searchableFields\":[],\"hasUnifiedTypes\":true,\"jitTypeHash\":null}}}",
           "uiPathActivityTypeId": "37a305b2-89b1-315d-b73f-1778839a6c47",
           "errorState": {
             "issues": []
           },
-          "configuration": "=jsonString:{\"essentialConfiguration\":{\"connectorVersion\":\"2.14.8\",\"customFieldsRequestDetails\":null,\"instanceParameters\":{\"connectorKey\":\"uipath-salesforce-slack\",\"objectName\":\"send_message_to_channel_v2\",\"httpMethod\":\"POST\",\"activityType\":\"Curated\",\"version\":\"1.0.0\",\"supportsStreaming\":false,\"subType\":\"standard\"},\"objectName\":\"send_message_to_channel_v2\",\"operation\":\"create\",\"packageVersion\":\"1.0.0\",\"httpMethod\":\"POST\",\"path\":\"/send_message_to_channel_v2\",\"unifiedTypesCompatible\":true,\"savedJitInputFieldId\":\"in_send_message_to_channel_v2\"}}"
+          "telemetryData": {
+            "connectorKey": "uipath-salesforce-slack",
+            "connectorName": "Slack",
+            "operationType": "create",
+            "objectName": "send_message_to_channel_v2",
+            "objectDisplayName": "Send message to channel",
+            "primaryKeyName": ""
+          }
+        }
+      },
+      "outputs": {
+        "output": {
+          "type": "object",
+          "description": "The return value of the connector.",
+          "source": "=result.response",
+          "var": "output"
+        },
+        "error": {
+          "type": "object",
+          "description": "Error information if the node fails",
+          "schema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "type": "object",
+            "required": [
+              "code",
+              "message",
+              "detail",
+              "category",
+              "status"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Error code as a string"
+              },
+              "message": {
+                "type": "string",
+                "description": "High-level error message"
+              },
+              "detail": {
+                "type": "string",
+                "description": "Detailed error description"
+              },
+              "category": {
+                "type": "string",
+                "description": "Error category"
+              },
+              "status": {
+                "type": "integer",
+                "description": "HTTP status code"
+              }
+            },
+            "additionalProperties": false
+          },
+          "source": "=Error",
+          "var": "error"
         }
       }
     },
@@ -513,10 +813,6 @@
           "source": "=Error",
           "var": "error"
         }
-      },
-      "position": {
-        "x": 0,
-        "y": 0
       }
     },
     {
@@ -525,7 +821,8 @@
       "typeVersion": "1.0.0",
       "display": {
         "label": "Recent PRs (GitHub API on the VM)",
-        "subLabel": "open 14d or merged 48h, with changed files"
+        "subLabel": "open 14d or merged 48h, with changed files",
+        "icon": "rpa"
       },
       "inputs": {
         "Script": {
@@ -618,10 +915,6 @@
             "additionalProperties": false
           }
         }
-      },
-      "position": {
-        "x": 0,
-        "y": 0
       }
     },
     {
@@ -690,10 +983,6 @@
           "source": "=Error",
           "var": "error"
         }
-      },
-      "position": {
-        "x": 0,
-        "y": 0
       }
     }
   ],
@@ -848,39 +1137,6 @@
             }
           ]
         }
-      }
-    },
-    {
-      "nodeType": "core.control.end",
-      "version": "1.0",
-      "category": "control-flow",
-      "description": "Mark the end of a process path",
-      "tags": [
-        "control-flow",
-        "end",
-        "finish",
-        "complete"
-      ],
-      "sortOrder": 66,
-      "display": {
-        "label": "End",
-        "icon": "circle-check",
-        "shape": "circle"
-      },
-      "handleConfiguration": [
-        {
-          "position": "left",
-          "handles": [
-            {
-              "id": "input",
-              "type": "target",
-              "handleType": "input"
-            }
-          ]
-        }
-      ],
-      "model": {
-        "type": "bpmn:EndEvent"
       }
     },
     {
@@ -1276,7 +1532,7 @@
     {
       "nodeType": "uipath.core.flow.4a7879cf-7494-4ada-9e83-ea487a4b55cb",
       "version": "1.0.0",
-      "category": "flow",
+      "category": "flow.in-solution",
       "runtimeConstraints": {
         "exclude": [
           "api-function"
@@ -1311,6 +1567,16 @@
               "id": "output",
               "type": "source",
               "handleType": "output"
+            },
+            {
+              "id": "error",
+              "label": "Error",
+              "type": "source",
+              "handleType": "output",
+              "visible": "{inputs.errorHandlingEnabled}",
+              "constraints": {
+                "maxConnections": 1
+              }
             }
           ]
         }
@@ -1569,6 +1835,39 @@
       }
     },
     {
+      "nodeType": "core.control.end",
+      "version": "1.0",
+      "category": "control-flow",
+      "description": "Mark the end of a process path",
+      "tags": [
+        "control-flow",
+        "end",
+        "finish",
+        "complete"
+      ],
+      "sortOrder": 66,
+      "display": {
+        "label": "End",
+        "icon": "circle-check",
+        "shape": "circle"
+      },
+      "handleConfiguration": [
+        {
+          "position": "left",
+          "handles": [
+            {
+              "id": "input",
+              "type": "target",
+              "handleType": "input"
+            }
+          ]
+        }
+      ],
+      "model": {
+        "type": "bpmn:EndEvent"
+      }
+    },
+    {
       "nodeType": "uipath.connector.uipath-salesforce-slack.send-message-to-channel",
       "version": "1.0.0",
       "category": "connector.196638",
@@ -1582,7 +1881,7 @@
       "display": {
         "label": "Send Message to Channel",
         "description": "Send messages to public or private Slack channels.",
-        "icon": "https://alpha.uipath.com/bc2ddac5-57bc-40e6-93fe-3b319b60ce36/studio_/typecache/icons/8af239e6c82c1abd57622314380112d55f7e151ac4845ba018a96d70b4d92297.svg",
+        "icon": "https://alpha.uipath.com/elements_/scaleunit_/3854d037-4ab5-4881-909b-968c433f6d88/v3/element/elements/uipath-salesforce-slack/image",
         "sourceDisplayName": "Slack"
       },
       "handleConfiguration": [
@@ -1838,7 +2137,7 @@
         "type": "bpmn:ServiceTask",
         "serviceType": "Orchestrator.StartJob",
         "version": "v2",
-        "listingVersion": "1.0.5",
+        "listingVersion": "1.0.8",
         "bindings": {
           "resource": "process",
           "resourceSubType": "Process",
@@ -2066,7 +2365,7 @@
         "id": "projects",
         "direction": "in",
         "type": "string",
-        "defaultValue": "studio-*",
+        "defaultValue": "studio-*,vsix-*",
         "triggerNodeId": "start"
       },
       {
@@ -2104,7 +2403,6 @@
       {
         "id": "selectTests.output",
         "type": "any",
-        "description": "The return value of the script",
         "schema": {
           "type": "object",
           "properties": {
@@ -2145,6 +2443,7 @@
             }
           }
         },
+        "description": "The return value of the script",
         "binding": {
           "nodeId": "selectTests",
           "outputId": "output"
@@ -2198,7 +2497,6 @@
       {
         "id": "investigate.error",
         "type": "object",
-        "description": "Error information if the node fails",
         "schema": {
           "$schema": "http://json-schema.org/draft-07/schema#",
           "type": "object",
@@ -2233,6 +2531,7 @@
           },
           "additionalProperties": false
         },
+        "description": "Error information if the node fails",
         "binding": {
           "nodeId": "investigate",
           "outputId": "error"
@@ -2283,7 +2582,6 @@
       {
         "id": "recordResult.output",
         "type": "any",
-        "description": "The return value of the script",
         "schema": {
           "type": "object",
           "properties": {
@@ -2342,6 +2640,7 @@
             }
           }
         },
+        "description": "The return value of the script",
         "binding": {
           "nodeId": "recordResult",
           "outputId": "output"
@@ -2359,7 +2658,6 @@
       {
         "id": "summarize.output",
         "type": "any",
-        "description": "The return value of the script",
         "schema": {
           "type": "object",
           "properties": {
@@ -2368,6 +2666,7 @@
             }
           }
         },
+        "description": "The return value of the script",
         "binding": {
           "nodeId": "summarize",
           "outputId": "output"
@@ -2383,18 +2682,8 @@
         }
       },
       {
-        "id": "replyInSlackThread1.output",
-        "type": "object",
-        "description": "The return value of the connector.",
-        "binding": {
-          "nodeId": "replyInSlackThread1",
-          "outputId": "output"
-        }
-      },
-      {
         "id": "replyInSlackThread1.error",
         "type": "object",
-        "description": "Error information if the node fails",
         "schema": {
           "$schema": "http://json-schema.org/draft-07/schema#",
           "type": "object",
@@ -2429,6 +2718,7 @@
           },
           "additionalProperties": false
         },
+        "description": "Error information if the node fails",
         "binding": {
           "nodeId": "replyInSlackThread1",
           "outputId": "error"
@@ -2437,7 +2727,6 @@
       {
         "id": "pickTests.output",
         "type": "any",
-        "description": "The return value of the script",
         "schema": {
           "type": "object",
           "properties": {
@@ -2556,6 +2845,7 @@
             }
           }
         },
+        "description": "The return value of the script",
         "binding": {
           "nodeId": "pickTests",
           "outputId": "output"
@@ -2597,7 +2887,6 @@
       {
         "id": "ghPrs.error",
         "type": "object",
-        "description": "Error information if the node fails",
         "schema": {
           "$schema": "http://json-schema.org/draft-07/schema#",
           "type": "object",
@@ -2632,6 +2921,7 @@
           },
           "additionalProperties": false
         },
+        "description": "Error information if the node fails",
         "binding": {
           "nodeId": "ghPrs",
           "outputId": "error"
@@ -2640,7 +2930,6 @@
       {
         "id": "parsePrs.output",
         "type": "any",
-        "description": "The return value of the script",
         "schema": {
           "type": "object",
           "properties": {
@@ -2678,6 +2967,7 @@
             }
           }
         },
+        "description": "The return value of the script",
         "binding": {
           "nodeId": "parsePrs",
           "outputId": "output"
@@ -2691,10 +2981,18 @@
           "nodeId": "parsePrs",
           "outputId": "error"
         }
+      },
+      {
+        "id": "replyInSlackThread1.output",
+        "type": "object",
+        "description": "The return value of the connector.",
+        "binding": {
+          "nodeId": "replyInSlackThread1",
+          "outputId": "output"
+        }
       }
     ]
   },
-  "runtime": "maestro",
   "bindings": [
     {
       "id": "bVmAgentName",
@@ -2722,8 +3020,8 @@
       "type": "string",
       "resource": "connection",
       "resourceKey": "ccf82d4b-3c2a-492f-bf8f-939b565366a2",
-      "propertyAttribute": "ConnectionId",
-      "default": "ccf82d4b-3c2a-492f-bf8f-939b565366a2"
+      "default": "ccf82d4b-3c2a-492f-bf8f-939b565366a2",
+      "propertyAttribute": "ConnectionId"
     },
     {
       "id": "b7OTt3AUG",
@@ -2731,8 +3029,7 @@
       "type": "string",
       "resource": "connection",
       "resourceKey": "ccf82d4b-3c2a-492f-bf8f-939b565366a2",
-      "propertyAttribute": "FolderKey",
-      "default": "0b28296b-1f4a-4ea9-a3d5-8b0abaac1cf0"
+      "propertyAttribute": "FolderKey"
     },
     {
       "id": "bVmExecName",
@@ -2775,7 +3072,8 @@
         "size": {
           "width": 96,
           "height": 96
-        }
+        },
+        "collapsed": false
       },
       "selectTests": {
         "position": {
@@ -2785,7 +3083,8 @@
         "size": {
           "width": 96,
           "height": 96
-        }
+        },
+        "collapsed": false
       },
       "investigate": {
         "position": {
@@ -2795,87 +3094,96 @@
         "size": {
           "width": 560,
           "height": 320
-        }
+        },
+        "collapsed": false
       },
       "callVmAgent": {
         "position": {
-          "x": 384,
-          "y": 256
+          "x": 112,
+          "y": 112
         },
         "size": {
           "width": 96,
           "height": 96
-        }
+        },
+        "collapsed": false
       },
       "recordResult": {
         "position": {
-          "x": 576,
-          "y": 272
+          "x": 320,
+          "y": 112
         },
         "size": {
           "width": 96,
           "height": 96
-        }
+        },
+        "collapsed": false
       },
       "summarize": {
         "position": {
-          "x": 1424,
-          "y": -96
+          "x": 1408,
+          "y": 0
         },
         "size": {
           "width": 96,
           "height": 96
-        }
+        },
+        "collapsed": false
       },
       "end": {
         "position": {
-          "x": 1808,
-          "y": -128
+          "x": 1792,
+          "y": 0
         },
         "size": {
           "width": 96,
           "height": 96
-        }
+        },
+        "collapsed": false
       },
       "replyInSlackThread1": {
         "position": {
-          "x": 1616,
-          "y": -112
+          "x": 1600,
+          "y": 0
         },
         "size": {
           "width": 96,
           "height": 96
-        }
+        },
+        "collapsed": false
       },
       "pickTests": {
         "position": {
           "x": 576,
-          "y": -48
+          "y": 0
         },
         "size": {
           "width": 96,
           "height": 96
-        }
+        },
+        "collapsed": false
       },
       "ghPrs": {
         "position": {
           "x": 192,
-          "y": -16
+          "y": 0
         },
         "size": {
           "width": 96,
           "height": 96
-        }
+        },
+        "collapsed": false
       },
       "parsePrs": {
         "position": {
           "x": 384,
-          "y": -32
+          "y": 0
         },
         "size": {
           "width": 96,
           "height": 96
-        }
+        },
+        "collapsed": false
       }
     }
   }

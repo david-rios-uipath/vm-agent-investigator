@@ -28,6 +28,14 @@ const night2 = JSON.parse(readFileSync(new URL('../../inputs/orchestrator-340893
   assert.equal(out.total, 3);
 }
 {
+  // The fixtures all set `projects`, so the default was never exercised - and the default is
+  // what the nightly actually runs with when the payload omits it.
+  const { projects, ...noProjects } = input;
+  const out = run('selectTests', { start: { output: noProjects } });
+  assert.equal(out.totalTests, 4, 'the default includes vsix');
+  assert.ok(out.groups.some((g) => g.project.startsWith('vsix-')), 'a vsix group survives the default filter');
+}
+{
   const out = run('selectTests', { start: { output: { ...input, failedTests: [{ project: 'studio-alpha', file: 'specs/a.spec.ts', title: 'has "quotes" and (parens) $1' }] } } });
   assert.match(out.groups[0].testCommand, /--grep "has \\"quotes\\" and \\\(parens\\\) \\\$1"$/);
 }
