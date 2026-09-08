@@ -60,7 +60,7 @@ const prFilesOut = [
     { number: 5, title: 'closed unmerged', html_url: 'u5', updated_at: now, state: 'closed', merged_at: null },
     ...Array.from({ length: 70 }, (_, i) => ({ number: 100 + i, title: 't', html_url: 'u', updated_at: now, state: 'open' }))];
   const out = run('recentPrs', { listOpenPrs1: { output: all } });
-  assert.equal(out.totalOpen, 75); assert.equal(out.prs.length, 60);
+  assert.equal(out.totalOpen, 75); assert.equal(out.prs.length, 25);
   assert.ok(out.prs.every((p) => p.number !== 1), 'stale open PR dropped'); assert.ok(out.prs.some((p) => p.number === 2), 'PascalCase read');
   assert.equal(out.prs.find((p) => p.number === 3).state, 'merged', 'recent merge kept as merged');
   assert.ok(out.prs.every((p) => p.number !== 4 && p.number !== 5), 'old merge and closed-unmerged dropped');

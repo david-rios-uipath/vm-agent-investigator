@@ -402,7 +402,7 @@
             "state": "all",
             "sort": "updated",
             "direction": "desc",
-            "pageSize": "100"
+            "pageSize": "25"
           },
           "pathParameters": {
             "repo": "flow-workbench"
@@ -438,7 +438,7 @@
           "method": "GET",
           "endpoint": "/{repo}/pulls/{pull_number}/files",
           "queryParameters": {
-            "pageSize": "100"
+            "pageSize": "30"
           },
           "pathParameters": {
             "repo": "flow-workbench",
@@ -619,14 +619,14 @@
       "typeVersion": "1.1",
       "display": {
         "label": "Recent open PRs",
-        "subLabel": "open (14 days) or merged (48h), max 60",
+        "subLabel": "open (14 days) or merged (48h), 25 most recently updated",
         "icon": "code"
       },
       "inputs": {
         "script": {
           "type": "literal",
           "fieldType": "string",
-          "expression": "// Connector payloads may arrive camelCase or PascalCase; read either.\nconst g = (o, k) => (o == null ? undefined : (o[k] !== undefined ? o[k] : o[k.charAt(0).toUpperCase() + k.slice(1)]));\nconst all = Array.isArray($vars.listOpenPrs1 && $vars.listOpenPrs1.output) ? $vars.listOpenPrs1.output : [];\nconst cutoff = Date.now() - 14 * 24 * 3600 * 1000;\nconst mergedCutoff = Date.now() - 48 * 3600 * 1000;\nconst prs = all\n  .map(pr => ({ number: g(pr, 'number'), title: g(pr, 'title') || '', url: g(pr, 'html_url') || g(pr, 'htmlUrl') || '', updatedAt: g(pr, 'updated_at') || g(pr, 'updatedAt') || '', mergedAt: g(pr, 'merged_at') || g(pr, 'mergedAt') || '', state: g(pr, 'state') || '' }))\n  // Open PRs may fix it; a PR merged after the nightly's commit already has. Closed-unmerged is noise.\n  .map(pr => ({ ...pr, state: pr.mergedAt ? 'merged' : pr.state }))\n  .filter(pr => pr.number && (pr.state === 'open' ? (!pr.updatedAt || Date.parse(pr.updatedAt) >= cutoff) : (pr.mergedAt && Date.parse(pr.mergedAt) >= mergedCutoff)))\n  .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)))\n  .slice(0, 60);\nreturn { prs, totalOpen: all.length };"
+          "expression": "// Connector payloads may arrive camelCase or PascalCase; read either.\nconst g = (o, k) => (o == null ? undefined : (o[k] !== undefined ? o[k] : o[k.charAt(0).toUpperCase() + k.slice(1)]));\nconst all = Array.isArray($vars.listOpenPrs1 && $vars.listOpenPrs1.output) ? $vars.listOpenPrs1.output : [];\nconst cutoff = Date.now() - 14 * 24 * 3600 * 1000;\nconst mergedCutoff = Date.now() - 48 * 3600 * 1000;\nconst prs = all\n  .map(pr => ({ number: g(pr, 'number'), title: g(pr, 'title') || '', url: g(pr, 'html_url') || g(pr, 'htmlUrl') || '', updatedAt: g(pr, 'updated_at') || g(pr, 'updatedAt') || '', mergedAt: g(pr, 'merged_at') || g(pr, 'mergedAt') || '', state: g(pr, 'state') || '' }))\n  // Maestro caps instance variables (~20 KB per PR from GitHub), so the list node fetches only the 25 most\n  // recently updated PRs. Open PRs may fix it; a PR merged after the nightly's commit already has. Closed-unmerged is noise.\n  .map(pr => ({ ...pr, state: pr.mergedAt ? 'merged' : pr.state }))\n  .filter(pr => pr.number && (pr.state === 'open' ? (!pr.updatedAt || Date.parse(pr.updatedAt) >= cutoff) : (pr.mergedAt && Date.parse(pr.mergedAt) >= mergedCutoff)))\n  .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)))\n  .slice(0, 25);\nreturn { prs, totalOpen: all.length };"
         }
       },
       "outputs": {
