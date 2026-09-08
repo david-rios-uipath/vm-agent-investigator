@@ -229,6 +229,15 @@ Sample payloads: `inputs/orchestrator-34015558366.json` (2026-09-06 nightly),
   `channel_not_found` on run 55f82a07 (the app is not a member of `#flow-dev-frontend`), the user
   token is. The node id is
   **`replyInSlackThread1`** — `uip maestro flow node add` does not let you choose an id.
+- **Open/merged PR check before investigating.** `ghPrs` is a `vm-exec-vm` job (no state key, 5 min) whose
+  PowerShell calls the GitHub API with the injected `GH_TOKEN`: the 40 most recently updated PRs, kept if open
+  (updated ≤14 days) or merged ≤48 h, each with its changed-file basenames, printed as one compact
+  `PRS_JSON=[{n,t,s,f}]` line (≈20 KB). `parsePrs` expands it; `pickTests` marks a group covered when a PR
+  touches its spec file or a page object named in its error line (`StudioProjectsPage`, `…Dialog`, `…Rail`…),
+  and gives the `maxTests` slots to uncovered groups. `recordResult` also relates VmAgent's hypothesis to those
+  PRs. Why on the VM: the Integration Service GitHub connector returns ~20 KB per PR and Maestro faulted with
+  "The instance's variables exceed the maximum allowed size" even at 10 PRs; 153 PRs with patches also stalled a
+  parallel loop for 10+ minutes. Keep flow variables small.
 - **CI hand-off:** flow-workbench PR
   [#3756](https://github.com/UiPath/flow-workbench/pull/3756) posts this payload from the
   nightly workflow. It resolves the release by process name `NightlyOrchestrator`, so do not
