@@ -1,0 +1,139 @@
+{
+ "runId": "34193167310",
+ "sha": "98113d98aa1a09afa9048c3d855c43a9d0bb3aae",
+ "runUrl": "https://github.com/UiPath/flow-workbench/actions/runs/34193167310",
+ "reportUrl": "https://theater.uipath.co/flow/98113d98aa1a09afa9048c3d855c43a9d0bb3aae/",
+ "slackTs": "1788852972.615549",
+ "projects": "studio-*,vsix-*",
+ "maxTests": 1,
+ "repoUrl": "https://github.com/UiPath/flow-workbench",
+ "branch": "develop",
+ "failedTests": [
+  {
+   "project": "vsix-staging-macos",
+   "file": "specs/inline-agents/agent-tools-vsix.spec.ts",
+   "title": "tools handle: a published MCP server tool attaches and wires to the agent @vsix",
+   "error": "Error: MCP loading completed, but no server tool row was rendered \u2014 verify the tenant has an MCP server with tools, that `canvas.nodes.mcp` reached the webview, and that the server's subtype is in `canvas.nodes.mcp-subtypes`."
+  },
+  {
+   "project": "vsix-staging-macos",
+   "file": "specs/inline-agents/agent-tools-vsix.spec.ts",
+   "title": "context handle: a published context-grounding index attaches and wires to the agent @vsix",
+   "error": "Error: No context-grounding index available on the test tenant \u2014 provision one under Indexes, or investigate the context fan-out."
+  },
+  {
+   "project": "vsix-staging-macos",
+   "file": "specs/vsix/package-and-deploy.spec.ts",
+   "title": "creates a Flow solution, packages it, and deploys it @vsix",
+   "error": "Error: Timed out waiting for FlowEditor webview frame (extensionId=uipath.uipath-maestro)."
+  },
+  {
+   "project": "vsix-alpha-linux",
+   "file": "specs/conversational-agents/in-solution-vsix.spec.ts",
+   "title": "an in-solution conversational agent is not offered as an inline-agent tool @vsix",
+   "error": "TimeoutError: locator.click: Timeout 10000ms exceeded."
+  },
+  {
+   "project": "vsix-alpha-linux",
+   "file": "specs/inline-agents/agent-tools-vsix.spec.ts",
+   "title": "tools handle: a published RPA workflow tool attaches and wires to the agent @vsix",
+   "error": "Error: locator.click: Timeout 10000ms exceeded."
+  },
+  {
+   "project": "vsix-alpha-linux",
+   "file": "specs/inline-agents/agent-tools-vsix.spec.ts",
+   "title": "tools handle: a published API workflow tool attaches and wires to the agent @vsix",
+   "error": "Error: locator.click: Timeout 10000ms exceeded."
+  },
+  {
+   "project": "vsix-alpha-linux",
+   "file": "specs/inline-agents/agent-tools-vsix.spec.ts",
+   "title": "tools handle: a published agent (agent-as-tool) tool attaches and wires to the agent @vsix",
+   "error": "Error: locator.click: Timeout 10000ms exceeded."
+  },
+  {
+   "project": "vsix-alpha-linux",
+   "file": "specs/inline-agents/agent-tools-vsix.spec.ts",
+   "title": "tools handle: a published Maestro BPMN process tool attaches and wires to the agent @vsix",
+   "error": "Error: locator.click: Timeout 10000ms exceeded."
+  },
+  {
+   "project": "vsix-alpha-linux",
+   "file": "specs/inline-agents/agent-tools-vsix.spec.ts",
+   "title": "tools handle: a published Maestro flow tool attaches and wires to the agent @vsix",
+   "error": "Error: locator.click: Timeout 10000ms exceeded."
+  },
+  {
+   "project": "vsix-alpha-linux",
+   "file": "specs/inline-agents/agent-tools-vsix.spec.ts",
+   "title": "tools handle: a published MCP server tool attaches and wires to the agent @vsix",
+   "error": "Error: locator.click: Timeout 10000ms exceeded."
+  },
+  {
+   "project": "vsix-alpha-linux",
+   "file": "specs/vsix/package-and-deploy.spec.ts",
+   "title": "creates a Flow solution, packages it, and deploys it @vsix",
+   "error": "Error: Timed out waiting for FlowEditor webview frame (extensionId=uipath.uipath-maestro)."
+  },
+  {
+   "project": "vsix-staging-linux",
+   "file": "specs/conversational-agents/in-solution-vsix.spec.ts",
+   "title": "an in-solution conversational agent is not offered as an inline-agent tool @vsix",
+   "error": "TimeoutError: locator.click: Timeout 10000ms exceeded."
+  },
+  {
+   "project": "vsix-staging-linux",
+   "file": "specs/inline-agents/agent-properties-vsix.spec.ts",
+   "title": "an edited system prompt survives reselecting the agent @vsix",
+   "error": "Error: Timed out waiting for FlowEditor webview frame (extensionId=uipath.uipath-maestro)."
+  },
+  {
+   "project": "vsix-staging-linux",
+   "file": "specs/inline-agents/agent-properties-vsix.spec.ts",
+   "title": "an edited user prompt survives reselecting the agent @vsix",
+   "error": "Error: Timed out waiting for FlowEditor webview frame (extensionId=uipath.uipath-maestro)."
+  },
+  {
+   "project": "vsix-alpha-windows",
+   "file": "specs/vsix/package-nested-solution.spec.ts",
+   "title": "packages a solution created in-place, without reopening the workspace at it @vsix",
+   "error": "TimeoutError: locator.waitFor: Timeout 30000ms exceeded."
+  },
+  {
+   "project": "vsix-alpha-windows",
+   "file": "specs/vsix/smoke.spec.ts",
+   "title": "signs in, builds and debugs a Script flow, then packages and deploys it @vsix @smoke",
+   "error": "Error: Timed out waiting for FlowEditor webview frame (extensionId=uipath.uipath-maestro)."
+  },
+  {
+   "project": "vsix-alpha-windows",
+   "file": "specs/inline-agents/agent-properties-vsix.spec.ts",
+   "title": "the model picker offers models and a selection survives reselecting the agent @vsix",
+   "error": "Error: no models offered \u2014 the host session is likely expired (vsix: re-run `uip login`)"
+  },
+  {
+   "project": "studio-alpha",
+   "file": "specs/inline-agents/agent-rename.spec.ts",
+   "title": "node id rename: a downstream expression reference and the incoming edge follow the rename @studio",
+   "error": "Error: the downstream prompt reference was not counted \u2014 did countNodeReferences stop scanning inputs?"
+  },
+  {
+   "project": "studio-alpha",
+   "file": "specs/inline-agents/agent-p2-batch.spec.ts",
+   "title": "node toolbar: collapsing agent tools hides the attached artifact and expanding restores it @studio",
+   "error": "Error: StudioProjectsPage.validate: the portal redirected to an auth error after 3 attempts (https://alpha.uipath.com/portal_/autherror?error=%20(429)). A \"(429)\" here means the identity service rate-limited us \u2014 the shared studio account is being authenticated by several shards at once."
+  },
+  {
+   "project": "studio-alpha",
+   "file": "specs/canvas/canvas-layout.spec.ts",
+   "title": "assertAllNodesInView should fail when content is out of bounds @standalone @studio",
+   "error": "Error: assertAllNodesInView: 2/3 nodes are outside visible area {\"x\":49,\"y\":122,\"width\":1063,\"height\":561}. Out of view: manualTrigger1: [x=517, y=115, w=96, h=96]; script1: [x=629, y=115, w=96, h=96]"
+  },
+  {
+   "project": "studio-alpha",
+   "file": "specs/canvas/canvas-layout.spec.ts",
+   "title": "should align two nodes left @standalone @studio",
+   "error": "Error: StudioProjectsPage.validate: the portal redirected to an auth error after 3 attempts (https://alpha.uipath.com/portal_/autherror?error=%20(429)). A \"(429)\" here means the identity service rate-limited us \u2014 the shared studio account is being authenticated by several shards at once."
+  }
+ ]
+}
