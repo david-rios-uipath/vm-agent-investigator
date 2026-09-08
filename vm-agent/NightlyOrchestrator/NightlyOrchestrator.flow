@@ -372,7 +372,7 @@
         "subLabel": "parallel"
       },
       "inputs": {
-        "collection": "=js:$vars.listOpenPrs.output",
+        "collection": "=js:$vars.listOpenPrs1.output || []",
         "parallel": true
       },
       "position": {
