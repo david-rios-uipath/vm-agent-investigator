@@ -42,6 +42,25 @@
         "UseConnectionService": "true",
         "Connector": "uipath-salesforce-slack"
       }
+    },
+    {
+      "resource": "connection",
+      "key": "3e9ae2b7-85a6-4271-8c23-5a620eed56e3",
+      "id": "connection3e9ae2b7-85a6-4271-8c23-5a620eed56e3",
+      "value": {
+        "ConnectionId": {
+          "defaultValue": "3e9ae2b7-85a6-4271-8c23-5a620eed56e3",
+          "isExpression": false,
+          "displayName": "uipath-microsoft-github connection"
+        }
+      },
+      "metadata": {
+        "ActivityName": "List open PRs",
+        "BindingsVersion": "2.2",
+        "DisplayLabel": "uipath-microsoft-github connection",
+        "UseConnectionService": "true",
+        "Connector": "uipath-microsoft-github"
+      }
     }
   ]
 }

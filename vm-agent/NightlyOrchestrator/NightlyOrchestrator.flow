@@ -21,14 +21,14 @@
       "typeVersion": "1.1",
       "display": {
         "label": "Select tests",
-        "subLabel": "filter by project, dedupe, cap at maxTests",
+        "subLabel": "dedupe, group by cause",
         "icon": "code"
       },
       "inputs": {
         "script": {
           "type": "literal",
           "fieldType": "string",
-          "expression": "const s = $vars.start.output;\nconst globs = String(s.projects || 'studio-*').split(',').map(g => g.trim()).filter(Boolean);\nconst matches = (p) => globs.some(g => new RegExp('^' + g.split('*').map(x => x.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')).join('.*') + '$').test(p));\n// One row per distinct test (same file+title across shards/platforms collapses).\nconst seen = new Set();\nconst rows = [];\nfor (const t of (s.failedTests || [])) {\n  if (!t || !matches(t.project || '')) continue;\n  const key = t.file + '::' + t.title;\n  if (seen.has(key)) continue;\n  seen.add(key);\n  rows.push(t);\n}\nrows.sort((a, b) => (a.file + a.title).localeCompare(b.file + b.title));\n// Tests whose first error line matches (digits/hashes ignored) share a cause. A named `Error:` groups\n// across spec files (shared infra failure); a bare timeout/locator message only within its file.\nconst norm = (e) => String(e || '').replace(/\\x1b\\[[0-9;]*m/g, '').split('\\n').map(l => l.trim()).find(Boolean) || '';\nconst causeKey = (t) => {\n  const n = norm(t.error).replace(/[0-9a-f]{8,}/gi, '#').replace(/\\d+/g, '#').slice(0, 160);\n  if (!n) return t.file + '::title:' + t.title;\n  return /^\\w*Error: /.test(n) && !/^TimeoutError/.test(n) ? 'err::' + n : t.file + '::' + n;\n};\nconst groups = [];\nconst byKey = new Map();\nfor (const t of rows) {\n  const k = causeKey(t);\n  const g = byKey.get(k);\n  if (g) { g.siblings.push(g.file === t.file ? t.title : `${t.file.split('/').pop()} › ${t.title}`); continue; }\n  const ng = { ...t, siblings: [] }; byKey.set(k, ng); groups.push(ng);\n}\n// Biggest cause first: it explains the most red.\ngroups.sort((a, b) => b.siblings.length - a.siblings.length);\nconst grep = (title) => String(title).replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&').replace(/\"/g, '\\\\\"');\nconst max = Number(s.maxTests) > 0 ? Number(s.maxTests) : 1;\nconst selected = groups.slice(0, max).map(t => ({\n  project: t.project, file: t.file, title: t.title, error: t.error || '', siblings: t.siblings,\n  testCommand: `corepack pnpm exec playwright test --config e2e/playwright.config.ts e2e/${t.file} --project ${t.project} --grep \"${grep(t.title)}\"`\n}));\nreturn { selected, skipped: groups.length - selected.length, total: groups.length, totalTests: rows.length };"
+          "expression": "const s = $vars.start.output;\nconst globs = String(s.projects || 'studio-*').split(',').map(g => g.trim()).filter(Boolean);\nconst matches = (p) => globs.some(g => new RegExp('^' + g.split('*').map(x => x.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')).join('.*') + '$').test(p));\n// One row per distinct test (same file+title across shards/platforms collapses).\nconst seen = new Set();\nconst rows = [];\nfor (const t of (s.failedTests || [])) {\n  if (!t || !matches(t.project || '')) continue;\n  const key = t.file + '::' + t.title;\n  if (seen.has(key)) continue;\n  seen.add(key);\n  rows.push(t);\n}\nrows.sort((a, b) => (a.file + a.title).localeCompare(b.file + b.title));\n// Tests whose first error line matches (digits/hashes ignored) share a cause. A named `Error:` groups\n// across spec files (shared infra failure); a bare timeout/locator message only within its file.\nconst norm = (e) => String(e || '').replace(/\\x1b\\[[0-9;]*m/g, '').split('\\n').map(l => l.trim()).find(Boolean) || '';\nconst causeKey = (t) => {\n  const n = norm(t.error).replace(/[0-9a-f]{8,}/gi, '#').replace(/\\d+/g, '#').slice(0, 160);\n  if (!n) return t.file + '::title:' + t.title;\n  return /^\\w*Error: /.test(n) && !/^TimeoutError/.test(n) ? 'err::' + n : t.file + '::' + n;\n};\nconst groups = [];\nconst byKey = new Map();\nfor (const t of rows) {\n  const k = causeKey(t);\n  const g = byKey.get(k);\n  if (g) { g.siblings.push(g.file === t.file ? t.title : `${t.file.split('/').pop()} › ${t.title}`); continue; }\n  const ng = { ...t, siblings: [] }; byKey.set(k, ng); groups.push(ng);\n}\n// Biggest cause first: it explains the most red.\ngroups.sort((a, b) => b.siblings.length - a.siblings.length);\nconst grep = (title) => String(title).replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&').replace(/\"/g, '\\\\\"');\nconst groups2 = groups.map(t => ({\n  project: t.project, file: t.file, title: t.title, error: t.error || '', siblings: t.siblings,\n  testCommand: `corepack pnpm exec playwright test --config e2e/playwright.config.ts e2e/${t.file} --project ${t.project} --grep \"${grep(t.title)}\"`\n}));\nreturn { groups: groups2, total: groups2.length, totalTests: rows.length };"
         }
       },
       "outputs": {
@@ -40,7 +40,13 @@
           "schema": {
             "type": "object",
             "properties": {
-              "selected": {
+              "total": {
+                "type": "number"
+              },
+              "totalTests": {
+                "type": "number"
+              },
+              "groups": {
                 "type": "array",
                 "items": {
                   "type": "object",
@@ -68,15 +74,6 @@
                     }
                   }
                 }
-              },
-              "skipped": {
-                "type": "number"
-              },
-              "total": {
-                "type": "number"
-              },
-              "totalTests": {
-                "type": "number"
               }
             }
           }
@@ -98,7 +95,7 @@
         "subLabel": "parallel, one VmAgent per test"
       },
       "inputs": {
-        "collection": "=js:$vars.selectTests.output['selected']",
+        "collection": "=js:$vars.pickTests.output['selected']",
         "parallel": true
       }
     },
@@ -210,7 +207,7 @@
         "script": {
           "type": "literal",
           "fieldType": "string",
-          "expression": "const t = $vars.investigate.currentItem;\nconst r = ($vars.callVmAgent && $vars.callVmAgent.output) || null;\nconst e = ($vars.callVmAgent && $vars.callVmAgent.error) || null;\nreturn {\n  project: t.project, file: t.file, title: t.title, siblings: t.siblings || [],\n  reproduced: !!(r && r.reproduced), fixVerified: !!(r && r.fixVerified),\n  prUrl: (r && r.prUrl) || '', hypothesis: (r && r.hypothesis) || '',\n  failed: !r || !!e, errorMessage: e ? String(e.message || e.code || 'VmAgent faulted') : ''\n};"
+          "expression": "const t = $vars.investigate.currentItem;\nconst r = ($vars.callVmAgent && $vars.callVmAgent.output) || null;\nconst e = ($vars.callVmAgent && $vars.callVmAgent.error) || null;\nconst base = (p) => String(p || '').split('/').pop().replace(/\\.(spec|test)?\\.?tsx?$/i, '').replace(/\\.[a-z]+$/i, '').toLowerCase();\nconst words = new Set();\nfor (const m of String((r && r.hypothesis) || '').matchAll(/\\b([A-Za-z][A-Za-z0-9-]+)\\.(tsx?|ts|css)\\b|\\b([A-Z][A-Za-z0-9]+(?:Page|Dialog|Panel|Rail|Service|Client|Store))\\b/g)) words.add((m[1] || m[3]).toLowerCase());\nconst relatedPrs = (($vars.pickTests.output || {}).prs || []).filter(pr => (pr.files || []).some(x => words.has(base(x)))).map(pr => ({ number: pr.number, title: pr.title, url: pr.url }));\nreturn {\n  project: t.project, file: t.file, title: t.title, siblings: t.siblings || [],\n  reproduced: !!(r && r.reproduced), fixVerified: !!(r && r.fixVerified),\n  prUrl: (r && r.prUrl) || '', hypothesis: (r && r.hypothesis) || '',\n  failed: !r || !!e, relatedPrs, errorMessage: e ? String(e.message || e.code || 'VmAgent faulted') : ''\n};"
         }
       },
       "outputs": {
@@ -254,6 +251,23 @@
                 "items": {
                   "type": "string"
                 }
+              },
+              "relatedPrs": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "number": {
+                      "type": "number"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "url": {
+                      "type": "string"
+                    }
+                  }
+                }
               }
             }
           }
@@ -279,7 +293,7 @@
         "script": {
           "type": "literal",
           "fieldType": "string",
-          "expression": "const s = $vars.start.output;\nconst sel = $vars.selectTests.output || { total: 0, skipped: 0, selected: [] };\nconst rows = ($vars.investigate.output || []).map(i => { const o = (i && i.recordResult && i.recordResult.output) || i; return o && o.title ? o : null; }).filter(Boolean);\nconst nTests = sel.totalTests || sel.total;\nconst head = `:robot_face: *VmAgent investigated ${rows.length} of ${sel.total} ${s.projects || 'studio-*'} failure groups* (${nTests} tests, <${s.runUrl}|run ${s.runId}>)` + (s.reportUrl ? ` · <${s.reportUrl}|report>` : '');\nif (sel.total === 0) return { text: `:robot_face: VmAgent: no ${s.projects || 'studio-*'} failures to investigate in <${s.runUrl}|run ${s.runId}>.` };\nconst spec = (f) => String(f).split('/').pop();\nconst lines = rows.map(r => {\n  if (r.failed) return `• \\`${spec(r.file)} › ${r.title}\\` — investigation faulted: ${r.errorMessage}`;\n  const parts = [r.reproduced ? 'reproduced' : 'not reproduced', r.fixVerified ? 'fix verified' : 'no verified fix', r.prUrl ? `<${r.prUrl}|draft PR>` : 'no PR'];\n  const sib = (r.siblings && r.siblings.length) ? ` (+${r.siblings.length} same cause: ${r.siblings.map(x => '`' + x + '`').join(', ')})` : '';\n  return `• \\`${spec(r.file)} › ${r.title}\\`${sib} — ${parts.join(', ')}` + (r.hypothesis ? `\\n    _${r.hypothesis.slice(0, 300)}_` : '');\n});\nif (sel.skipped > 0) lines.push(`_${sel.skipped} not investigated (maxTests=${s.maxTests})_`);\nreturn { text: [head, ...lines].join('\\n') };\n"
+          "expression": "const s = $vars.start.output;\nconst sel = $vars.pickTests.output || { total: 0, skipped: 0, selected: [], covered: [] };\nconst rows = ($vars.investigate.output || []).map(i => { const o = (i && i.recordResult && i.recordResult.output) || i; return o && o.title ? o : null; }).filter(Boolean);\nconst nTests = sel.totalTests || sel.total;\nconst head = `:robot_face: *VmAgent investigated ${rows.length} of ${sel.total} ${String(s.projects || 'studio-*').replace(/-?\\*/g, '')} failure groups* (${nTests} tests, <${s.runUrl}|run ${s.runId}>)` + (s.reportUrl ? ` · <${s.reportUrl}|report>` : '');\nif (sel.total === 0) return { text: `:robot_face: VmAgent: no ${String(s.projects || 'studio-*').replace(/-?\\*/g, '')} failures to investigate in <${s.runUrl}|run ${s.runId}>.` };\nconst spec = (f) => String(f).split('/').pop();\nconst lines = rows.map(r => {\n  if (r.failed) return `• \\`${spec(r.file)} › ${r.title}\\` — investigation faulted: ${r.errorMessage}`;\n  const parts = [r.reproduced ? 'reproduced' : 'not reproduced', r.fixVerified ? 'fix verified' : 'no verified fix', r.prUrl ? `<${r.prUrl}|draft PR>` : 'no PR'];\n  for (const pr of (r.relatedPrs || [])) parts.push(`related open <${pr.url}|PR #${pr.number}>`);\n  const sib = (r.siblings && r.siblings.length) ? ` (+${r.siblings.length} same cause: ${r.siblings.map(x => '`' + x + '`').join(', ')})` : '';\n  return `• \\`${spec(r.file)} › ${r.title}\\`${sib} — ${parts.join(', ')}` + (r.hypothesis ? `\\n    _${r.hypothesis.slice(0, 300)}_` : '');\n});\nfor (const c of (sel.covered || [])) {\n  const sib = (c.siblings && c.siblings.length) ? ` (+${c.siblings.length} same cause)` : '';\n  lines.push(`• \\`${spec(c.file)} › ${c.title}\\`${sib} — not investigated: open <${c.coveredBy.url}|PR #${c.coveredBy.number}> already touches \\`${c.coveredBy.file.split('/').pop()}\\``);\n}\nif (sel.skipped > 0) lines.push(`_${sel.skipped} not investigated (maxTests=${s.maxTests})_`);\nreturn { text: [head, ...lines].join('\\n') };\n"
         }
       },
       "outputs": {
@@ -348,6 +362,247 @@
           "configuration": "=jsonString:{\"essentialConfiguration\":{\"connectorVersion\":\"2.14.8\",\"customFieldsRequestDetails\":null,\"instanceParameters\":{\"connectorKey\":\"uipath-salesforce-slack\",\"objectName\":\"send_message_to_channel_v2\",\"httpMethod\":\"POST\",\"activityType\":\"Curated\",\"version\":\"1.0.0\",\"supportsStreaming\":false,\"subType\":\"standard\"},\"objectName\":\"send_message_to_channel_v2\",\"operation\":\"create\",\"packageVersion\":\"1.0.0\",\"httpMethod\":\"POST\",\"path\":\"/send_message_to_channel_v2\",\"unifiedTypesCompatible\":true,\"savedJitInputFieldId\":\"in_send_message_to_channel_v2\"}}"
         }
       }
+    },
+    {
+      "id": "prFiles",
+      "type": "core.logic.loop",
+      "typeVersion": "2.4",
+      "display": {
+        "label": "Files of each open PR",
+        "subLabel": "parallel"
+      },
+      "inputs": {
+        "collection": "=js:$vars.listOpenPrs.output",
+        "parallel": true
+      },
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "listOpenPrs1",
+      "type": "uipath.connector.uipath-microsoft-github.list-records",
+      "typeVersion": "1.0.0",
+      "display": {
+        "label": "List open PRs"
+      },
+      "inputs": {
+        "detail": {
+          "connector": "uipath-microsoft-github",
+          "connectionId": "3e9ae2b7-85a6-4271-8c23-5a620eed56e3",
+          "connectionResourceId": "3e9ae2b7-85a6-4271-8c23-5a620eed56e3",
+          "connectionFolderKey": "0b28296b-1f4a-4ea9-a3d5-8b0abaac1cf0",
+          "method": "GET",
+          "endpoint": "/{repo}/pulls",
+          "queryParameters": {
+            "state": "open",
+            "sort": "updated",
+            "direction": "desc",
+            "pageSize": "100"
+          },
+          "pathParameters": {
+            "repo": "UiPath/flow-workbench"
+          },
+          "uiPathActivityTypeId": "5d6fae7f-1ab5-3727-8c27-6cfa57ded5ed",
+          "errorState": {
+            "issues": []
+          },
+          "configuration": "=jsonString:{\"essentialConfiguration\":{\"connectorVersion\":\"2.6.14\",\"customFieldsRequestDetails\":null,\"instanceParameters\":{\"connectorKey\":\"uipath-microsoft-github\",\"activityType\":\"Generic\",\"version\":\"1.0.0\",\"operation\":\"list\",\"supportsStreaming\":false,\"objectName\":\"pulls\"},\"objectName\":\"pulls\",\"operation\":\"list\",\"packageVersion\":\"1.0.0\",\"httpMethod\":\"GET\",\"path\":\"/{repo}/pulls\",\"unifiedTypesCompatible\":true}}",
+          "inputMetadata": {
+            "operation": "list",
+            "pagination": {
+              "maxPageSize": 1000
+            }
+          }
+        },
+        "errorHandlingEnabled": true
+      }
+    },
+    {
+      "id": "listPrFiles1",
+      "type": "uipath.connector.uipath-microsoft-github.list-records",
+      "typeVersion": "1.0.0",
+      "display": {
+        "label": "List PR files"
+      },
+      "inputs": {
+        "detail": {
+          "connector": "uipath-microsoft-github",
+          "connectionId": "3e9ae2b7-85a6-4271-8c23-5a620eed56e3",
+          "connectionResourceId": "3e9ae2b7-85a6-4271-8c23-5a620eed56e3",
+          "connectionFolderKey": "0b28296b-1f4a-4ea9-a3d5-8b0abaac1cf0",
+          "method": "GET",
+          "endpoint": "/{repo}/pulls/{pull_number}/files",
+          "queryParameters": {
+            "pageSize": "100"
+          },
+          "pathParameters": {
+            "repo": "UiPath/flow-workbench",
+            "pull_number": "=js:$vars.prFiles.currentItem[\"number\"]"
+          },
+          "uiPathActivityTypeId": "5d6fae7f-1ab5-3727-8c27-6cfa57ded5ed",
+          "errorState": {
+            "issues": []
+          },
+          "configuration": "=jsonString:{\"essentialConfiguration\":{\"connectorVersion\":\"2.6.14\",\"customFieldsRequestDetails\":null,\"instanceParameters\":{\"connectorKey\":\"uipath-microsoft-github\",\"activityType\":\"Generic\",\"version\":\"1.0.0\",\"operation\":\"list\",\"supportsStreaming\":false,\"objectName\":\"pulls::files\"},\"objectName\":\"pulls::files\",\"operation\":\"list\",\"packageVersion\":\"1.0.0\",\"httpMethod\":\"GET\",\"path\":\"/{repo}/pulls/{pull_number}/files\",\"unifiedTypesCompatible\":true}}",
+          "inputMetadata": {
+            "operation": "list",
+            "pagination": {
+              "maxPageSize": 1000
+            }
+          }
+        },
+        "errorHandlingEnabled": true
+      },
+      "parentId": "prFiles"
+    },
+    {
+      "id": "pickTests",
+      "type": "core.action.script",
+      "typeVersion": "1.1",
+      "display": {
+        "label": "Pick tests",
+        "subLabel": "skip groups an open PR already touches, cap at maxTests",
+        "icon": "code"
+      },
+      "inputs": {
+        "script": {
+          "type": "literal",
+          "fieldType": "string",
+          "expression": "const s = $vars.start.output;\nconst sel = $vars.selectTests.output || { groups: [], total: 0, totalTests: 0 };\n// Connector payloads may arrive camelCase or PascalCase; read either.\nconst g = (o, k) => (o == null ? undefined : (o[k] !== undefined ? o[k] : o[k.charAt(0).toUpperCase() + k.slice(1)]));\nconst base = (path) => String(path || '').split('/').pop().replace(/\\.(spec|test)?\\.?tsx?$/i, '').replace(/\\.[a-z]+$/i, '').toLowerCase();\nconst prs = Array.isArray($vars.listOpenPrs1 && $vars.listOpenPrs1.output) ? $vars.listOpenPrs1.output : [];\nconst filesByPr = new Map();\nfor (const it of ($vars.prFiles.output || [])) {\n  const files = it && it.listPrFiles1 && it.listPrFiles1.output;\n  if (!Array.isArray(files) || !files.length) continue;\n  // The loop aggregate is positional; recover the PR number from the request path when possible.\n  filesByPr.set(filesByPr.size, files.map(x => String(g(x, 'filename') || '')));\n}\nconst prList = prs.map((pr, i) => ({ number: g(pr, 'number'), title: g(pr, 'title') || '', url: g(pr, 'html_url') || g(pr, 'htmlUrl') || '', files: filesByPr.get(i) || [] }));\n// A group is covered when an open PR touches its spec file or a page object named in its error.\nconst tokens = (t) => {\n  const set = new Set([base(t.file)]);\n  const first = String(t.error || '').split('\\n')[0];\n  for (const m of first.matchAll(/\\b([A-Z][A-Za-z0-9]+(?:Page|Dialog|Panel|Rail|Service|Client|Store))\\b/g)) set.add(m[1].toLowerCase());\n  return set;\n};\nconst covered = [];\nconst open = [];\nfor (const t of sel.groups || []) {\n  const tk = tokens(t);\n  let hit = null;\n  for (const pr of prList) {\n    const f = pr.files.find(x => x === t.file || x === 'e2e/' + t.file || tk.has(base(x)));\n    if (f) { hit = { number: pr.number, title: pr.title, url: pr.url, file: f }; break; }\n  }\n  if (hit) covered.push({ ...t, coveredBy: hit }); else open.push(t);\n}\nconst max = Number(s.maxTests) > 0 ? Number(s.maxTests) : 1;\nconst selected = open.slice(0, max);\nreturn { selected, covered, skipped: open.length - selected.length, total: sel.total, totalTests: sel.totalTests, prs: prList.map(p => ({ number: p.number, title: p.title, url: p.url, files: p.files })) };"
+        }
+      },
+      "outputs": {
+        "output": {
+          "type": "any",
+          "description": "The return value of the script",
+          "source": "=result.response",
+          "var": "output",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "selected": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "project": {
+                      "type": "string"
+                    },
+                    "file": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "testCommand": {
+                      "type": "string"
+                    },
+                    "siblings": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              },
+              "covered": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "project": {
+                      "type": "string"
+                    },
+                    "file": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "testCommand": {
+                      "type": "string"
+                    },
+                    "siblings": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "coveredBy": {
+                      "type": "object",
+                      "properties": {
+                        "number": {
+                          "type": "number"
+                        },
+                        "title": {
+                          "type": "string"
+                        },
+                        "url": {
+                          "type": "string"
+                        },
+                        "file": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "skipped": {
+                "type": "number"
+              },
+              "total": {
+                "type": "number"
+              },
+              "totalTests": {
+                "type": "number"
+              },
+              "prs": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "number": {
+                      "type": "number"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "url": {
+                      "type": "string"
+                    },
+                    "files": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "error": {
+          "type": "object",
+          "description": "Error information if the node fails",
+          "source": "=Error",
+          "var": "error"
+        }
+      },
+      "position": {
+        "x": 0,
+        "y": 0
+      }
     }
   ],
   "edges": [
@@ -356,13 +611,6 @@
       "sourceNodeId": "start",
       "sourcePort": "output",
       "targetNodeId": "selectTests",
-      "targetPort": "input"
-    },
-    {
-      "id": "e_select_loop",
-      "sourceNodeId": "selectTests",
-      "sourcePort": "success",
-      "targetNodeId": "investigate",
       "targetPort": "input"
     },
     {
@@ -412,6 +660,62 @@
       "sourceNodeId": "replyInSlackThread1",
       "sourcePort": "output",
       "targetNodeId": "end",
+      "targetPort": "input"
+    },
+    {
+      "id": "e_selectTests_success_listOpenPrs1",
+      "sourceNodeId": "selectTests",
+      "sourcePort": "success",
+      "targetNodeId": "listOpenPrs1",
+      "targetPort": "input"
+    },
+    {
+      "id": "e_listOpenPrs1_output_prFiles",
+      "sourceNodeId": "listOpenPrs1",
+      "sourcePort": "output",
+      "targetNodeId": "prFiles",
+      "targetPort": "input"
+    },
+    {
+      "id": "e_listOpenPrs1_error_pickTests",
+      "sourceNodeId": "listOpenPrs1",
+      "sourcePort": "error",
+      "targetNodeId": "pickTests",
+      "targetPort": "input"
+    },
+    {
+      "id": "e_prFiles_start_listPrFiles1",
+      "sourceNodeId": "prFiles",
+      "sourcePort": "start",
+      "targetNodeId": "listPrFiles1",
+      "targetPort": "input"
+    },
+    {
+      "id": "e_listPrFiles1_output_prFiles",
+      "sourceNodeId": "listPrFiles1",
+      "sourcePort": "output",
+      "targetNodeId": "prFiles",
+      "targetPort": "continue"
+    },
+    {
+      "id": "e_listPrFiles1_error_prFiles",
+      "sourceNodeId": "listPrFiles1",
+      "sourcePort": "error",
+      "targetNodeId": "prFiles",
+      "targetPort": "continue"
+    },
+    {
+      "id": "e_prFiles_success_pickTests",
+      "sourceNodeId": "prFiles",
+      "sourcePort": "success",
+      "targetNodeId": "pickTests",
+      "targetPort": "input"
+    },
+    {
+      "id": "e_pickTests_success_investigate",
+      "sourceNodeId": "pickTests",
+      "sourcePort": "success",
+      "targetNodeId": "investigate",
       "targetPort": "input"
     }
   ],
@@ -1409,6 +1713,221 @@
       "debug": {
         "runtime": "bpmnEngine"
       }
+    },
+    {
+      "nodeType": "uipath.connector.uipath-microsoft-github.list-records",
+      "version": "1.0.0",
+      "category": "connector.196612",
+      "tags": [
+        "connector",
+        "activity"
+      ],
+      "sortOrder": 520,
+      "supportsErrorHandling": true,
+      "description": "List records in GitHub",
+      "display": {
+        "label": "List Records",
+        "description": "List records in GitHub",
+        "icon": "https://alpha.uipath.com/bc2ddac5-57bc-40e6-93fe-3b319b60ce36/studio_/typecache/icons/a148a7da48f0292729a848ee809872b14dc92ff13dc63c8af2f9bf267ff391ea.svg",
+        "sourceDisplayName": "GitHub"
+      },
+      "handleConfiguration": [
+        {
+          "position": "left",
+          "handles": [
+            {
+              "id": "input",
+              "type": "target",
+              "handleType": "input",
+              "label": ""
+            }
+          ]
+        },
+        {
+          "position": "right",
+          "handles": [
+            {
+              "id": "output",
+              "type": "source",
+              "handleType": "output",
+              "label": ""
+            },
+            {
+              "id": "error",
+              "label": "Error",
+              "type": "source",
+              "handleType": "output",
+              "visible": "{inputs.errorHandlingEnabled}",
+              "constraints": {
+                "maxConnections": 1
+              }
+            }
+          ]
+        }
+      ],
+      "model": {
+        "type": "bpmn:SendTask",
+        "serviceType": "Intsvc.ActivityExecution",
+        "bindings": {
+          "resource": "connection",
+          "resourceKey": "",
+          "values": [
+            {
+              "name": "uipath-microsoft-github connection",
+              "propertyAttribute": "ConnectionId"
+            },
+            {
+              "name": "FolderKey",
+              "propertyAttribute": "FolderKey"
+            }
+          ]
+        },
+        "context": [
+          {
+            "name": "connectorKey",
+            "type": "string",
+            "value": "uipath-microsoft-github"
+          },
+          {
+            "name": "operation",
+            "type": "string"
+          },
+          {
+            "name": "objectName",
+            "type": "string"
+          },
+          {
+            "name": "method",
+            "type": "string"
+          },
+          {
+            "name": "connection",
+            "type": "string",
+            "value": "<bindings.uipath-microsoft-github connection>"
+          },
+          {
+            "name": "folderKey",
+            "type": "string",
+            "value": "<bindings.FolderKey>"
+          },
+          {
+            "name": "activityConfigurationVersion",
+            "type": "string",
+            "value": "v1"
+          },
+          {
+            "name": "metadata",
+            "body": {
+              "telemetryData": {
+                "connectorKey": "uipath-microsoft-github",
+                "connectorName": "List Records"
+              },
+              "inputMetadata": {},
+              "errorState": {
+                "hasError": true
+              }
+            },
+            "type": "json"
+          }
+        ]
+      },
+      "form": {
+        "id": "connector-properties",
+        "title": "Connector configuration",
+        "sections": [
+          {
+            "id": "connector",
+            "title": "Connector",
+            "collapsible": true,
+            "defaultExpanded": true,
+            "fields": [
+              {
+                "label": "",
+                "name": "inputs.detail",
+                "type": "custom",
+                "component": "dap-config",
+                "componentProps": {
+                  "connectorDetail": {
+                    "isAppActivity": false,
+                    "packageId": "196612",
+                    "svgIconUrl": "icons/a148a7da48f0292729a848ee809872b14dc92ff13dc63c8af2f9bf267ff391ea.svg",
+                    "displayName": "List Records",
+                    "assemblyQualifiedName": "UiPath.IntegrationService.Activities.Runtime.Activities.ConnectorActivity, UiPath.IntegrationService.Activities.Runtime, Version=1.33.0.0, Culture=neutral, PublicKeyToken=null",
+                    "description": "List records in GitHub",
+                    "category": "GitHub.Advanced",
+                    "activityColor": "#E56D5C",
+                    "configuration": "{\"connectorKey\":\"uipath-microsoft-github\",\"activityType\":\"Generic\",\"version\":\"1.0.0\",\"operation\":\"List\",\"supportsStreaming\":false}",
+                    "uiPathActivityTypeId": "5d6fae7f-1ab5-3727-8c27-6cfa57ded5ed",
+                    "isExperimental": false,
+                    "helpUrlTemplate": "https://docs.uipath.com/{0}/activities/other/latest/integration-service/uipath-microsoft-github-List-All-Records",
+                    "isEnabled": true,
+                    "targetPlatform": "CrossPlatform",
+                    "isAdvanced": false,
+                    "isRestricted": false,
+                    "hasWpfOnlyDesigner": false,
+                    "tags": [
+                      ""
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "inputDefinition": {},
+      "inputDefaults": {},
+      "outputDefinition": {
+        "output": {
+          "type": "object",
+          "description": "The return value of the connector.",
+          "source": "=result.response",
+          "var": "output"
+        },
+        "error": {
+          "type": "object",
+          "description": "Error information if the node fails",
+          "source": "=Error",
+          "var": "error",
+          "schema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "type": "object",
+            "required": [
+              "code",
+              "message",
+              "detail",
+              "category",
+              "status"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Error code as a string"
+              },
+              "message": {
+                "type": "string",
+                "description": "High-level error message"
+              },
+              "detail": {
+                "type": "string",
+                "description": "Detailed error description"
+              },
+              "category": {
+                "type": "string",
+                "description": "Error category"
+              },
+              "status": {
+                "type": "integer",
+                "description": "HTTP status code"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "debug": {
+        "runtime": "bpmnEngine"
+      }
     }
   ],
   "variables": {
@@ -1496,7 +2015,13 @@
         "schema": {
           "type": "object",
           "properties": {
-            "selected": {
+            "total": {
+              "type": "number"
+            },
+            "totalTests": {
+              "type": "number"
+            },
+            "groups": {
               "type": "array",
               "items": {
                 "type": "object",
@@ -1524,15 +2049,6 @@
                   }
                 }
               }
-            },
-            "skipped": {
-              "type": "number"
-            },
-            "total": {
-              "type": "number"
-            },
-            "totalTests": {
-              "type": "number"
             }
           }
         },
@@ -1710,6 +2226,23 @@
               "items": {
                 "type": "string"
               }
+            },
+            "relatedPrs": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "number": {
+                    "type": "number"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  }
+                }
+              }
             }
           }
         },
@@ -1804,6 +2337,319 @@
           "nodeId": "replyInSlackThread1",
           "outputId": "error"
         }
+      },
+      {
+        "id": "prFiles.currentItem",
+        "type": "any",
+        "description": "The current item being iterated in the loop",
+        "binding": {
+          "nodeId": "prFiles",
+          "outputId": "currentItem"
+        }
+      },
+      {
+        "id": "prFiles.currentIteration",
+        "type": "number",
+        "description": "The current iteration number (1-based)",
+        "binding": {
+          "nodeId": "prFiles",
+          "outputId": "currentIteration"
+        }
+      },
+      {
+        "id": "prFiles.collection",
+        "type": "array",
+        "description": "The collection being iterated over",
+        "binding": {
+          "nodeId": "prFiles",
+          "outputId": "collection"
+        }
+      },
+      {
+        "id": "prFiles.output",
+        "type": "array",
+        "description": "Aggregated results from all loop iterations",
+        "binding": {
+          "nodeId": "prFiles",
+          "outputId": "output"
+        }
+      },
+      {
+        "id": "prFiles.error",
+        "type": "object",
+        "description": "Error information if the node fails",
+        "schema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "required": [
+            "code",
+            "message",
+            "detail",
+            "category",
+            "status"
+          ],
+          "properties": {
+            "code": {
+              "type": "string",
+              "description": "Error code as a string"
+            },
+            "message": {
+              "type": "string",
+              "description": "High-level error message"
+            },
+            "detail": {
+              "type": "string",
+              "description": "Detailed error description"
+            },
+            "category": {
+              "type": "string",
+              "description": "Error category"
+            },
+            "status": {
+              "type": "integer",
+              "description": "HTTP status code"
+            }
+          },
+          "additionalProperties": false
+        },
+        "binding": {
+          "nodeId": "prFiles",
+          "outputId": "error"
+        }
+      },
+      {
+        "id": "listOpenPrs1.output",
+        "type": "object",
+        "description": "The return value of the connector.",
+        "binding": {
+          "nodeId": "listOpenPrs1",
+          "outputId": "output"
+        }
+      },
+      {
+        "id": "listOpenPrs1.error",
+        "type": "object",
+        "description": "Error information if the node fails",
+        "schema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "required": [
+            "code",
+            "message",
+            "detail",
+            "category",
+            "status"
+          ],
+          "properties": {
+            "code": {
+              "type": "string",
+              "description": "Error code as a string"
+            },
+            "message": {
+              "type": "string",
+              "description": "High-level error message"
+            },
+            "detail": {
+              "type": "string",
+              "description": "Detailed error description"
+            },
+            "category": {
+              "type": "string",
+              "description": "Error category"
+            },
+            "status": {
+              "type": "integer",
+              "description": "HTTP status code"
+            }
+          },
+          "additionalProperties": false
+        },
+        "binding": {
+          "nodeId": "listOpenPrs1",
+          "outputId": "error"
+        }
+      },
+      {
+        "id": "listPrFiles1.output",
+        "type": "object",
+        "description": "The return value of the connector.",
+        "binding": {
+          "nodeId": "listPrFiles1",
+          "outputId": "output"
+        }
+      },
+      {
+        "id": "listPrFiles1.error",
+        "type": "object",
+        "description": "Error information if the node fails",
+        "schema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "required": [
+            "code",
+            "message",
+            "detail",
+            "category",
+            "status"
+          ],
+          "properties": {
+            "code": {
+              "type": "string",
+              "description": "Error code as a string"
+            },
+            "message": {
+              "type": "string",
+              "description": "High-level error message"
+            },
+            "detail": {
+              "type": "string",
+              "description": "Detailed error description"
+            },
+            "category": {
+              "type": "string",
+              "description": "Error category"
+            },
+            "status": {
+              "type": "integer",
+              "description": "HTTP status code"
+            }
+          },
+          "additionalProperties": false
+        },
+        "binding": {
+          "nodeId": "listPrFiles1",
+          "outputId": "error"
+        }
+      },
+      {
+        "id": "pickTests.output",
+        "type": "any",
+        "description": "The return value of the script",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "selected": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "project": {
+                    "type": "string"
+                  },
+                  "file": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "error": {
+                    "type": "string"
+                  },
+                  "testCommand": {
+                    "type": "string"
+                  },
+                  "siblings": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            },
+            "covered": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "project": {
+                    "type": "string"
+                  },
+                  "file": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "error": {
+                    "type": "string"
+                  },
+                  "testCommand": {
+                    "type": "string"
+                  },
+                  "siblings": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "coveredBy": {
+                    "type": "object",
+                    "properties": {
+                      "number": {
+                        "type": "number"
+                      },
+                      "title": {
+                        "type": "string"
+                      },
+                      "url": {
+                        "type": "string"
+                      },
+                      "file": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "skipped": {
+              "type": "number"
+            },
+            "total": {
+              "type": "number"
+            },
+            "totalTests": {
+              "type": "number"
+            },
+            "prs": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "number": {
+                    "type": "number"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  },
+                  "files": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "binding": {
+          "nodeId": "pickTests",
+          "outputId": "output"
+        }
+      },
+      {
+        "id": "pickTests.error",
+        "type": "object",
+        "description": "Error information if the node fails",
+        "binding": {
+          "nodeId": "pickTests",
+          "outputId": "error"
+        }
       }
     ]
   },
@@ -1846,6 +2692,24 @@
       "resourceKey": "ccf82d4b-3c2a-492f-bf8f-939b565366a2",
       "propertyAttribute": "FolderKey",
       "default": "0b28296b-1f4a-4ea9-a3d5-8b0abaac1cf0"
+    },
+    {
+      "id": "bYxtKXquX",
+      "name": "uipath-microsoft-github connection",
+      "type": "string",
+      "resource": "connection",
+      "resourceKey": "3e9ae2b7-85a6-4271-8c23-5a620eed56e3",
+      "propertyAttribute": "ConnectionId",
+      "default": "3e9ae2b7-85a6-4271-8c23-5a620eed56e3"
+    },
+    {
+      "id": "blM5ouagQ",
+      "name": "FolderKey",
+      "type": "string",
+      "resource": "connection",
+      "resourceKey": "3e9ae2b7-85a6-4271-8c23-5a620eed56e3",
+      "propertyAttribute": "FolderKey",
+      "default": "0b28296b-1f4a-4ea9-a3d5-8b0abaac1cf0"
     }
   ],
   "layout": {
@@ -1872,8 +2736,8 @@
       },
       "investigate": {
         "position": {
-          "x": 192,
-          "y": -80
+          "x": 1264,
+          "y": -688
         },
         "size": {
           "width": 560,
@@ -1882,8 +2746,8 @@
       },
       "callVmAgent": {
         "position": {
-          "x": -192,
-          "y": 288
+          "x": 864,
+          "y": -800
         },
         "size": {
           "width": 96,
@@ -1892,8 +2756,8 @@
       },
       "recordResult": {
         "position": {
-          "x": 0,
-          "y": 304
+          "x": 1056,
+          "y": -816
         },
         "size": {
           "width": 96,
@@ -1902,8 +2766,8 @@
       },
       "summarize": {
         "position": {
-          "x": 848,
-          "y": -64
+          "x": 1920,
+          "y": -672
         },
         "size": {
           "width": 96,
@@ -1912,8 +2776,8 @@
       },
       "end": {
         "position": {
-          "x": 1232,
-          "y": -96
+          "x": 2304,
+          "y": -704
         },
         "size": {
           "width": 96,
@@ -1922,8 +2786,48 @@
       },
       "replyInSlackThread1": {
         "position": {
-          "x": 1040,
-          "y": -80
+          "x": 2112,
+          "y": -688
+        },
+        "size": {
+          "width": 96,
+          "height": 96
+        }
+      },
+      "prFiles": {
+        "position": {
+          "x": 400,
+          "y": -512
+        },
+        "size": {
+          "width": 560,
+          "height": 320
+        }
+      },
+      "listOpenPrs1": {
+        "position": {
+          "x": 192,
+          "y": -16
+        },
+        "size": {
+          "width": 96,
+          "height": 96
+        }
+      },
+      "listPrFiles1": {
+        "position": {
+          "x": 192,
+          "y": -208
+        },
+        "size": {
+          "width": 96,
+          "height": 96
+        }
+      },
+      "pickTests": {
+        "position": {
+          "x": 1056,
+          "y": -496
         },
         "size": {
           "width": 96,
