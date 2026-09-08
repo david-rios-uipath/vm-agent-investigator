@@ -48,11 +48,26 @@ const prs = [
   { number: 3700, title: 'chore: unrelated', html_url: 'https://github.com/UiPath/flow-workbench/pull/3700' },
 ];
 const prFilesOut = [
-  { listPrFiles1: { output: [{ filename: 'e2e/pages/StudioProjectsPage.ts' }, { filename: 'packages/canvas/src/components/properties-panel/neighbors/NeighborRail.tsx' }] } },
-  { listPrFiles1: { output: [{ filename: 'README.md' }] } },
+  { prFileNames: { output: { number: 3758, title: 'fix(e2e): revive three closed nightly fixes', url: 'https://github.com/UiPath/flow-workbench/pull/3758', files: ['e2e/pages/StudioProjectsPage.ts', 'packages/canvas/src/components/properties-panel/neighbors/NeighborRail.tsx'] } } },
+  { prFileNames: { output: { number: 3700, title: 'chore: unrelated', url: 'https://github.com/UiPath/flow-workbench/pull/3700', files: ['README.md'] } } },
 ];
+// recentPrs: 14-day window, newest first, max 25, tolerant of PascalCase
 {
-  const out = run('pickTests', { start: { output: night2 }, selectTests: { output: sel2 }, listOpenPrs1: { output: prs }, prFiles: { output: prFilesOut } });
+  const now = new Date().toISOString(); const old = new Date(Date.now() - 30 * 86400000).toISOString();
+  const all = [{ number: 1, title: 'a', html_url: 'u1', updated_at: old }, { Number: 2, Title: 'b', Html_url: 'u2', Updated_at: now }, ...Array.from({ length: 30 }, (_, i) => ({ number: 100 + i, title: 't', html_url: 'u', updated_at: now }))];
+  const out = run('recentPrs', { listOpenPrs1: { output: all } });
+  assert.equal(out.totalOpen, 32); assert.equal(out.prs.length, 25); assert.ok(out.prs.every((p) => p.number !== 1), 'stale PR dropped'); assert.ok(out.prs.some((p) => p.number === 2), 'PascalCase read');
+  assert.deepEqual(run('recentPrs', { listOpenPrs1: { error: { message: 'x' } } }), { prs: [], totalOpen: 0 });
+}
+// prFileNames: keeps paths only
+{
+  const out = run('prFileNames', { prFiles: { currentItem: { number: 5, title: 'x', url: 'u' } }, listPrFiles1: { output: [{ filename: 'a.ts', patch: '@@' }, { Filename: 'b.ts' }] } });
+  assert.deepEqual(out, { number: 5, title: 'x', url: 'u', files: ['a.ts', 'b.ts'] });
+  assert.deepEqual(run('prFileNames', { prFiles: { currentItem: { number: 5 } }, listPrFiles1: { error: {} } }).files, []);
+}
+console.log('recentPrs/prFileNames ok');
+{
+  const out = run('pickTests', { start: { output: night2 }, selectTests: { output: sel2 }, prFiles: { output: prFilesOut } });
   assert.equal(out.covered.length, 1, 'the auth-error group names StudioProjectsPage, which #3758 touches');
   assert.equal(out.covered[0].coveredBy.number, 3758);
   assert.equal(out.covered[0].coveredBy.file, 'e2e/pages/StudioProjectsPage.ts');
@@ -63,17 +78,15 @@ const prFilesOut = [
   assert.deepEqual(out.prs[0].files.length, 2);
 }
 {
-  // PascalCase payloads and a failed GitHub call both degrade to "nothing covered".
-  const out = run('pickTests', { start: { output: night2 }, selectTests: { output: sel2 }, listOpenPrs1: { output: [{ Number: 1, Title: 't', Html_url: 'u' }] }, prFiles: { output: [{ listPrFiles1: { output: [{ Filename: 'e2e/pages/StudioProjectsPage.ts' }] } }] } });
-  assert.equal(out.covered.length, 1);
-  const none = run('pickTests', { start: { output: night2 }, selectTests: { output: sel2 }, listOpenPrs1: { error: { message: 'x' } }, prFiles: { output: [] } });
+  // A failed GitHub call degrades to "nothing covered".
+  const none = run('pickTests', { start: { output: night2 }, selectTests: { output: sel2 }, prFiles: { output: [] } });
   assert.equal(none.covered.length, 0); assert.equal(none.selected.length, 1); assert.equal(none.skipped, 2);
 }
 console.log('pickTests ok');
 
 // recordResult: related PRs from the hypothesis
 {
-  const pick = run('pickTests', { start: { output: night2 }, selectTests: { output: sel2 }, listOpenPrs1: { output: prs }, prFiles: { output: prFilesOut } });
+  const pick = run('pickTests', { start: { output: night2 }, selectTests: { output: sel2 }, prFiles: { output: prFilesOut } });
   const t = pick.selected[0];
   const out = run('recordResult', { investigate: { currentItem: t }, pickTests: { output: pick },
     callVmAgent: { output: { reproduced: true, fixVerified: false, prUrl: '', hypothesis: 'The rail in NeighborRail.tsx:112 overlaps the close button' } } });
@@ -86,7 +99,7 @@ console.log('recordResult ok');
 
 // summarize
 {
-  const pick = run('pickTests', { start: { output: night2 }, selectTests: { output: sel2 }, listOpenPrs1: { output: prs }, prFiles: { output: prFilesOut } });
+  const pick = run('pickTests', { start: { output: night2 }, selectTests: { output: sel2 }, prFiles: { output: prFilesOut } });
   const row = { project: 'studio-alpha', file: 'specs/data-transform/data-transform.spec.ts', title: 'should add a Map operation with field mappings',
     reproduced: true, fixVerified: true, prUrl: 'https://github.com/UiPath/flow-workbench/pull/3729', hypothesis: 'neighbor rail intercepts click', failed: false, errorMessage: '',
     siblings: ['should write a Custom Script operation in a Data Transform node'], relatedPrs: [{ number: 3758, title: 't', url: 'https://github.com/UiPath/flow-workbench/pull/3758' }] };

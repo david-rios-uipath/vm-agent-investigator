@@ -372,7 +372,7 @@
         "subLabel": "parallel"
       },
       "inputs": {
-        "collection": "=js:$vars.listOpenPrs1.output || []",
+        "collection": "=js:$vars.recentPrs.output['prs']",
         "parallel": true
       },
       "position": {
@@ -470,7 +470,7 @@
         "script": {
           "type": "literal",
           "fieldType": "string",
-          "expression": "const s = $vars.start.output;\nconst sel = $vars.selectTests.output || { groups: [], total: 0, totalTests: 0 };\n// Connector payloads may arrive camelCase or PascalCase; read either.\nconst g = (o, k) => (o == null ? undefined : (o[k] !== undefined ? o[k] : o[k.charAt(0).toUpperCase() + k.slice(1)]));\nconst base = (path) => String(path || '').split('/').pop().replace(/\\.(spec|test)?\\.?tsx?$/i, '').replace(/\\.[a-z]+$/i, '').toLowerCase();\nconst prs = Array.isArray($vars.listOpenPrs1 && $vars.listOpenPrs1.output) ? $vars.listOpenPrs1.output : [];\nconst filesByPr = new Map();\nfor (const it of ($vars.prFiles.output || [])) {\n  const files = it && it.listPrFiles1 && it.listPrFiles1.output;\n  if (!Array.isArray(files) || !files.length) continue;\n  // The loop aggregate is positional; recover the PR number from the request path when possible.\n  filesByPr.set(filesByPr.size, files.map(x => String(g(x, 'filename') || '')));\n}\nconst prList = prs.map((pr, i) => ({ number: g(pr, 'number'), title: g(pr, 'title') || '', url: g(pr, 'html_url') || g(pr, 'htmlUrl') || '', files: filesByPr.get(i) || [] }));\n// A group is covered when an open PR touches its spec file or a page object named in its error.\nconst tokens = (t) => {\n  const set = new Set([base(t.file)]);\n  const first = String(t.error || '').split('\\n')[0];\n  for (const m of first.matchAll(/\\b([A-Z][A-Za-z0-9]+(?:Page|Dialog|Panel|Rail|Service|Client|Store))\\b/g)) set.add(m[1].toLowerCase());\n  return set;\n};\nconst covered = [];\nconst open = [];\nfor (const t of sel.groups || []) {\n  const tk = tokens(t);\n  let hit = null;\n  for (const pr of prList) {\n    const f = pr.files.find(x => x === t.file || x === 'e2e/' + t.file || tk.has(base(x)));\n    if (f) { hit = { number: pr.number, title: pr.title, url: pr.url, file: f }; break; }\n  }\n  if (hit) covered.push({ ...t, coveredBy: hit }); else open.push(t);\n}\nconst max = Number(s.maxTests) > 0 ? Number(s.maxTests) : 1;\nconst selected = open.slice(0, max);\nreturn { selected, covered, skipped: open.length - selected.length, total: sel.total, totalTests: sel.totalTests, prs: prList.map(p => ({ number: p.number, title: p.title, url: p.url, files: p.files })) };"
+          "expression": "const s = $vars.start.output;\nconst sel = $vars.selectTests.output || { groups: [], total: 0, totalTests: 0 };\n// Connector payloads may arrive camelCase or PascalCase; read either.\nconst g = (o, k) => (o == null ? undefined : (o[k] !== undefined ? o[k] : o[k.charAt(0).toUpperCase() + k.slice(1)]));\nconst base = (path) => String(path || '').split('/').pop().replace(/\\.(spec|test)?\\.?tsx?$/i, '').replace(/\\.[a-z]+$/i, '').toLowerCase();\nconst prList = ($vars.prFiles.output || [])\n  .map(it => (it && it.prFileNames && it.prFileNames.output) || (it && it.files ? it : null))\n  .filter(p => p && p.number)\n  .map(p => ({ number: p.number, title: p.title || '', url: p.url || '', files: (p.files || []).map(String) }));\n// A group is covered when an open PR touches its spec file or a page object named in its error.\nconst tokens = (t) => {\n  const set = new Set([base(t.file)]);\n  const first = String(t.error || '').split('\\n')[0];\n  for (const m of first.matchAll(/\\b([A-Z][A-Za-z0-9]+(?:Page|Dialog|Panel|Rail|Service|Client|Store))\\b/g)) set.add(m[1].toLowerCase());\n  return set;\n};\nconst covered = [];\nconst open = [];\nfor (const t of sel.groups || []) {\n  const tk = tokens(t);\n  let hit = null;\n  for (const pr of prList) {\n    const f = pr.files.find(x => x === t.file || x === 'e2e/' + t.file || tk.has(base(x)));\n    if (f) { hit = { number: pr.number, title: pr.title, url: pr.url, file: f }; break; }\n  }\n  if (hit) covered.push({ ...t, coveredBy: hit }); else open.push(t);\n}\nconst max = Number(s.maxTests) > 0 ? Number(s.maxTests) : 1;\nconst selected = open.slice(0, max);\nreturn { selected, covered, skipped: open.length - selected.length, total: sel.total, totalTests: sel.totalTests, prs: prList };"
         }
       },
       "outputs": {
@@ -603,6 +603,125 @@
         "x": 0,
         "y": 0
       }
+    },
+    {
+      "id": "recentPrs",
+      "type": "core.action.script",
+      "typeVersion": "1.1",
+      "display": {
+        "label": "Recent open PRs",
+        "subLabel": "updated in the last 14 days, max 25",
+        "icon": "code"
+      },
+      "inputs": {
+        "script": {
+          "type": "literal",
+          "fieldType": "string",
+          "expression": "// Connector payloads may arrive camelCase or PascalCase; read either.\nconst g = (o, k) => (o == null ? undefined : (o[k] !== undefined ? o[k] : o[k.charAt(0).toUpperCase() + k.slice(1)]));\nconst all = Array.isArray($vars.listOpenPrs1 && $vars.listOpenPrs1.output) ? $vars.listOpenPrs1.output : [];\nconst cutoff = Date.now() - 14 * 24 * 3600 * 1000;\nconst prs = all\n  .map(pr => ({ number: g(pr, 'number'), title: g(pr, 'title') || '', url: g(pr, 'html_url') || g(pr, 'htmlUrl') || '', updatedAt: g(pr, 'updated_at') || g(pr, 'updatedAt') || '' }))\n  .filter(pr => pr.number && (!pr.updatedAt || Date.parse(pr.updatedAt) >= cutoff))\n  .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)))\n  .slice(0, 25);\nreturn { prs, totalOpen: all.length };"
+        }
+      },
+      "outputs": {
+        "output": {
+          "type": "any",
+          "description": "The return value of the script",
+          "source": "=result.response",
+          "var": "output",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "prs": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "number": {
+                      "type": "number"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "url": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "totalOpen": {
+                "type": "number"
+              }
+            }
+          }
+        },
+        "error": {
+          "type": "object",
+          "description": "Error information if the node fails",
+          "source": "=Error",
+          "var": "error"
+        }
+      },
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "prFileNames",
+      "type": "core.action.script",
+      "typeVersion": "1.1",
+      "display": {
+        "label": "File names",
+        "subLabel": "drop patches, keep paths",
+        "icon": "code"
+      },
+      "inputs": {
+        "script": {
+          "type": "literal",
+          "fieldType": "string",
+          "expression": "const g = (o, k) => (o == null ? undefined : (o[k] !== undefined ? o[k] : o[k.charAt(0).toUpperCase() + k.slice(1)]));\nconst pr = $vars.prFiles.currentItem || {};\nconst files = Array.isArray($vars.listPrFiles1 && $vars.listPrFiles1.output) ? $vars.listPrFiles1.output : [];\nreturn { number: pr.number, title: pr.title, url: pr.url, files: files.map(x => String(g(x, 'filename') || '')).filter(Boolean) };"
+        }
+      },
+      "outputs": {
+        "output": {
+          "type": "any",
+          "description": "The return value of the script",
+          "source": "=result.response",
+          "var": "output",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "number": {
+                "type": "number"
+              },
+              "title": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string"
+              },
+              "files": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "error": {
+          "type": "object",
+          "description": "Error information if the node fails",
+          "source": "=Error",
+          "var": "error"
+        }
+      },
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "parentId": "prFiles"
     }
   ],
   "edges": [
@@ -670,13 +789,6 @@
       "targetPort": "input"
     },
     {
-      "id": "e_listOpenPrs1_output_prFiles",
-      "sourceNodeId": "listOpenPrs1",
-      "sourcePort": "output",
-      "targetNodeId": "prFiles",
-      "targetPort": "input"
-    },
-    {
       "id": "e_listOpenPrs1_error_pickTests",
       "sourceNodeId": "listOpenPrs1",
       "sourcePort": "error",
@@ -691,20 +803,6 @@
       "targetPort": "input"
     },
     {
-      "id": "e_listPrFiles1_output_prFiles",
-      "sourceNodeId": "listPrFiles1",
-      "sourcePort": "output",
-      "targetNodeId": "prFiles",
-      "targetPort": "continue"
-    },
-    {
-      "id": "e_listPrFiles1_error_prFiles",
-      "sourceNodeId": "listPrFiles1",
-      "sourcePort": "error",
-      "targetNodeId": "prFiles",
-      "targetPort": "continue"
-    },
-    {
       "id": "e_prFiles_success_pickTests",
       "sourceNodeId": "prFiles",
       "sourcePort": "success",
@@ -717,6 +815,41 @@
       "sourcePort": "success",
       "targetNodeId": "investigate",
       "targetPort": "input"
+    },
+    {
+      "id": "e_listOpenPrs1_output_recentPrs",
+      "sourceNodeId": "listOpenPrs1",
+      "sourcePort": "output",
+      "targetNodeId": "recentPrs",
+      "targetPort": "input"
+    },
+    {
+      "id": "e_recentPrs_success_prFiles",
+      "sourceNodeId": "recentPrs",
+      "sourcePort": "success",
+      "targetNodeId": "prFiles",
+      "targetPort": "input"
+    },
+    {
+      "id": "e_listPrFiles1_output_prFileNames",
+      "sourceNodeId": "listPrFiles1",
+      "sourcePort": "output",
+      "targetNodeId": "prFileNames",
+      "targetPort": "input"
+    },
+    {
+      "id": "e_listPrFiles1_error_prFileNames",
+      "sourceNodeId": "listPrFiles1",
+      "sourcePort": "error",
+      "targetNodeId": "prFileNames",
+      "targetPort": "input"
+    },
+    {
+      "id": "e_prFileNames_success_prFiles",
+      "sourceNodeId": "prFileNames",
+      "sourcePort": "success",
+      "targetNodeId": "prFiles",
+      "targetPort": "continue"
     }
   ],
   "definitions": [
@@ -2650,6 +2783,90 @@
           "nodeId": "pickTests",
           "outputId": "error"
         }
+      },
+      {
+        "id": "recentPrs.output",
+        "type": "any",
+        "description": "The return value of the script",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "prs": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "number": {
+                    "type": "number"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  },
+                  "updatedAt": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "totalOpen": {
+              "type": "number"
+            }
+          }
+        },
+        "binding": {
+          "nodeId": "recentPrs",
+          "outputId": "output"
+        }
+      },
+      {
+        "id": "recentPrs.error",
+        "type": "object",
+        "description": "Error information if the node fails",
+        "binding": {
+          "nodeId": "recentPrs",
+          "outputId": "error"
+        }
+      },
+      {
+        "id": "prFileNames.output",
+        "type": "any",
+        "description": "The return value of the script",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "number": {
+              "type": "number"
+            },
+            "title": {
+              "type": "string"
+            },
+            "url": {
+              "type": "string"
+            },
+            "files": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "binding": {
+          "nodeId": "prFileNames",
+          "outputId": "output"
+        }
+      },
+      {
+        "id": "prFileNames.error",
+        "type": "object",
+        "description": "Error information if the node fails",
+        "binding": {
+          "nodeId": "prFileNames",
+          "outputId": "error"
+        }
       }
     ]
   },
@@ -2736,8 +2953,8 @@
       },
       "investigate": {
         "position": {
-          "x": 1264,
-          "y": -688
+          "x": 1440,
+          "y": 304
         },
         "size": {
           "width": 560,
@@ -2746,8 +2963,8 @@
       },
       "callVmAgent": {
         "position": {
-          "x": 864,
-          "y": -800
+          "x": 1040,
+          "y": 672
         },
         "size": {
           "width": 96,
@@ -2756,8 +2973,8 @@
       },
       "recordResult": {
         "position": {
-          "x": 1056,
-          "y": -816
+          "x": 1248,
+          "y": 688
         },
         "size": {
           "width": 96,
@@ -2766,8 +2983,8 @@
       },
       "summarize": {
         "position": {
-          "x": 1920,
-          "y": -672
+          "x": 2096,
+          "y": 320
         },
         "size": {
           "width": 96,
@@ -2776,8 +2993,8 @@
       },
       "end": {
         "position": {
-          "x": 2304,
-          "y": -704
+          "x": 2480,
+          "y": 288
         },
         "size": {
           "width": 96,
@@ -2786,8 +3003,8 @@
       },
       "replyInSlackThread1": {
         "position": {
-          "x": 2112,
-          "y": -688
+          "x": 2288,
+          "y": 304
         },
         "size": {
           "width": 96,
@@ -2796,8 +3013,8 @@
       },
       "prFiles": {
         "position": {
-          "x": 400,
-          "y": -512
+          "x": 576,
+          "y": 144
         },
         "size": {
           "width": 560,
@@ -2817,7 +3034,7 @@
       "listPrFiles1": {
         "position": {
           "x": 192,
-          "y": -208
+          "y": 512
         },
         "size": {
           "width": 96,
@@ -2826,8 +3043,28 @@
       },
       "pickTests": {
         "position": {
-          "x": 1056,
-          "y": -496
+          "x": 1248,
+          "y": 160
+        },
+        "size": {
+          "width": 96,
+          "height": 96
+        }
+      },
+      "recentPrs": {
+        "position": {
+          "x": 384,
+          "y": 528
+        },
+        "size": {
+          "width": 96,
+          "height": 96
+        }
+      },
+      "prFileNames": {
+        "position": {
+          "x": 384,
+          "y": 528
         },
         "size": {
           "width": 96,
