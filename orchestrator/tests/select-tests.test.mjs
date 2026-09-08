@@ -54,9 +54,9 @@ const prFilesOut = [
 // recentPrs: 14-day window, newest first, max 25, tolerant of PascalCase
 {
   const now = new Date().toISOString(); const old = new Date(Date.now() - 30 * 86400000).toISOString();
-  const all = [{ number: 1, title: 'a', html_url: 'u1', updated_at: old }, { Number: 2, Title: 'b', Html_url: 'u2', Updated_at: now }, ...Array.from({ length: 30 }, (_, i) => ({ number: 100 + i, title: 't', html_url: 'u', updated_at: now }))];
+  const all = [{ number: 1, title: 'a', html_url: 'u1', updated_at: old }, { Number: 2, Title: 'b', Html_url: 'u2', Updated_at: now }, ...Array.from({ length: 70 }, (_, i) => ({ number: 100 + i, title: 't', html_url: 'u', updated_at: now }))];
   const out = run('recentPrs', { listOpenPrs1: { output: all } });
-  assert.equal(out.totalOpen, 32); assert.equal(out.prs.length, 25); assert.ok(out.prs.every((p) => p.number !== 1), 'stale PR dropped'); assert.ok(out.prs.some((p) => p.number === 2), 'PascalCase read');
+  assert.equal(out.totalOpen, 72); assert.equal(out.prs.length, 60); assert.ok(out.prs.every((p) => p.number !== 1), 'stale PR dropped'); assert.ok(out.prs.some((p) => p.number === 2), 'PascalCase read');
   assert.deepEqual(run('recentPrs', { listOpenPrs1: { error: { message: 'x' } } }), { prs: [], totalOpen: 0 });
 }
 // prFileNames: keeps paths only

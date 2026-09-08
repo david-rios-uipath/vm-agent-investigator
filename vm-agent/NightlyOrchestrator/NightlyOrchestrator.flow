@@ -610,14 +610,14 @@
       "typeVersion": "1.1",
       "display": {
         "label": "Recent open PRs",
-        "subLabel": "updated in the last 14 days, max 25",
+        "subLabel": "updated in the last 14 days, max 60",
         "icon": "code"
       },
       "inputs": {
         "script": {
           "type": "literal",
           "fieldType": "string",
-          "expression": "// Connector payloads may arrive camelCase or PascalCase; read either.\nconst g = (o, k) => (o == null ? undefined : (o[k] !== undefined ? o[k] : o[k.charAt(0).toUpperCase() + k.slice(1)]));\nconst all = Array.isArray($vars.listOpenPrs1 && $vars.listOpenPrs1.output) ? $vars.listOpenPrs1.output : [];\nconst cutoff = Date.now() - 14 * 24 * 3600 * 1000;\nconst prs = all\n  .map(pr => ({ number: g(pr, 'number'), title: g(pr, 'title') || '', url: g(pr, 'html_url') || g(pr, 'htmlUrl') || '', updatedAt: g(pr, 'updated_at') || g(pr, 'updatedAt') || '' }))\n  .filter(pr => pr.number && (!pr.updatedAt || Date.parse(pr.updatedAt) >= cutoff))\n  .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)))\n  .slice(0, 25);\nreturn { prs, totalOpen: all.length };"
+          "expression": "// Connector payloads may arrive camelCase or PascalCase; read either.\nconst g = (o, k) => (o == null ? undefined : (o[k] !== undefined ? o[k] : o[k.charAt(0).toUpperCase() + k.slice(1)]));\nconst all = Array.isArray($vars.listOpenPrs1 && $vars.listOpenPrs1.output) ? $vars.listOpenPrs1.output : [];\nconst cutoff = Date.now() - 14 * 24 * 3600 * 1000;\nconst prs = all\n  .map(pr => ({ number: g(pr, 'number'), title: g(pr, 'title') || '', url: g(pr, 'html_url') || g(pr, 'htmlUrl') || '', updatedAt: g(pr, 'updated_at') || g(pr, 'updatedAt') || '' }))\n  .filter(pr => pr.number && (!pr.updatedAt || Date.parse(pr.updatedAt) >= cutoff))\n  .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)))\n  .slice(0, 60);\nreturn { prs, totalOpen: all.length };"
         }
       },
       "outputs": {
@@ -3054,7 +3054,7 @@
       "recentPrs": {
         "position": {
           "x": 384,
-          "y": 528
+          "y": 160
         },
         "size": {
           "width": 96,

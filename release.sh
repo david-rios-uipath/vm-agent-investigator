@@ -48,10 +48,15 @@ echo "$PUB" | grep -q "\"PackageVersion\": \"$VERSION\"" || { echo "publish of $
 echo "published $VERSION"
 
 # stop anything running in the folder, then replace the deployment in place
+FK=$(uip or folders list --all --name "$DEPLOY" --output json 2>/dev/null | python3 -c "
+import sys,json;t=sys.stdin.read();d=json.loads(t[t.find('{'):]);D=d['Data'];items=D if isinstance(D,list) else next((v for v in D.values() if isinstance(v,list)),[])
+print(next((x['Key'] for x in items if x.get('Name')=='$DEPLOY'),''))")
 for k in $(uip or jobs list --folder-path "$FOLDER" --output json 2>/dev/null | python3 -c "
 import sys,json;t=sys.stdin.read();i=t.find('{');d=json.loads(t[i:])
-print(' '.join(x['Key'] for x in d['Data'] if x.get('State') in ('Running','Pending','Suspended')))"); do
-  uip or jobs stop "$k" --strategy Kill >/dev/null 2>&1 || true
+print(' '.join(x['Key'] for x in d['Data'] if x.get('State') in ('Running','Pending','Suspended','Terminating')))"); do
+  # Maestro flow jobs must be cancelled through Maestro; a Kill leaves them Terminating forever.
+  uip maestro flow instance cancel "$k" -f "$FK" --comment "release $VERSION" >/dev/null 2>&1 \
+    || uip or jobs stop "$k" >/dev/null 2>&1 || true
 done
 n=0; until [ $n -ge 18 ] || [ "$(uip or jobs list --folder-path "$FOLDER" --output json 2>/dev/null | python3 -c "
 import sys,json;t=sys.stdin.read();i=t.find('{');d=json.loads(t[i:]);print(len([x for x in d['Data'] if x.get('State') in ('Running','Stopping','Pending','Suspended')]))")" = "0" ]; do sleep 10; n=$((n+1)); done
