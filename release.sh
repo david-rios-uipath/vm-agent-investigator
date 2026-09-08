@@ -43,7 +43,9 @@ print('NightlyOrchestrator bindings_v2:', orch)
 assert '4a7879cf-7494-4ada-9e83-ea487a4b55cb' in orch, \
     'VmAgent flow binding missing from orchestrator package - not publishing'
 PY
-uip solution publish "$ZIP" --output json | grep '"PackageVersion"'
+PUB=$(uip solution publish "$ZIP" --output json 2>&1)
+echo "$PUB" | grep -q "\"PackageVersion\": \"$VERSION\"" || { echo "publish of $VERSION failed (a version that already exists is rejected):"; echo "$PUB" | grep -E '"Message"|"Result"' | head -3; exit 1; }
+echo "published $VERSION"
 
 # stop anything running in the folder, then replace the deployment in place
 for k in $(uip or jobs list --folder-path "$FOLDER" --output json 2>/dev/null | python3 -c "
