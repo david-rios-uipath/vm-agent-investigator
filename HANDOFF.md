@@ -201,7 +201,14 @@ Trigger inputs:
 | `repoUrl` | string | `https://github.com/UiPath/flow-workbench` | repo VmAgent checks out |
 | `branch` | string | `develop` | branch VmAgent checks out |
 
-Sample payload: `inputs/orchestrator-34015558366.json`.
+Sample payloads: `inputs/orchestrator-34015558366.json` (2026-09-06 nightly),
+`inputs/orchestrator-34089391590.json` (2026-09-07 nightly, 6 tests, 3 causes).
+
+- **One `VmAgent` per failure cause, not per test.** `selectTests` dedupes `file + title` across
+  shards, then groups by the first error line (digits/hashes ignored): a named `Error:` groups
+  across spec files (shared infra failure, e.g. the auth-redirect error), a bare
+  `TimeoutError`/locator message only within its file. Biggest group is investigated first; the
+  rest of a group is listed as siblings in the Slack row. `total` counts groups, `totalTests` tests.
 
 - **`maxTests` must equal the robot pool's VM count — today that is 1.** The loop is
   `parallel: true`, so each selected test starts its own `VmAgent` job at once; with one VM the
@@ -214,7 +221,9 @@ Sample payload: `inputs/orchestrator-34015558366.json`.
   `send_message_to_channel_v2`. `thread_ts` is `=js:$vars.start.output.slackTs || undefined`, so
   an empty `slackTs` posts a top-level message instead of failing (unverified: no run has reached
   the Slack node yet). Channel `C0AH25MT3L5`,
-  connection `david.rios` (`uipath-salesforce-slack`), `send_as=bot`. The node id is
+  connection `david.rios` (`uipath-salesforce-slack`), **`send_as=user`** — the bot identity got
+  `channel_not_found` on run 55f82a07 (the app is not a member of `#flow-dev-frontend`), the user
+  token is. The node id is
   **`replyInSlackThread1`** — `uip maestro flow node add` does not let you choose an id.
 - **CI hand-off:** flow-workbench PR
   [#3756](https://github.com/UiPath/flow-workbench/pull/3756) posts this payload from the
@@ -224,7 +233,7 @@ Sample payload: `inputs/orchestrator-34015558366.json`.
 Release and run it:
 
 ```bash
-./release.sh 1.1.0 /tmp/orch-1.json NightlyOrchestrator
+./release.sh 1.1.2 inputs/orchestrator-34089391590.json NightlyOrchestrator
 ```
 
 `release.sh` now takes an optional third argument, the process to start (default `VmAgent`);
