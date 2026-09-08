@@ -52,9 +52,10 @@ to every child rather than an empty string. Empty means the CLI's account defaul
 is Opus: a single investigate pass cost $4.51 and a fix pass $2.29 on 2026-09-08, which is the
 wrong default for a job that is meant to run nightly. Set `claude-haiku-4-5-20251001` when testing
 plumbing rather than reasoning — `probe-phase.sh` reads the same lever from `CLAUDE_MODEL`, and
-also defaults to Sonnet now. The summarizer agent node moved from `anthropic.claude-opus-4-8` to
-`anthropic.claude-sonnet-5`; that model lives in `VmAgent.flow` **and** in two `agent.json` copies,
-all three of which must be patched together.
+also defaults to Sonnet now. The summarizer agent node stays on `anthropic.claude-opus-4-8`: it runs through the LLM gateway,
+which is billed separately from the Claude Code account the phases use. If it ever does move, that
+model lives in `VmAgent.flow` **and** in two `agent.json` copies, all three of which must be
+patched together.
 `probe-phase.sh` reads the same lever from `CLAUDE_MODEL`. `maxIterations`
 and the `iteration` global are gone with the investigator loop.
 
