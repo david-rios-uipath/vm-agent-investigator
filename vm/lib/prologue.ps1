@@ -180,6 +180,103 @@ function Install-Deps {
   Set-Content -Path (Deps-Stamp) -Value (Lockfile-Hash) -NoNewline
 }
 
+# ------------------------------------------------------------------- vsix projects
+# The vsix Playwright projects drive a real VS Code (e2e/vsix/launcher.ts) instead of a browser.
+# They need three things the studio projects do not: a home directory this account can write
+# (the extension resolves its identity from <home>\.uipath\.auth), that credential file, and the
+# extension bundle built from the working tree.
+#
+# A window is not one of them. Jobs run as LOCAL SERVICE in session 0, where Electron gets no
+# window at all - but Playwright attaches over the debug port and records via CDP screencast,
+# both of which work there (probed with vm/probes/vsix-cdp.ps1: workbench target present,
+# Page.captureScreenshot returns a painted frame).
+
+# `vsix-staging-linux` is not a project the config defines: the platform segment comes from
+# CI's E2E_RUNNER_PLATFORM and the host segment from E2E_VSIX_HOST (e2e/config/base-config.ts
+# builds the name from all three). Drop both - this VM runs VS Code on Windows, so the bare
+# name is the one that resolves here. Studio commands pass through untouched.
+function Resolve-TestCommand([string]$TestCommand) {
+  return [regex]::Replace($TestCommand,
+    '(--project[=\s]+"?)vsix-(alpha|staging)(?:-(?:vscode|cursor))?(?:-(?:linux|macos|windows))?',
+    '${1}vsix-$2')
+}
+
+function Test-IsVsixCommand([string]$TestCommand) { return $TestCommand -match '--project[=\s]+"?vsix-' }
+
+$script:VsixHome = 'C:\vm-agent\home'
+
+# %USERPROFILE% for LOCAL SERVICE lives under C:\Windows\ServiceProfiles and is not dependable
+# (the same reason CLAUDE_CONFIG_DIR is pinned). node's os.homedir() reads it, and both the login
+# script and the extension resolve the credential file through it, so point both at one
+# directory we know is writable. cmd.exe children inherit these.
+function Set-VsixHome {
+  New-Item -ItemType Directory -Force -Path $VsixHome | Out-Null
+  $env:USERPROFILE = $VsixHome
+  $env:HOME = $VsixHome
+  Write-Output "[vsix] home = $VsixHome"
+}
+
+# @uipath/cli resolves through the repo's .npmrc (GitHub Packages), the same way CI installs it.
+function Ensure-UipCli {
+  if (Test-Tool 'uip') { return }
+  Write-Output '[vsix] installing @uipath/cli'
+  Invoke-Cmd "npm install -g --ignore-scripts --userconfig `"$RepoDir\.npmrc`" --prefix `"$NodeBin`" @uipath/cli" $RepoDir |
+    Select-Object -Last 5 | ForEach-Object { Write-Output "  $_" }
+  Add-ToolPath
+  if (-not (Test-Tool 'uip')) { throw '[vsix] uip still not runnable after npm install' }
+}
+
+# `uip login --no-browser` prints an authorization URL and waits on a localhost callback; the
+# repo's own script drives that URL with a headless Chromium and the shared tester account, then
+# writes <home>\.uipath\.auth. Reuse it rather than reimplementing the handshake - it is exactly
+# what .github/workflows/playwright-vsix.yml runs. The environment mirrors that workflow, whose
+# values are also e2e/config/base-config.ts's alpha defaults.
+function Get-VsixEnvironment([string]$TestCommand) {
+  if ($TestCommand -match '--project[=\s]+"?vsix-staging') { return 'staging' }
+  return 'alpha'
+}
+
+function Ensure-VsixAuth([string]$Environment = 'alpha') {
+  $auth = Join-Path $VsixHome '.uipath\.auth'
+  # One credential file, one identity: a cached login for the other environment is worse than
+  # no login, so the stamp forces a re-login when the environment changes.
+  $stamp = Join-Path $VsixHome '.uipath\.vm-agent-environment'
+  if ((Test-Path $auth) -and (Test-Path $stamp) -and ((Get-Content $stamp -Raw).Trim() -eq $Environment)) {
+    Write-Output "[vsix] .uipath\.auth already present for $Environment"
+    return
+  }
+  if (-not $env:PLAYWRIGHT_PASSWORD) { throw '[vsix] PLAYWRIGHT_PASSWORD was not injected; add the Secret asset to the process folder' }
+  $script = Join-Path $RepoDir '.github\scripts\vsix-interactive-login.mjs'
+  if (-not (Test-Path $script)) { throw "[vsix] $script is missing from the checkout" }
+  # Same values as .github/workflows/playwright-vsix.yml, which are also base-config.ts's
+  # defaults for each region.
+  $loginEnv = if ($Environment -eq 'staging') {
+    @{ E2E_AUTHORITY = 'https://staging.uipath.com'; E2E_ORGANIZATION = 'ap4ao'; E2E_TENANT = 'euTenant' }
+  } else {
+    @{ E2E_AUTHORITY = 'https://alpha.uipath.com'; E2E_ORGANIZATION = 'experiencestest'; E2E_TENANT = 'DefaultTenant' }
+  }
+  $loginEnv['E2E_EMAIL'] = 'uip-experiences-tester@outlook.com'
+  Write-Output "[vsix] uip login to $Environment (interactive authorization code, headless browser)"
+  $out = @(Invoke-Cmd "node `"$script`"" $RepoDir $loginEnv 2>&1)
+  $code = $LASTEXITCODE
+  $out | Select-Object -Last 15 | ForEach-Object { Write-Output "  $_" }
+  if ($code -ne 0) { throw "[vsix] interactive login exited $code" }
+  if (-not (Test-Path $auth)) { throw "[vsix] login reported success but wrote no $auth" }
+  Set-Content -Path $stamp -Value $Environment -NoNewline
+  Write-Output '[vsix] credential file written'
+}
+
+# The bundle FlowEditorProvider activates, built from the working tree - so this is also how a
+# patch to product source reaches the verify run, the vsix counterpart of the studio projects'
+# locally served MFE. Minutes of webpack, so build once, and never before a patch is applied.
+function Build-Vsix {
+  Write-Output '[vsix] corepack pnpm --filter=uipath-maestro run package'
+  $out = @(Invoke-Cmd 'corepack pnpm --filter=uipath-maestro run package' $RepoDir 2>&1)
+  $code = $LASTEXITCODE
+  $out | Select-Object -Last 10 | ForEach-Object { Write-Output "  $_" }
+  if ($code -ne 0) { throw "[vsix] extension build failed with $code" }
+}
+
 function Deps-Stamp { Join-Path $RepoDir 'node_modules\.vm-agent-installed' }
 function Lockfile-Hash { (Get-FileHash (Join-Path $RepoDir 'pnpm-lock.yaml') -Algorithm SHA256).Hash }
 function Test-DepsInstalled {

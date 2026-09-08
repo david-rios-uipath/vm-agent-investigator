@@ -80,6 +80,19 @@ try {
   exit 1
 }
 
+$TestCommand = Resolve-TestCommand $TestCommand
+$IsVsix = Test-IsVsixCommand $TestCommand
+if ($IsVsix) {
+  try {
+    Set-VsixHome
+    Ensure-UipCli
+    Ensure-VsixAuth (Get-VsixEnvironment $TestCommand)
+  } catch {
+    Write-Output "[phase] vsix setup failed: $_"
+    exit 1
+  }
+}
+
 # ---------------------------------------------------------------- claude helpers
 
 function New-Prompt([string]$Template, [hashtable]$Values) {
@@ -216,6 +229,7 @@ switch ($Phase) {
     Write-Output "[repro] $TestCommand"
     # E2E_RECORD: playwright.config.ts only records with it set, and the failing run is the
     # "before" clip the PR shows next to the verified fix.
+    if ($IsVsix) { Build-Vsix }
     $out = @(Invoke-Cmd $TestCommand $RepoDir @{ CI = 'true'; E2E_RECORD = '1' } 2>&1)
     $exit = $LASTEXITCODE
     $stdout = ($out -join "`n")
@@ -329,8 +343,24 @@ switch ($Phase) {
 
   # studio-alpha loads the flow MFE from alpha's deployed bundle, so a product-source patch
   # would apply, run and change nothing. studio-local keeps the alpha backend and serves the
-  # patched bundle locally.
-  $localCmd = $TestCommand.Replace('--project studio-alpha', '--project studio-local')
+  # patched bundle locally. A vsix run needs no such rewrite: it launches the extension this
+  # working tree builds, so the patch is in what runs.
+  $localCmd = if ($IsVsix) { $TestCommand } else { $TestCommand.Replace('--project studio-alpha', '--project studio-local') }
+  $verifyNote = if ($IsVsix) {
+    'It is the failing command unchanged. The vsix projects launch VS Code with the extension ' +
+    'built from THIS working tree (`corepack pnpm --filter=uipath-maestro run package`, which the ' +
+    'phase runs for you after your patch), so a product fix is genuinely exercised. There is no ' +
+    'dev server and no project rewrite.'
+  } else {
+    'It is the failing command with `--project studio-alpha` rewritten to `--project studio-local`. ' +
+    '`studio-alpha` loads the flow MFE from alpha''s deployed bundle, so a patch to product source ' +
+    'would apply, run and change nothing; `studio-local` keeps the alpha backend but points the ' +
+    '`remoteflow` remote at a locally served bundle, so a product fix is genuinely exercised. That ' +
+    'needs `corepack pnpm run dev:studio` serving `/remoteEntry.js` on port 3000 or 3001, with ' +
+    '`E2E_SKIP_WEBSERVER=1` and `E2E_STUDIO_PORT=<that port>` set. Note rsbuild answers ' +
+    '`/remoteEntry.js` with the SPA index.html fallback while it is still building - a 200 whose ' +
+    'body starts with `<` means the remote is NOT up yet.'
+  }
 
   $prompt = New-Prompt 'fixer.md' @{
     REPO_URL = $RepoUrl; BRANCH = $Branch; RUN_ID = $RunId; NOTES_DIR = $notes
@@ -338,6 +368,7 @@ switch ($Phase) {
     EXIT_CODE = $(if ($ev) { $ev.exitCode } else { '' })
     OUTPUT_TAIL = $(if ($ev) { Get-Tail $ev.excerpt 4000 } else { '' })
     LOCAL_TEST_COMMAND = $localCmd
+    VERIFY_NOTE = $verifyNote
     VERIFY_OUTPUT = $prevVerify
     NOTEBOOK = Get-Content -Raw $notebook
   }
@@ -378,42 +409,58 @@ switch ($Phase) {
   # Outside $notes: the dev server holds this open past the end of the phase, and a locked
   # file in the state directory used to sink the whole archive.
   $devlog = Join-Path 'C:\vm-agent' "studio-dev-$RunId.log"
-  Note '[verify] starting local studio MFE (pnpm run dev:studio)'
-  $dev = Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', "set `"PATH=$ToolPath;%PATH%`" && corepack pnpm run dev:studio > `"$devlog`" 2>&1" -WorkingDirectory $RepoDir -PassThru -WindowStyle Hidden
+  $dev = $null
   $port = ''
-  foreach ($attempt in 1..60) {
-    foreach ($p in 3000, 3001) {
-      try {
-        $resp = Invoke-WebRequest "http://localhost:$p/remoteEntry.js" -UseBasicParsing -TimeoutSec 3
-        # rsbuild serves the SPA index.html fallback for unknown paths while still building;
-        # only a non-HTML body means the module federation remote is really up.
-        if ($resp.StatusCode -eq 200 -and -not $resp.Content.TrimStart().StartsWith('<')) { $port = "$p"; break }
-      } catch { }
+  $ready = $false
+  if ($IsVsix) {
+    # Built AFTER the patch: the bundle is what the test loads, so building earlier would verify
+    # the unpatched extension. No dev server - the vsix projects serve nothing over HTTP.
+    Note '[verify] building the patched extension'
+    try { Build-Vsix; $ready = $true } catch { Note "[verify] $_" }
+  } else {
+    Note '[verify] starting local studio MFE (pnpm run dev:studio)'
+    $dev = Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', "set `"PATH=$ToolPath;%PATH%`" && corepack pnpm run dev:studio > `"$devlog`" 2>&1" -WorkingDirectory $RepoDir -PassThru -WindowStyle Hidden
+    foreach ($attempt in 1..60) {
+      foreach ($p in 3000, 3001) {
+        try {
+          $resp = Invoke-WebRequest "http://localhost:$p/remoteEntry.js" -UseBasicParsing -TimeoutSec 3
+          # rsbuild serves the SPA index.html fallback for unknown paths while still building;
+          # only a non-HTML body means the module federation remote is really up.
+          if ($resp.StatusCode -eq 200 -and -not $resp.Content.TrimStart().StartsWith('<')) { $port = "$p"; break }
+        } catch { }
+      }
+      if ($port) { break }
+      Start-Sleep -Seconds 5
     }
-    if ($port) { break }
-    Start-Sleep -Seconds 5
+    $ready = [bool]$port
   }
 
   $fixVerified = $false
-  if (-not $port) {
-    Note '[verify] the studio dev server never served remoteEntry.js; tail of its log:'
-    Get-Content $devlog -Tail 40 -ErrorAction SilentlyContinue | ForEach-Object { Note "  $_" }
-    # Only worth keeping in state when it explains a failure.
-    Copy-Item $devlog (Join-Path $notes 'studio-dev.log') -ErrorAction SilentlyContinue
+  if (-not $ready) {
+    if ($IsVsix) { Note '[verify] the extension did not build; the patch cannot be verified' }
+    else {
+      Note '[verify] the studio dev server never served remoteEntry.js; tail of its log:'
+      Get-Content $devlog -Tail 40 -ErrorAction SilentlyContinue | ForEach-Object { Note "  $_" }
+      # Only worth keeping in state when it explains a failure.
+      Copy-Item $devlog (Join-Path $notes 'studio-dev.log') -ErrorAction SilentlyContinue
+    }
   } else {
-    Note "[verify] studio MFE serving on port $port"
+    if (-not $IsVsix) { Note "[verify] studio MFE serving on port $port" }
     $cmd = "$localCmd --retries=0 --reporter=line"
-    # Cold auth ("Storage state is invalid ... regenerating") runs inside the spec's own 120 s
-    # beforeEach budget and, with a cold dev server on a 2-CPU VM, times out in setup before the
-    # test reaches the step the patch is about. When there is no storage state yet, run the test
-    # once to log in and warm the server; only the second run counts.
-    # The dev server was started seconds ago and rsbuild compiles lazily: the first visit to
-    # each route (and the first add-node search) pays that compile, on top of a cold login when
-    # there is no storage state. Always run the test once uncounted; only the second run decides.
-    $env = @{ CI = 'true'; E2E_SKIP_WEBSERVER = '1'; E2E_STUDIO_PORT = $port }
-    Note '[verify] warm-up run (cold dev server, maybe cold login); result not counted'
-    $warm = @(Invoke-Cmd $cmd $RepoDir $env 2>&1)
-    Note "[verify] warm-up exit $LASTEXITCODE"
+    # E2E_SKIP_WEBSERVER / E2E_STUDIO_PORT belong to the studio-local path only; a vsix run
+    # spawns its own VS Code and hits nothing over HTTP.
+    $env = if ($IsVsix) { @{ CI = 'true' } } else { @{ CI = 'true'; E2E_SKIP_WEBSERVER = '1'; E2E_STUDIO_PORT = $port } }
+    if (-not $IsVsix) {
+      # The dev server was started seconds ago and rsbuild compiles lazily: the first visit to
+      # each route (and the first add-node search) pays that compile, on top of a cold login when
+      # there is no storage state - both inside the spec's own 120 s beforeEach budget, which
+      # then times out before the test reaches the step the patch is about. Run it once
+      # uncounted; only the second run decides. A vsix run has no such server to warm, and its
+      # own launch cost is already inside the project's 180 s budget.
+      Note '[verify] warm-up run (cold dev server, maybe cold login); result not counted'
+      $warm = @(Invoke-Cmd $cmd $RepoDir $env 2>&1)
+      Note "[verify] warm-up exit $LASTEXITCODE"
+    }
     Note "[verify] $cmd"
     # E2E_SKIP_WEBSERVER: the workbench Vite server is only for the standalone project and would
     # otherwise cost ~120 s and contend for port 3000 with the studio dev server.
@@ -436,7 +483,7 @@ switch ($Phase) {
     Save-DemoVideo (Join-Path $RepoDir 'e2e\test-results') $notes 'fix-demo' ${function:Note} | Out-Null
   }
 
-  taskkill /PID $dev.Id /T /F 2>&1 | Out-Null
+  if ($dev) { taskkill /PID $dev.Id /T /F 2>&1 | Out-Null }
   & git -C $RepoDir checkout -- . 2>&1 | Out-Null
   & git -C $RepoDir clean -fd -- e2e 2>&1 | Out-Null
 

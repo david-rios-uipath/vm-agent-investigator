@@ -23,8 +23,12 @@ SMOKE="${SMOKE_ONLY:-0}"
 MODEL="${CLAUDE_MODEL:-}"   # empty = account default; e.g. claude-haiku-4-5-20251001
 BRANCH="${TARGET_BRANCH:-}" # empty = the branch in inputs/debug-execution.json
 # macOS ships bash 3.2: no associative arrays.
+# TIMEOUT_MINUTES overrides the per-phase default. A cold vsix repro needs it: VS Code download
+# plus the first `pnpm --filter=uipath-maestro run package` alone can outlast 15 minutes, and the
+# job comes back as exitCode 124 having proven nothing.
 case "$PHASE" in
-  repro) TIMEOUT=15;; investigate) TIMEOUT=20;; fix) TIMEOUT=45;; pr) TIMEOUT=10;;
+  repro) TIMEOUT="${TIMEOUT_MINUTES:-15}";; investigate) TIMEOUT="${TIMEOUT_MINUTES:-20}";;
+  fix) TIMEOUT="${TIMEOUT_MINUTES:-45}";; pr) TIMEOUT="${TIMEOUT_MINUTES:-10}";;
   *) echo "unknown phase: $PHASE" >&2; exit 1;;
 esac
 cd "$(dirname "$0")"

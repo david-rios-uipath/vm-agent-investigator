@@ -24,14 +24,7 @@ why you declined.
 
       {{LOCAL_TEST_COMMAND}}
 
-  It is the failing command with `--project studio-alpha` rewritten to `--project studio-local`.
-  `studio-alpha` loads the flow MFE from alpha's deployed bundle, so a patch to product source
-  would apply, run and change nothing; `studio-local` keeps the alpha backend but points the
-  `remoteflow` remote at a locally served bundle, so a product fix is genuinely exercised. That
-  needs `corepack pnpm run dev:studio` serving `/remoteEntry.js` on port 3000 or 3001, with
-  `E2E_SKIP_WEBSERVER=1` and `E2E_STUDIO_PORT=<that port>` set. Note rsbuild answers
-  `/remoteEntry.js` with the SPA index.html fallback while it is still building - a 200 whose
-  body starts with `<` means the remote is NOT up yet.
+  {{VERIFY_NOTE}}
 
 - test output tail from repro:
 

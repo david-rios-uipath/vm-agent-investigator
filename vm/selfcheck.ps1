@@ -16,6 +16,19 @@ $ErrorActionPreference = 'Stop'
 Assert ($null -eq (Test-Tool 'definitely-not-a-real-command-xyz')) 'a missing tool returns null instead of throwing'
 Assert ($null -ne (Test-Tool 'git')) 'an installed tool returns its version line'
 
+# Resolve-TestCommand: the nightly reports a platform-suffixed project name that only exists
+# on the runner that produced it.
+$base = 'pnpm exec playwright test --config e2e/playwright.config.ts'
+Assert ((Resolve-TestCommand "$base --project vsix-staging-linux") -eq "$base --project vsix-staging") 'the linux suffix is dropped'
+Assert ((Resolve-TestCommand "$base --project=vsix-alpha-macos") -eq "$base --project=vsix-alpha") 'the macos suffix is dropped, --project= form'
+Assert ((Resolve-TestCommand "$base --project vsix-staging-cursor-linux") -eq "$base --project vsix-staging") 'the cursor host segment is dropped too'
+Assert ((Resolve-TestCommand "$base --project vsix-alpha") -eq "$base --project vsix-alpha") 'an unsuffixed vsix name is left alone'
+Assert ((Resolve-TestCommand "$base --project studio-alpha") -eq "$base --project studio-alpha") 'a studio command passes through'
+Assert (Test-IsVsixCommand "$base --project vsix-staging") 'a vsix command is recognised'
+Assert (-not (Test-IsVsixCommand "$base --project studio-alpha")) 'a studio command is not'
+Assert ((Get-VsixEnvironment "$base --project vsix-staging") -eq 'staging') 'a staging project logs in to staging'
+Assert ((Get-VsixEnvironment "$base --project vsix-alpha") -eq 'alpha') 'an alpha project logs in to alpha'
+
 # Get-Tail
 Assert ((Get-Tail 'abc' 10) -eq 'abc') 'short text is returned whole'
 Assert ((Get-Tail ('x' * 100) 10).EndsWith('x' * 10)) 'long text keeps its tail'
