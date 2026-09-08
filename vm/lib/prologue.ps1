@@ -274,6 +274,24 @@ function Build-Vsix {
   $out = @(Invoke-Cmd 'corepack pnpm --filter=uipath-maestro run package' $RepoDir 2>&1)
   $code = $LASTEXITCODE
   $out | Select-Object -Last 10 | ForEach-Object { Write-Output "  $_" }
+
+  # `scripts/fetch-mfe-assets.mjs` stages the MFE assets through renames. One EPERM there leaves
+  # packages/vsix/.mfe-cache in a state every later build trips over - first at rebuildCache's
+  # rename, then at stageDestination's - so the failure looks permanent and survives a plain
+  # retry. Deleting the cache and building again clears it (verified on the pool VM: two builds
+  # failed at those two sites, a third succeeded with nothing else changed). The cache is a
+  # download cache, so this costs a re-fetch, not correctness - and the pool's single VM means a
+  # poisoned cache would otherwise outlive the job that created it.
+  if ($code -ne 0) {
+    $cache = Join-Path $RepoDir 'packages\vsix\.mfe-cache'
+    if (Test-Path $cache) {
+      Write-Output '[vsix] build failed; clearing packages\vsix\.mfe-cache and building once more'
+      Remove-Item $cache -Recurse -Force -ErrorAction SilentlyContinue
+      $out = @(Invoke-Cmd 'corepack pnpm --filter=uipath-maestro run package' $RepoDir 2>&1)
+      $code = $LASTEXITCODE
+      $out | Select-Object -Last 10 | ForEach-Object { Write-Output "  $_" }
+    }
+  }
   if ($code -ne 0) { throw "[vsix] extension build failed with $code" }
 }
 
