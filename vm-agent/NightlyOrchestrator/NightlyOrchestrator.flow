@@ -367,100 +367,6 @@
       }
     },
     {
-      "id": "prFiles",
-      "type": "core.logic.loop",
-      "typeVersion": "2.4",
-      "display": {
-        "label": "Files of each open PR",
-        "subLabel": "parallel"
-      },
-      "inputs": {
-        "collection": "=js:$vars.recentPrs.output['prs']",
-        "parallel": true
-      },
-      "position": {
-        "x": 0,
-        "y": 0
-      }
-    },
-    {
-      "id": "listOpenPrs1",
-      "type": "uipath.connector.uipath-microsoft-github.list-records",
-      "typeVersion": "1.0.0",
-      "display": {
-        "label": "List recent PRs"
-      },
-      "inputs": {
-        "detail": {
-          "connector": "uipath-microsoft-github",
-          "connectionId": "3e9ae2b7-85a6-4271-8c23-5a620eed56e3",
-          "connectionResourceId": "3e9ae2b7-85a6-4271-8c23-5a620eed56e3",
-          "connectionFolderKey": "0b28296b-1f4a-4ea9-a3d5-8b0abaac1cf0",
-          "method": "GET",
-          "endpoint": "/{repo}/pulls",
-          "queryParameters": {
-            "state": "all",
-            "sort": "updated",
-            "direction": "desc",
-            "pageSize": "10"
-          },
-          "pathParameters": {
-            "repo": "flow-workbench"
-          },
-          "uiPathActivityTypeId": "5d6fae7f-1ab5-3727-8c27-6cfa57ded5ed",
-          "errorState": {
-            "issues": []
-          },
-          "configuration": "=jsonString:{\"essentialConfiguration\":{\"connectorVersion\":\"2.6.14\",\"customFieldsRequestDetails\":null,\"instanceParameters\":{\"connectorKey\":\"uipath-microsoft-github\",\"activityType\":\"Generic\",\"version\":\"1.0.0\",\"operation\":\"list\",\"supportsStreaming\":false,\"objectName\":\"pulls\"},\"objectName\":\"pulls\",\"operation\":\"list\",\"packageVersion\":\"1.0.0\",\"httpMethod\":\"GET\",\"path\":\"/{repo}/pulls\",\"unifiedTypesCompatible\":true}}",
-          "inputMetadata": {
-            "operation": "list",
-            "pagination": {
-              "maxPageSize": 1000
-            }
-          }
-        },
-        "errorHandlingEnabled": true
-      }
-    },
-    {
-      "id": "listPrFiles1",
-      "type": "uipath.connector.uipath-microsoft-github.list-records",
-      "typeVersion": "1.0.0",
-      "display": {
-        "label": "List PR files"
-      },
-      "inputs": {
-        "detail": {
-          "connector": "uipath-microsoft-github",
-          "connectionId": "3e9ae2b7-85a6-4271-8c23-5a620eed56e3",
-          "connectionResourceId": "3e9ae2b7-85a6-4271-8c23-5a620eed56e3",
-          "connectionFolderKey": "0b28296b-1f4a-4ea9-a3d5-8b0abaac1cf0",
-          "method": "GET",
-          "endpoint": "/{repo}/pulls/{pull_number}/files",
-          "queryParameters": {
-            "pageSize": "30"
-          },
-          "pathParameters": {
-            "repo": "flow-workbench",
-            "pull_number": "=js:$vars.prFiles.currentItem[\"number\"]"
-          },
-          "uiPathActivityTypeId": "5d6fae7f-1ab5-3727-8c27-6cfa57ded5ed",
-          "errorState": {
-            "issues": []
-          },
-          "configuration": "=jsonString:{\"essentialConfiguration\":{\"connectorVersion\":\"2.6.14\",\"customFieldsRequestDetails\":null,\"instanceParameters\":{\"connectorKey\":\"uipath-microsoft-github\",\"activityType\":\"Generic\",\"version\":\"1.0.0\",\"operation\":\"list\",\"supportsStreaming\":false,\"objectName\":\"pulls::files\"},\"objectName\":\"pulls::files\",\"operation\":\"list\",\"packageVersion\":\"1.0.0\",\"httpMethod\":\"GET\",\"path\":\"/{repo}/pulls/{pull_number}/files\",\"unifiedTypesCompatible\":true}}",
-          "inputMetadata": {
-            "operation": "list",
-            "pagination": {
-              "maxPageSize": 1000
-            }
-          }
-        },
-        "errorHandlingEnabled": true
-      },
-      "parentId": "prFiles"
-    },
-    {
       "id": "pickTests",
       "type": "core.action.script",
       "typeVersion": "1.1",
@@ -473,7 +379,7 @@
         "script": {
           "type": "literal",
           "fieldType": "string",
-          "expression": "const s = $vars.start.output;\nconst sel = $vars.selectTests.output || { groups: [], total: 0, totalTests: 0 };\n// Connector payloads may arrive camelCase or PascalCase; read either.\nconst g = (o, k) => (o == null ? undefined : (o[k] !== undefined ? o[k] : o[k.charAt(0).toUpperCase() + k.slice(1)]));\nconst base = (path) => String(path || '').split('/').pop().replace(/\\.(spec|test)?\\.?tsx?$/i, '').replace(/\\.[a-z]+$/i, '').toLowerCase();\nconst prList = ($vars.prFiles.output || [])\n  .map(it => (it && it.prFileNames && it.prFileNames.output) || (it && it.files ? it : null))\n  .filter(p => p && p.number)\n  .map(p => ({ number: p.number, title: p.title || '', url: p.url || '', state: p.state || 'open', files: (p.files || []).map(String) }));\n// A group is covered when an open PR touches its spec file or a page object named in its error.\nconst tokens = (t) => {\n  const set = new Set([base(t.file)]);\n  const first = String(t.error || '').split('\\n')[0];\n  for (const m of first.matchAll(/\\b([A-Z][A-Za-z0-9]+(?:Page|Dialog|Panel|Rail|Service|Client|Store))\\b/g)) set.add(m[1].toLowerCase());\n  return set;\n};\nconst covered = [];\nconst open = [];\nfor (const t of sel.groups || []) {\n  const tk = tokens(t);\n  let hit = null;\n  for (const pr of prList) {\n    const f = pr.files.find(x => x === t.file || x === 'e2e/' + t.file || tk.has(base(x)));\n    if (f) { hit = { number: pr.number, title: pr.title, url: pr.url, state: pr.state, file: f }; break; }\n  }\n  if (hit) covered.push({ ...t, coveredBy: hit }); else open.push(t);\n}\nconst max = Number(s.maxTests) > 0 ? Number(s.maxTests) : 1;\nconst selected = open.slice(0, max);\nreturn { selected, covered, skipped: open.length - selected.length, total: sel.total, totalTests: sel.totalTests, prs: prList };"
+          "expression": "const s = $vars.start.output;\nconst sel = $vars.selectTests.output || { groups: [], total: 0, totalTests: 0 };\nconst base = (path) => String(path || '').split('/').pop().replace(/\\.(spec|test)?\\.?tsx?$/i, '').replace(/\\.[a-z]+$/i, '').toLowerCase();\nconst prList = ((($vars.parsePrs || {}).output || {}).prs || []).filter(p => p && p.number).map(p => ({ number: p.number, title: p.title || '', url: p.url || '', state: p.state || 'open', files: (p.files || []).map(String) }));\n// A group is covered when an open PR touches its spec file or a page object named in its error.\nconst tokens = (t) => {\n  const set = new Set([base(t.file)]);\n  const first = String(t.error || '').split('\\n')[0];\n  for (const m of first.matchAll(/\\b([A-Z][A-Za-z0-9]+(?:Page|Dialog|Panel|Rail|Service|Client|Store))\\b/g)) set.add(m[1].toLowerCase());\n  return set;\n};\nconst covered = [];\nconst open = [];\nfor (const t of sel.groups || []) {\n  const tk = tokens(t);\n  let hit = null;\n  for (const pr of prList) {\n    const f = pr.files.find(x => base(x) === base(t.file) || tk.has(base(x)));\n    if (f) { hit = { number: pr.number, title: pr.title, url: pr.url, state: pr.state, file: f }; break; }\n  }\n  if (hit) covered.push({ ...t, coveredBy: hit }); else open.push(t);\n}\nconst max = Number(s.maxTests) > 0 ? Number(s.maxTests) : 1;\nconst selected = open.slice(0, max);\nreturn { selected, covered, skipped: open.length - selected.length, total: sel.total, totalTests: sel.totalTests, prs: prList };"
         }
       },
       "outputs": {
@@ -614,19 +520,124 @@
       }
     },
     {
-      "id": "recentPrs",
+      "id": "ghPrs",
+      "type": "uipath.core.rpa-workflow.ca36341d-ecec-4ba6-aa76-134d0afe4ba7",
+      "typeVersion": "1.0.0",
+      "display": {
+        "label": "Recent PRs (GitHub API on the VM)",
+        "subLabel": "open 14d or merged 48h, with changed files"
+      },
+      "inputs": {
+        "Script": {
+          "type": "literal",
+          "expression": "$ErrorActionPreference = 'Stop'\n[Net.ServicePointManager]::SecurityProtocol = 'Tls12'\n# Open PRs may fix a failing test; a PR merged after the nightly's commit already has. Output is one compact\n# ASCII line so the flow can parse it; the raw GitHub payloads are far too big for Maestro instance variables.\n$h = @{ 'User-Agent' = 'vm-agent'; 'Accept' = 'application/vnd.github+json' }\nif ($env:GH_TOKEN) { $h['Authorization'] = \"token $($env:GH_TOKEN)\" }\n$repo = 'UiPath/flow-workbench'\n$out = @()\ntry {\n  $pulls = Invoke-RestMethod -Headers $h -Uri \"https://api.github.com/repos/$repo/pulls?state=all&sort=updated&direction=desc&per_page=40\"\n  $now = [DateTime]::UtcNow\n  foreach ($p in $pulls) {\n    $keep = $false\n    if ($p.state -eq 'open') { $keep = ([DateTime]$p.updated_at) -gt $now.AddDays(-14) }\n    elseif ($p.merged_at) { $keep = ([DateTime]$p.merged_at) -gt $now.AddHours(-48) }\n    if (-not $keep) { continue }\n    $files = @()\n    try { $files = @(Invoke-RestMethod -Headers $h -Uri \"https://api.github.com/repos/$repo/pulls/$($p.number)/files?per_page=100\" | ForEach-Object { $_.filename }) } catch { Write-Output \"[prcheck] files of #$($p.number): $_\" }\n    # Compact: vm-exec returns only the last 32000 chars of stdout. Basenames are what the flow matches on.\n    $names = @($files | ForEach-Object { ($_ -split '/')[-1] } | Select-Object -Unique)\n    $title = if ($p.title.Length -gt 80) { $p.title.Substring(0, 80) } else { $p.title }\n    $out += [pscustomobject]@{ n = $p.number; t = $title; s = $(if ($p.merged_at) { 'm' } else { 'o' }); f = $names }\n  }\n} catch { Write-Output \"[prcheck] $_\" }\n$json = if ($out.Count -eq 0) { '[]' } elseif ($out.Count -eq 1) { '[' + ($out[0] | ConvertTo-Json -Compress -Depth 5) + ']' } else { $out | ConvertTo-Json -Compress -Depth 5 }\n$json = [regex]::Replace($json, '[^\\x00-\\x7F]', { param($m) '\\u{0:x4}' -f [int][char]$m.Value })\nWrite-Output \"[prcheck] $($out.Count) candidate PRs\"\nWrite-Output \"PRS_JSON=$json\"\nexit 0",
+          "fieldType": "string"
+        },
+        "WorkDir": {
+          "type": "literal",
+          "expression": "C:\\vm-agent",
+          "fieldType": "string"
+        },
+        "RunId": {
+          "type": "jsExpression",
+          "expression": "'prcheck-' + String($vars.start.output.runId || 'manual')",
+          "fieldType": "string"
+        },
+        "StateKey": {
+          "type": "literal",
+          "expression": "",
+          "fieldType": "string"
+        },
+        "TimeoutMinutes": {
+          "type": "literal",
+          "expression": "5",
+          "fieldType": "number"
+        },
+        "MaxOutputChars": 32000,
+        "errorHandlingEnabled": true
+      },
+      "outputs": {
+        "output": {
+          "type": "object",
+          "source": "=this",
+          "var": "output",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "ExitCode": {
+                "type": "integer",
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "Stdout": {
+                "type": "string"
+              },
+              "OutputBlobPath": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "error": {
+          "type": "object",
+          "description": "Error information if the node fails",
+          "source": "=Error",
+          "var": "error",
+          "schema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "type": "object",
+            "required": [
+              "code",
+              "message",
+              "detail",
+              "category",
+              "status"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Error code as a string"
+              },
+              "message": {
+                "type": "string",
+                "description": "High-level error message"
+              },
+              "detail": {
+                "type": "string",
+                "description": "Detailed error description"
+              },
+              "category": {
+                "type": "string",
+                "description": "Error category"
+              },
+              "status": {
+                "type": "integer",
+                "description": "HTTP status code"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "parsePrs",
       "type": "core.action.script",
       "typeVersion": "1.1",
       "display": {
-        "label": "Recent open PRs",
-        "subLabel": "open (14 days) or merged (48h), 10 most recently updated",
+        "label": "Parse PR list",
+        "subLabel": "PRS_JSON= line; absent = no PR check",
         "icon": "code"
       },
       "inputs": {
         "script": {
           "type": "literal",
           "fieldType": "string",
-          "expression": "// Connector payloads may arrive camelCase or PascalCase; read either.\nconst g = (o, k) => (o == null ? undefined : (o[k] !== undefined ? o[k] : o[k.charAt(0).toUpperCase() + k.slice(1)]));\nconst all = Array.isArray($vars.listOpenPrs1 && $vars.listOpenPrs1.output) ? $vars.listOpenPrs1.output : [];\nconst cutoff = Date.now() - 14 * 24 * 3600 * 1000;\nconst mergedCutoff = Date.now() - 48 * 3600 * 1000;\nconst prs = all\n  .map(pr => ({ number: g(pr, 'number'), title: g(pr, 'title') || '', url: g(pr, 'html_url') || g(pr, 'htmlUrl') || '', updatedAt: g(pr, 'updated_at') || g(pr, 'updatedAt') || '', mergedAt: g(pr, 'merged_at') || g(pr, 'mergedAt') || '', state: g(pr, 'state') || '' }))\n  // Maestro caps instance variables (~20 KB per PR from GitHub), so the list node fetches only the 10 most\n  // recently updated PRs. Open PRs may fix it; a PR merged after the nightly's commit already has. Closed-unmerged is noise.\n  .map(pr => ({ ...pr, state: pr.mergedAt ? 'merged' : pr.state }))\n  .filter(pr => pr.number && (pr.state === 'open' ? (!pr.updatedAt || Date.parse(pr.updatedAt) >= cutoff) : (pr.mergedAt && Date.parse(pr.mergedAt) >= mergedCutoff)))\n  .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)))\n  .slice(0, 10);\nreturn { prs, totalOpen: all.length };"
+          "expression": "// The VM script prints exactly one PRS_JSON= line, last. Its absence means the check itself failed;\n// the run then continues as if no PR were related.\nconst out = $vars.ghPrs.output || {};\nconst lines = String(out.Stdout || '').split('\\n');\nfor (let i = lines.length - 1; i >= 0; i--) {\n  const l = lines[i].trim();\n  if (l.startsWith('PRS_JSON=')) {\n    try {\n      const raw = JSON.parse(l.slice('PRS_JSON='.length));\n      // Compact keys from the VM: n=number, t=title, s=o|m, f=file basenames.\n      const prs = (Array.isArray(raw) ? raw : []).map(r => ({ number: r.n, title: r.t || '', url: `https://github.com/UiPath/flow-workbench/pull/${r.n}`, state: r.s === 'm' ? 'merged' : 'open', files: (r.f || []).map(String) }));\n      return { prs, ok: true };\n    } catch (e) { break; }\n  }\n}\nreturn { prs: [], ok: false, exitCode: out.ExitCode };"
         }
       },
       "outputs": {
@@ -652,19 +663,22 @@
                     "url": {
                       "type": "string"
                     },
-                    "updatedAt": {
-                      "type": "string"
-                    },
-                    "mergedAt": {
-                      "type": "string"
-                    },
                     "state": {
                       "type": "string"
+                    },
+                    "files": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
                     }
                   }
                 }
               },
-              "totalOpen": {
+              "ok": {
+                "type": "boolean"
+              },
+              "exitCode": {
                 "type": "number"
               }
             }
@@ -681,65 +695,6 @@
         "x": 0,
         "y": 0
       }
-    },
-    {
-      "id": "prFileNames",
-      "type": "core.action.script",
-      "typeVersion": "1.1",
-      "display": {
-        "label": "File names",
-        "subLabel": "drop patches, keep paths",
-        "icon": "code"
-      },
-      "inputs": {
-        "script": {
-          "type": "literal",
-          "fieldType": "string",
-          "expression": "const g = (o, k) => (o == null ? undefined : (o[k] !== undefined ? o[k] : o[k.charAt(0).toUpperCase() + k.slice(1)]));\nconst pr = $vars.prFiles.currentItem || {};\nconst files = Array.isArray($vars.listPrFiles1 && $vars.listPrFiles1.output) ? $vars.listPrFiles1.output : [];\nreturn { number: pr.number, title: pr.title, url: pr.url, state: pr.state || 'open', files: files.map(x => String(g(x, 'filename') || '')).filter(Boolean) };"
-        }
-      },
-      "outputs": {
-        "output": {
-          "type": "any",
-          "description": "The return value of the script",
-          "source": "=result.response",
-          "var": "output",
-          "schema": {
-            "type": "object",
-            "properties": {
-              "number": {
-                "type": "number"
-              },
-              "title": {
-                "type": "string"
-              },
-              "url": {
-                "type": "string"
-              },
-              "files": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
-              },
-              "state": {
-                "type": "string"
-              }
-            }
-          }
-        },
-        "error": {
-          "type": "object",
-          "description": "Error information if the node fails",
-          "source": "=Error",
-          "var": "error"
-        }
-      },
-      "position": {
-        "x": 0,
-        "y": 0
-      },
-      "parentId": "prFiles"
     }
   ],
   "edges": [
@@ -800,34 +755,6 @@
       "targetPort": "input"
     },
     {
-      "id": "e_selectTests_success_listOpenPrs1",
-      "sourceNodeId": "selectTests",
-      "sourcePort": "success",
-      "targetNodeId": "listOpenPrs1",
-      "targetPort": "input"
-    },
-    {
-      "id": "e_listOpenPrs1_error_pickTests",
-      "sourceNodeId": "listOpenPrs1",
-      "sourcePort": "error",
-      "targetNodeId": "pickTests",
-      "targetPort": "input"
-    },
-    {
-      "id": "e_prFiles_start_listPrFiles1",
-      "sourceNodeId": "prFiles",
-      "sourcePort": "start",
-      "targetNodeId": "listPrFiles1",
-      "targetPort": "input"
-    },
-    {
-      "id": "e_prFiles_success_pickTests",
-      "sourceNodeId": "prFiles",
-      "sourcePort": "success",
-      "targetNodeId": "pickTests",
-      "targetPort": "input"
-    },
-    {
       "id": "e_pickTests_success_investigate",
       "sourceNodeId": "pickTests",
       "sourcePort": "success",
@@ -835,39 +762,32 @@
       "targetPort": "input"
     },
     {
-      "id": "e_listOpenPrs1_output_recentPrs",
-      "sourceNodeId": "listOpenPrs1",
-      "sourcePort": "output",
-      "targetNodeId": "recentPrs",
-      "targetPort": "input"
-    },
-    {
-      "id": "e_recentPrs_success_prFiles",
-      "sourceNodeId": "recentPrs",
+      "id": "e_selectTests_success_ghPrs",
+      "sourceNodeId": "selectTests",
       "sourcePort": "success",
-      "targetNodeId": "prFiles",
+      "targetNodeId": "ghPrs",
       "targetPort": "input"
     },
     {
-      "id": "e_listPrFiles1_output_prFileNames",
-      "sourceNodeId": "listPrFiles1",
+      "id": "e_ghPrs_output_parsePrs",
+      "sourceNodeId": "ghPrs",
       "sourcePort": "output",
-      "targetNodeId": "prFileNames",
+      "targetNodeId": "parsePrs",
       "targetPort": "input"
     },
     {
-      "id": "e_listPrFiles1_error_prFileNames",
-      "sourceNodeId": "listPrFiles1",
+      "id": "e_ghPrs_error_parsePrs",
+      "sourceNodeId": "ghPrs",
       "sourcePort": "error",
-      "targetNodeId": "prFileNames",
+      "targetNodeId": "parsePrs",
       "targetPort": "input"
     },
     {
-      "id": "e_prFileNames_success_prFiles",
-      "sourceNodeId": "prFileNames",
+      "id": "e_parsePrs_success_pickTests",
+      "sourceNodeId": "parsePrs",
       "sourcePort": "success",
-      "targetNodeId": "prFiles",
-      "targetPort": "continue"
+      "targetNodeId": "pickTests",
+      "targetPort": "input"
     }
   ],
   "definitions": [
@@ -1866,21 +1786,21 @@
       }
     },
     {
-      "nodeType": "uipath.connector.uipath-microsoft-github.list-records",
+      "nodeType": "uipath.core.rpa-workflow.ca36341d-ecec-4ba6-aa76-134d0afe4ba7",
       "version": "1.0.0",
-      "category": "connector.196612",
-      "tags": [
-        "connector",
-        "activity"
-      ],
-      "sortOrder": 520,
+      "category": "rpa-workflow.published",
+      "runtimeConstraints": {
+        "exclude": [
+          "api-function"
+        ]
+      },
+      "description": "vm-exec bound in the VM-pool folder; referenced as an agent tool so calls run on the Windows robot VM",
+      "tags": [],
+      "sortOrder": 630,
       "supportsErrorHandling": true,
-      "description": "List records in GitHub",
       "display": {
-        "label": "List Records",
-        "description": "List records in GitHub",
-        "icon": "https://alpha.uipath.com/bc2ddac5-57bc-40e6-93fe-3b319b60ce36/studio_/typecache/icons/a148a7da48f0292729a848ee809872b14dc92ff13dc63c8af2f9bf267ff391ea.svg",
-        "sourceDisplayName": "GitHub"
+        "label": "vm-exec-vm",
+        "icon": "rpa"
       },
       "handleConfiguration": [
         {
@@ -1889,8 +1809,7 @@
             {
               "id": "input",
               "type": "target",
-              "handleType": "input",
-              "label": ""
+              "handleType": "input"
             }
           ]
         },
@@ -1900,8 +1819,7 @@
             {
               "id": "output",
               "type": "source",
-              "handleType": "output",
-              "label": ""
+              "handleType": "output"
             },
             {
               "id": "error",
@@ -1917,123 +1835,147 @@
         }
       ],
       "model": {
-        "type": "bpmn:SendTask",
-        "serviceType": "Intsvc.ActivityExecution",
+        "type": "bpmn:ServiceTask",
+        "serviceType": "Orchestrator.StartJob",
+        "version": "v2",
+        "listingVersion": "1.0.5",
         "bindings": {
-          "resource": "connection",
-          "resourceKey": "",
+          "resource": "process",
+          "resourceSubType": "Process",
+          "resourceKey": "e2e-investigator.vm-exec-vm",
+          "orchestratorType": "process",
           "values": [
             {
-              "name": "uipath-microsoft-github connection",
-              "propertyAttribute": "ConnectionId"
+              "name": "name",
+              "propertyAttribute": "name",
+              "default": "vm-exec-vm"
             },
             {
-              "name": "FolderKey",
-              "propertyAttribute": "FolderKey"
+              "name": "folderPath",
+              "propertyAttribute": "folderPath",
+              "default": "e2e-investigator"
+            },
+            {
+              "name": "folderKey",
+              "propertyAttribute": "folderKey",
+              "default": "0b28296b-1f4a-4ea9-a3d5-8b0abaac1cf0"
             }
           ]
         },
         "context": [
           {
-            "name": "connectorKey",
+            "name": "name",
             "type": "string",
-            "value": "uipath-microsoft-github"
+            "value": "<bindings.name>"
           },
           {
-            "name": "operation",
-            "type": "string"
-          },
-          {
-            "name": "objectName",
-            "type": "string"
-          },
-          {
-            "name": "method",
-            "type": "string"
-          },
-          {
-            "name": "connection",
+            "name": "folderPath",
             "type": "string",
-            "value": "<bindings.uipath-microsoft-github connection>"
+            "value": "<bindings.folderPath>"
           },
           {
-            "name": "folderKey",
+            "name": "_label",
             "type": "string",
-            "value": "<bindings.FolderKey>"
-          },
-          {
-            "name": "activityConfigurationVersion",
-            "type": "string",
-            "value": "v1"
-          },
-          {
-            "name": "metadata",
-            "body": {
-              "telemetryData": {
-                "connectorKey": "uipath-microsoft-github",
-                "connectorName": "List Records"
-              },
-              "inputMetadata": {},
-              "errorState": {
-                "hasError": true
-              }
-            },
-            "type": "json"
+            "value": "vm-exec-vm"
           }
         ]
       },
       "form": {
-        "id": "connector-properties",
-        "title": "Connector configuration",
+        "id": "activity-properties",
+        "title": "RPA Workflow",
         "sections": [
           {
-            "id": "connector",
-            "title": "Connector",
+            "id": "inputs",
+            "title": "Inputs",
             "collapsible": true,
             "defaultExpanded": true,
             "fields": [
               {
-                "label": "",
-                "name": "inputs.detail",
-                "type": "custom",
-                "component": "dap-config",
-                "componentProps": {
-                  "connectorDetail": {
-                    "isAppActivity": false,
-                    "packageId": "196612",
-                    "svgIconUrl": "icons/a148a7da48f0292729a848ee809872b14dc92ff13dc63c8af2f9bf267ff391ea.svg",
-                    "displayName": "List Records",
-                    "assemblyQualifiedName": "UiPath.IntegrationService.Activities.Runtime.Activities.ConnectorActivity, UiPath.IntegrationService.Activities.Runtime, Version=1.33.0.0, Culture=neutral, PublicKeyToken=null",
-                    "description": "List records in GitHub",
-                    "category": "GitHub.Advanced",
-                    "activityColor": "#E56D5C",
-                    "configuration": "{\"connectorKey\":\"uipath-microsoft-github\",\"activityType\":\"Generic\",\"version\":\"1.0.0\",\"operation\":\"List\",\"supportsStreaming\":false}",
-                    "uiPathActivityTypeId": "5d6fae7f-1ab5-3727-8c27-6cfa57ded5ed",
-                    "isExperimental": false,
-                    "helpUrlTemplate": "https://docs.uipath.com/{0}/activities/other/latest/integration-service/uipath-microsoft-github-List-All-Records",
-                    "isEnabled": true,
-                    "targetPlatform": "CrossPlatform",
-                    "isAdvanced": false,
-                    "isRestricted": false,
-                    "hasWpfOnlyDesigner": false,
-                    "tags": [
-                      ""
-                    ]
-                  }
-                }
+                "name": "inputs.Script",
+                "type": "text",
+                "label": "Script"
+              },
+              {
+                "name": "inputs.WorkDir",
+                "type": "text",
+                "label": "WorkDir"
+              },
+              {
+                "name": "inputs.RunId",
+                "type": "text",
+                "label": "RunId"
+              },
+              {
+                "name": "inputs.StateKey",
+                "type": "text",
+                "label": "StateKey"
+              },
+              {
+                "name": "inputs.TimeoutMinutes",
+                "type": "number",
+                "label": "TimeoutMinutes"
+              },
+              {
+                "name": "inputs.MaxOutputChars",
+                "type": "number",
+                "label": "MaxOutputChars"
               }
             ]
           }
         ]
       },
-      "inputDefinition": {},
-      "inputDefaults": {},
+      "inputDefinition": {
+        "type": "object",
+        "properties": {
+          "Script": {
+            "type": "string"
+          },
+          "WorkDir": {
+            "type": "string"
+          },
+          "RunId": {
+            "type": "string"
+          },
+          "StateKey": {
+            "type": "string"
+          },
+          "TimeoutMinutes": {
+            "type": "number"
+          },
+          "MaxOutputChars": {
+            "type": "number"
+          }
+        }
+      },
+      "inputDefaults": {
+        "Script": "",
+        "WorkDir": "",
+        "RunId": "",
+        "StateKey": "",
+        "TimeoutMinutes": 0,
+        "MaxOutputChars": 0
+      },
       "outputDefinition": {
         "output": {
           "type": "object",
-          "description": "The return value of the connector.",
-          "source": "=result.response",
-          "var": "output"
+          "source": "=this",
+          "var": "output",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "ExitCode": {
+                "type": "integer",
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "Stdout": {
+                "type": "string"
+              },
+              "OutputBlobPath": {
+                "type": "string"
+              }
+            }
+          }
         },
         "error": {
           "type": "object",
@@ -2493,189 +2435,6 @@
         }
       },
       {
-        "id": "prFiles.currentItem",
-        "type": "any",
-        "description": "The current item being iterated in the loop",
-        "binding": {
-          "nodeId": "prFiles",
-          "outputId": "currentItem"
-        }
-      },
-      {
-        "id": "prFiles.currentIteration",
-        "type": "number",
-        "description": "The current iteration number (1-based)",
-        "binding": {
-          "nodeId": "prFiles",
-          "outputId": "currentIteration"
-        }
-      },
-      {
-        "id": "prFiles.collection",
-        "type": "array",
-        "description": "The collection being iterated over",
-        "binding": {
-          "nodeId": "prFiles",
-          "outputId": "collection"
-        }
-      },
-      {
-        "id": "prFiles.output",
-        "type": "array",
-        "description": "Aggregated results from all loop iterations",
-        "binding": {
-          "nodeId": "prFiles",
-          "outputId": "output"
-        }
-      },
-      {
-        "id": "prFiles.error",
-        "type": "object",
-        "description": "Error information if the node fails",
-        "schema": {
-          "$schema": "http://json-schema.org/draft-07/schema#",
-          "type": "object",
-          "required": [
-            "code",
-            "message",
-            "detail",
-            "category",
-            "status"
-          ],
-          "properties": {
-            "code": {
-              "type": "string",
-              "description": "Error code as a string"
-            },
-            "message": {
-              "type": "string",
-              "description": "High-level error message"
-            },
-            "detail": {
-              "type": "string",
-              "description": "Detailed error description"
-            },
-            "category": {
-              "type": "string",
-              "description": "Error category"
-            },
-            "status": {
-              "type": "integer",
-              "description": "HTTP status code"
-            }
-          },
-          "additionalProperties": false
-        },
-        "binding": {
-          "nodeId": "prFiles",
-          "outputId": "error"
-        }
-      },
-      {
-        "id": "listOpenPrs1.output",
-        "type": "object",
-        "description": "The return value of the connector.",
-        "binding": {
-          "nodeId": "listOpenPrs1",
-          "outputId": "output"
-        }
-      },
-      {
-        "id": "listOpenPrs1.error",
-        "type": "object",
-        "description": "Error information if the node fails",
-        "schema": {
-          "$schema": "http://json-schema.org/draft-07/schema#",
-          "type": "object",
-          "required": [
-            "code",
-            "message",
-            "detail",
-            "category",
-            "status"
-          ],
-          "properties": {
-            "code": {
-              "type": "string",
-              "description": "Error code as a string"
-            },
-            "message": {
-              "type": "string",
-              "description": "High-level error message"
-            },
-            "detail": {
-              "type": "string",
-              "description": "Detailed error description"
-            },
-            "category": {
-              "type": "string",
-              "description": "Error category"
-            },
-            "status": {
-              "type": "integer",
-              "description": "HTTP status code"
-            }
-          },
-          "additionalProperties": false
-        },
-        "binding": {
-          "nodeId": "listOpenPrs1",
-          "outputId": "error"
-        }
-      },
-      {
-        "id": "listPrFiles1.output",
-        "type": "object",
-        "description": "The return value of the connector.",
-        "binding": {
-          "nodeId": "listPrFiles1",
-          "outputId": "output"
-        }
-      },
-      {
-        "id": "listPrFiles1.error",
-        "type": "object",
-        "description": "Error information if the node fails",
-        "schema": {
-          "$schema": "http://json-schema.org/draft-07/schema#",
-          "type": "object",
-          "required": [
-            "code",
-            "message",
-            "detail",
-            "category",
-            "status"
-          ],
-          "properties": {
-            "code": {
-              "type": "string",
-              "description": "Error code as a string"
-            },
-            "message": {
-              "type": "string",
-              "description": "High-level error message"
-            },
-            "detail": {
-              "type": "string",
-              "description": "Detailed error description"
-            },
-            "category": {
-              "type": "string",
-              "description": "Error category"
-            },
-            "status": {
-              "type": "integer",
-              "description": "HTTP status code"
-            }
-          },
-          "additionalProperties": false
-        },
-        "binding": {
-          "nodeId": "listPrFiles1",
-          "outputId": "error"
-        }
-      },
-      {
         "id": "pickTests.output",
         "type": "any",
         "description": "The return value of the script",
@@ -2812,7 +2571,74 @@
         }
       },
       {
-        "id": "recentPrs.output",
+        "id": "ghPrs.output",
+        "type": "object",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "ExitCode": {
+              "type": "integer",
+              "minimum": -2147483648,
+              "maximum": 2147483647
+            },
+            "Stdout": {
+              "type": "string"
+            },
+            "OutputBlobPath": {
+              "type": "string"
+            }
+          }
+        },
+        "binding": {
+          "nodeId": "ghPrs",
+          "outputId": "output"
+        }
+      },
+      {
+        "id": "ghPrs.error",
+        "type": "object",
+        "description": "Error information if the node fails",
+        "schema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "required": [
+            "code",
+            "message",
+            "detail",
+            "category",
+            "status"
+          ],
+          "properties": {
+            "code": {
+              "type": "string",
+              "description": "Error code as a string"
+            },
+            "message": {
+              "type": "string",
+              "description": "High-level error message"
+            },
+            "detail": {
+              "type": "string",
+              "description": "Detailed error description"
+            },
+            "category": {
+              "type": "string",
+              "description": "Error category"
+            },
+            "status": {
+              "type": "integer",
+              "description": "HTTP status code"
+            }
+          },
+          "additionalProperties": false
+        },
+        "binding": {
+          "nodeId": "ghPrs",
+          "outputId": "error"
+        }
+      },
+      {
+        "id": "parsePrs.output",
         "type": "any",
         "description": "The return value of the script",
         "schema": {
@@ -2832,75 +2658,37 @@
                   "url": {
                     "type": "string"
                   },
-                  "updatedAt": {
-                    "type": "string"
-                  },
-                  "mergedAt": {
-                    "type": "string"
-                  },
                   "state": {
                     "type": "string"
+                  },
+                  "files": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
                   }
                 }
               }
             },
-            "totalOpen": {
+            "ok": {
+              "type": "boolean"
+            },
+            "exitCode": {
               "type": "number"
             }
           }
         },
         "binding": {
-          "nodeId": "recentPrs",
+          "nodeId": "parsePrs",
           "outputId": "output"
         }
       },
       {
-        "id": "recentPrs.error",
+        "id": "parsePrs.error",
         "type": "object",
         "description": "Error information if the node fails",
         "binding": {
-          "nodeId": "recentPrs",
-          "outputId": "error"
-        }
-      },
-      {
-        "id": "prFileNames.output",
-        "type": "any",
-        "description": "The return value of the script",
-        "schema": {
-          "type": "object",
-          "properties": {
-            "number": {
-              "type": "number"
-            },
-            "title": {
-              "type": "string"
-            },
-            "url": {
-              "type": "string"
-            },
-            "files": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            "state": {
-              "type": "string"
-            }
-          }
-        },
-        "binding": {
-          "nodeId": "prFileNames",
-          "outputId": "output"
-        }
-      },
-      {
-        "id": "prFileNames.error",
-        "type": "object",
-        "description": "Error information if the node fails",
-        "binding": {
-          "nodeId": "prFileNames",
+          "nodeId": "parsePrs",
           "outputId": "error"
         }
       }
@@ -2947,22 +2735,34 @@
       "default": "0b28296b-1f4a-4ea9-a3d5-8b0abaac1cf0"
     },
     {
-      "id": "bYxtKXquX",
-      "name": "uipath-microsoft-github connection",
+      "id": "bVmExecName",
+      "name": "name",
       "type": "string",
-      "resource": "connection",
-      "resourceKey": "3e9ae2b7-85a6-4271-8c23-5a620eed56e3",
-      "propertyAttribute": "ConnectionId",
-      "default": "3e9ae2b7-85a6-4271-8c23-5a620eed56e3"
+      "resource": "process",
+      "resourceKey": "e2e-investigator.vm-exec-vm",
+      "default": "vm-exec-vm",
+      "propertyAttribute": "name",
+      "resourceSubType": "Process"
     },
     {
-      "id": "blM5ouagQ",
-      "name": "FolderKey",
+      "id": "bVmExecFolderPath",
+      "name": "folderPath",
       "type": "string",
-      "resource": "connection",
-      "resourceKey": "3e9ae2b7-85a6-4271-8c23-5a620eed56e3",
-      "propertyAttribute": "FolderKey",
-      "default": "0b28296b-1f4a-4ea9-a3d5-8b0abaac1cf0"
+      "resource": "process",
+      "resourceKey": "e2e-investigator.vm-exec-vm",
+      "default": "e2e-investigator",
+      "propertyAttribute": "folderPath",
+      "resourceSubType": "Process"
+    },
+    {
+      "id": "bFSZOddFk",
+      "name": "folderKey",
+      "type": "string",
+      "resource": "process",
+      "resourceKey": "e2e-investigator.vm-exec-vm",
+      "default": "0b28296b-1f4a-4ea9-a3d5-8b0abaac1cf0",
+      "propertyAttribute": "folderKey",
+      "resourceSubType": "Process"
     }
   ],
   "layout": {
@@ -2989,8 +2789,8 @@
       },
       "investigate": {
         "position": {
-          "x": 1440,
-          "y": 304
+          "x": 768,
+          "y": -112
         },
         "size": {
           "width": 560,
@@ -2999,8 +2799,8 @@
       },
       "callVmAgent": {
         "position": {
-          "x": 1040,
-          "y": 672
+          "x": 384,
+          "y": 256
         },
         "size": {
           "width": 96,
@@ -3009,8 +2809,8 @@
       },
       "recordResult": {
         "position": {
-          "x": 1248,
-          "y": 688
+          "x": 576,
+          "y": 272
         },
         "size": {
           "width": 96,
@@ -3019,8 +2819,8 @@
       },
       "summarize": {
         "position": {
-          "x": 2096,
-          "y": 320
+          "x": 1424,
+          "y": -96
         },
         "size": {
           "width": 96,
@@ -3029,8 +2829,8 @@
       },
       "end": {
         "position": {
-          "x": 2480,
-          "y": 288
+          "x": 1808,
+          "y": -128
         },
         "size": {
           "width": 96,
@@ -3039,25 +2839,25 @@
       },
       "replyInSlackThread1": {
         "position": {
-          "x": 2288,
-          "y": 304
+          "x": 1616,
+          "y": -112
         },
         "size": {
           "width": 96,
           "height": 96
         }
       },
-      "prFiles": {
+      "pickTests": {
         "position": {
           "x": 576,
-          "y": 144
+          "y": -48
         },
         "size": {
-          "width": 560,
-          "height": 320
+          "width": 96,
+          "height": 96
         }
       },
-      "listOpenPrs1": {
+      "ghPrs": {
         "position": {
           "x": 192,
           "y": -16
@@ -3067,40 +2867,10 @@
           "height": 96
         }
       },
-      "listPrFiles1": {
-        "position": {
-          "x": 192,
-          "y": 512
-        },
-        "size": {
-          "width": 96,
-          "height": 96
-        }
-      },
-      "pickTests": {
-        "position": {
-          "x": 1248,
-          "y": 160
-        },
-        "size": {
-          "width": 96,
-          "height": 96
-        }
-      },
-      "recentPrs": {
+      "parsePrs": {
         "position": {
           "x": 384,
-          "y": 160
-        },
-        "size": {
-          "width": 96,
-          "height": 96
-        }
-      },
-      "prFileNames": {
-        "position": {
-          "x": 384,
-          "y": 528
+          "y": -32
         },
         "size": {
           "width": 96,
