@@ -28,9 +28,6 @@
               "runId": {
                 "type": "string"
               },
-              "sha": {
-                "type": "string"
-              },
               "runUrl": {
                 "type": "string"
               },
@@ -40,7 +37,7 @@
               "slackTs": {
                 "type": "string"
               },
-              "projects": {
+              "environments": {
                 "type": "string"
               },
               "repoUrl": {
@@ -66,7 +63,7 @@
                 "items": {
                   "type": "object",
                   "properties": {
-                    "project": {
+                    "environment": {
                       "type": "string"
                     },
                     "file": {
@@ -100,7 +97,7 @@
         "script": {
           "type": "literal",
           "fieldType": "string",
-          "expression": "const s = $vars.start.output;\nconst globs = String(s.projects || 'studio-*,vsix-*').split(',').map(g => g.trim()).filter(Boolean);\nconst matches = (p) => globs.some(g => new RegExp('^' + g.split('*').map(x => x.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')).join('.*') + '$').test(p));\n// One row per distinct test (same file+title across shards/platforms collapses).\nconst seen = new Set();\nconst rows = [];\nfor (const t of (s.failedTests || [])) {\n  if (!t || !matches(t.project || '')) continue;\n  const key = t.file + '::' + t.title;\n  if (seen.has(key)) continue;\n  seen.add(key);\n  rows.push(t);\n}\nrows.sort((a, b) => (a.file + a.title).localeCompare(b.file + b.title));\n// Tests whose first error line matches (digits/hashes ignored) share a cause. A named `Error:` groups\n// across spec files (shared infra failure); a bare timeout/locator message only within its file.\nconst norm = (e) => String(e || '').replace(/\\x1b\\[[0-9;]*m/g, '').split('\\n').map(l => l.trim()).find(Boolean) || '';\nconst causeKey = (t) => {\n  const n = norm(t.error).replace(/[0-9a-f]{8,}/gi, '#').replace(/\\d+/g, '#').slice(0, 160);\n  if (!n) return t.file + '::title:' + t.title;\n  return /^\\w*Error: /.test(n) && !/^TimeoutError/.test(n) ? 'err::' + n : t.file + '::' + n;\n};\nconst groups = [];\nconst byKey = new Map();\nfor (const t of rows) {\n  const k = causeKey(t);\n  const g = byKey.get(k);\n  if (g) { g.siblings.push(g.file === t.file ? t.title : `${t.file.split('/').pop()} › ${t.title}`); continue; }\n  const ng = { ...t, siblings: [] }; byKey.set(k, ng); groups.push(ng);\n}\n// Biggest cause first: it explains the most red.\ngroups.sort((a, b) => b.siblings.length - a.siblings.length);\nconst grep = (title) => String(title).replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&').replace(/\"/g, '\\\\\"');\nconst groups2 = groups.map(t => ({\n  project: t.project, file: t.file, title: t.title, error: t.error || '', siblings: t.siblings,\n  testCommand: `corepack pnpm exec playwright test --config e2e/playwright.config.ts e2e/${t.file} --project ${t.project} --grep \"${grep(t.title)}\"`\n}));\nreturn { groups: groups2, total: groups2.length, totalTests: rows.length };"
+          "expression": "const s = $vars.start.output;\nconst globs = String(s.environments || 'studio-*,vsix-*').split(',').map(g => g.trim()).filter(Boolean);\nconst matches = (p) => globs.some(g => new RegExp('^' + g.split('*').map(x => x.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')).join('.*') + '$').test(p));\n// One row per distinct test (same file+title across shards/platforms collapses).\nconst seen = new Set();\nconst rows = [];\nfor (const t of (s.failedTests || [])) {\n  if (!t || !matches(t.environment || '')) continue;\n  const key = t.file + '::' + t.title;\n  if (seen.has(key)) continue;\n  seen.add(key);\n  rows.push(t);\n}\nrows.sort((a, b) => (a.file + a.title).localeCompare(b.file + b.title));\n// Tests whose first error line matches (digits/hashes ignored) share a cause. A named `Error:` groups\n// across spec files (shared infra failure); a bare timeout/locator message only within its file.\nconst norm = (e) => String(e || '').replace(/\\x1b\\[[0-9;]*m/g, '').split('\\n').map(l => l.trim()).find(Boolean) || '';\nconst causeKey = (t) => {\n  const n = norm(t.error).replace(/[0-9a-f]{8,}/gi, '#').replace(/\\d+/g, '#').slice(0, 160);\n  if (!n) return t.file + '::title:' + t.title;\n  return /^\\w*Error: /.test(n) && !/^TimeoutError/.test(n) ? 'err::' + n : t.file + '::' + n;\n};\nconst groups = [];\nconst byKey = new Map();\nfor (const t of rows) {\n  const k = causeKey(t);\n  const g = byKey.get(k);\n  if (g) { g.siblings.push(g.file === t.file ? t.title : `${t.file.split('/').pop()} › ${t.title}`); continue; }\n  const ng = { ...t, siblings: [] }; byKey.set(k, ng); groups.push(ng);\n}\n// Biggest cause first: it explains the most red.\ngroups.sort((a, b) => b.siblings.length - a.siblings.length);\nconst grep = (title) => String(title).replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&').replace(/\"/g, '\\\\\"');\nconst groups2 = groups.map(t => ({\n  environment: t.environment, file: t.file, title: t.title, error: t.error || '', siblings: t.siblings,\n  testCommand: `corepack pnpm exec playwright test --config e2e/playwright.config.ts e2e/${t.file} --project ${t.environment} --grep \"${grep(t.title)}\"`\n}));\nreturn { groups: groups2, total: groups2.length, totalTests: rows.length };"
         }
       },
       "outputs": {
@@ -123,7 +120,7 @@
                 "items": {
                   "type": "object",
                   "properties": {
-                    "project": {
+                    "environment": {
                       "type": "string"
                     },
                     "file": {
@@ -204,7 +201,7 @@
             "items": {
               "type": "object",
               "properties": {
-                "project": {
+                "environment": {
                   "type": "string"
                 },
                 "file": {
@@ -395,7 +392,7 @@
         },
         "error": {
           "type": "object",
-          "description": "Error information if the flow fails",
+          "description": "Error information if the node fails",
           "source": "=Error",
           "var": "error",
           "schema": {
@@ -448,7 +445,7 @@
         "script": {
           "type": "literal",
           "fieldType": "string",
-          "expression": "const t = $vars.investigate.currentItem;\nconst r = ($vars.callVmAgent && $vars.callVmAgent.output) || null;\nconst e = ($vars.callVmAgent && $vars.callVmAgent.error) || null;\nconst base = (p) => String(p || '').split('/').pop().replace(/\\.(spec|test)?\\.?tsx?$/i, '').replace(/\\.[a-z]+$/i, '').toLowerCase();\nconst words = new Set();\nfor (const m of String((r && r.hypothesis) || '').matchAll(/\\b([A-Za-z][A-Za-z0-9-]+)\\.(tsx?|ts|css)\\b|\\b([A-Z][A-Za-z0-9]+(?:Page|Dialog|Panel|Rail|Service|Client|Store))\\b/g)) words.add((m[1] || m[3]).toLowerCase());\nconst relatedPrs = (($vars.pickTests.output || {}).prs || []).filter(pr => (pr.files || []).some(x => words.has(base(x)))).map(pr => ({ number: pr.number, title: pr.title, url: pr.url, state: pr.state || 'open' }));\nreturn {\n  project: t.project, file: t.file, title: t.title, siblings: t.siblings || [],\n  reproduced: !!(r && r.reproduced), fixVerified: !!(r && r.fixVerified),\n  prUrl: (r && r.prUrl) || '', hypothesis: (r && r.hypothesis) || '',\n  failed: !r || !!e, relatedPrs, errorMessage: e ? String(e.message || e.code || 'VmAgent faulted') : ''\n};"
+          "expression": "const t = $vars.investigate.currentItem;\nconst r = ($vars.callVmAgent && $vars.callVmAgent.output) || null;\nconst e = ($vars.callVmAgent && $vars.callVmAgent.error) || null;\nconst base = (p) => String(p || '').split('/').pop().replace(/\\.(spec|test)?\\.?tsx?$/i, '').replace(/\\.[a-z]+$/i, '').toLowerCase();\nconst words = new Set();\nfor (const m of String((r && r.hypothesis) || '').matchAll(/\\b([A-Za-z][A-Za-z0-9-]+)\\.(tsx?|ts|css)\\b|\\b([A-Z][A-Za-z0-9]+(?:Page|Dialog|Panel|Rail|Service|Client|Store))\\b/g)) words.add((m[1] || m[3]).toLowerCase());\nconst relatedPrs = (($vars.pickTests.output || {}).prs || []).filter(pr => (pr.files || []).some(x => words.has(base(x)))).map(pr => ({ number: pr.number, title: pr.title, url: pr.url, state: pr.state || 'open' }));\nreturn {\n  environment: t.environment, file: t.file, title: t.title, siblings: t.siblings || [],\n  reproduced: !!(r && r.reproduced), fixVerified: !!(r && r.fixVerified),\n  prUrl: (r && r.prUrl) || '', hypothesis: (r && r.hypothesis) || '',\n  failed: !r || !!e, relatedPrs, errorMessage: e ? String(e.message || e.code || 'VmAgent faulted') : ''\n};"
         }
       },
       "outputs": {
@@ -460,7 +457,7 @@
           "schema": {
             "type": "object",
             "properties": {
-              "project": {
+              "environment": {
                 "type": "string"
               },
               "file": {
@@ -538,7 +535,7 @@
         "script": {
           "type": "literal",
           "fieldType": "string",
-          "expression": "const s = $vars.start.output;\nconst sel = $vars.pickTests.output || { total: 0, totalTests: 0, skipped: 0, selected: [], covered: [] };\nconst rows = ($vars.investigate.output || []).map(i => { const o = (i && i.recordResult && i.recordResult.output) || i; return o && o.title ? o : null; }).filter(Boolean);\nconst nTests = sel.totalTests || sel.total;\nconst head = `:robot_face: *VmAgent investigated ${rows.length} of ${sel.total} ${String(s.projects || 'studio-*,vsix-*').replace(/-?\\*/g, '').replace(/,/g, '/')} failure groups* (${nTests} tests, <${s.runUrl}|run ${s.runId}>)` + (s.reportUrl ? ` · <${s.reportUrl}|report>` : '');\nif (sel.total === 0) return { text: `:robot_face: VmAgent: no ${String(s.projects || 'studio-*,vsix-*').replace(/-?\\*/g, '').replace(/,/g, '/')} failures to investigate in <${s.runUrl}|run ${s.runId}>.` };\nconst spec = (f) => String(f).split('/').pop();\nconst lines = rows.map(r => {\n  if (r.failed) return `• \\`${spec(r.file)} › ${r.title}\\` — investigation faulted: ${r.errorMessage}`;\n  const parts = [r.reproduced ? 'reproduced' : 'not reproduced', r.fixVerified ? 'fix verified' : 'no verified fix', r.prUrl ? `<${r.prUrl}|draft PR>` : 'no PR'];\n  for (const pr of (r.relatedPrs || [])) parts.push(`related ${pr.state === 'merged' ? 'merged' : 'open'} <${pr.url}|PR #${pr.number}>`);\n  const sib = (r.siblings && r.siblings.length) ? ` (+${r.siblings.length} same cause: ${r.siblings.map(x => '`' + x + '`').join(', ')})` : '';\n  return `• \\`${spec(r.file)} › ${r.title}\\`${sib} — ${parts.join(', ')}` + (r.hypothesis ? `\\n    _${r.hypothesis.slice(0, 300)}_` : '');\n});\nfor (const c of (sel.covered || [])) {\n  const sib = (c.siblings && c.siblings.length) ? ` (+${c.siblings.length} same cause)` : '';\n  const verb = c.coveredBy.state === 'merged' ? 'likely already fixed by merged' : 'not investigated: open';\n  lines.push(`• \\`${spec(c.file)} › ${c.title}\\`${sib} — ${verb} <${c.coveredBy.url}|PR #${c.coveredBy.number}> (touches \\`${c.coveredBy.file.split('/').pop()}\\`)`);\n}\nif (sel.skipped > 0) lines.push(`_${sel.skipped} not investigated (maxTests=${s.maxTests})_`);\nreturn { text: [head, ...lines].join('\\n') };\n"
+          "expression": "const s = $vars.start.output;\nconst sel = $vars.pickTests.output || { total: 0, totalTests: 0, skipped: 0, selected: [], covered: [] };\nconst rows = ($vars.investigate.output || []).map(i => { const o = (i && i.recordResult && i.recordResult.output) || i; return o && o.title ? o : null; }).filter(Boolean);\nconst nTests = sel.totalTests || sel.total;\nconst head = `:robot_face: *VmAgent investigated ${rows.length} of ${sel.total} ${String(s.environments || 'studio-*,vsix-*').replace(/-?\\*/g, '').replace(/,/g, '/')} failure groups* (${nTests} tests, <${s.runUrl}|run ${s.runId}>)` + (s.reportUrl ? ` · <${s.reportUrl}|report>` : '');\nif (sel.total === 0) return { text: `:robot_face: VmAgent: no ${String(s.environments || 'studio-*,vsix-*').replace(/-?\\*/g, '').replace(/,/g, '/')} failures to investigate in <${s.runUrl}|run ${s.runId}>.` };\nconst spec = (f) => String(f).split('/').pop();\nconst lines = rows.map(r => {\n  if (r.failed) return `• \\`${spec(r.file)} › ${r.title}\\` — investigation faulted: ${r.errorMessage}`;\n  const parts = [r.reproduced ? 'reproduced' : 'not reproduced', r.fixVerified ? 'fix verified' : 'no verified fix', r.prUrl ? `<${r.prUrl}|draft PR>` : 'no PR'];\n  for (const pr of (r.relatedPrs || [])) parts.push(`related ${pr.state === 'merged' ? 'merged' : 'open'} <${pr.url}|PR #${pr.number}>`);\n  const sib = (r.siblings && r.siblings.length) ? ` (+${r.siblings.length} same cause: ${r.siblings.map(x => '`' + x + '`').join(', ')})` : '';\n  return `• \\`${spec(r.file)} › ${r.title}\\`${sib} — ${parts.join(', ')}` + (r.hypothesis ? `\\n    _${r.hypothesis.slice(0, 300)}_` : '');\n});\nfor (const c of (sel.covered || [])) {\n  const sib = (c.siblings && c.siblings.length) ? ` (+${c.siblings.length} same cause)` : '';\n  const verb = c.coveredBy.state === 'merged' ? 'likely already fixed by merged' : 'not investigated: open';\n  lines.push(`• \\`${spec(c.file)} › ${c.title}\\`${sib} — ${verb} <${c.coveredBy.url}|PR #${c.coveredBy.number}> (touches \\`${c.coveredBy.file.split('/').pop()}\\`)`);\n}\nif (sel.skipped > 0) lines.push(`_${sel.skipped} not investigated (maxTests=${s.maxTests})_`);\nreturn { text: [head, ...lines].join('\\n') };\n"
         }
       },
       "outputs": {
@@ -696,7 +693,7 @@
                 "items": {
                   "type": "object",
                   "properties": {
-                    "project": {
+                    "environment": {
                       "type": "string"
                     },
                     "file": {
@@ -725,7 +722,7 @@
                 "items": {
                   "type": "object",
                   "properties": {
-                    "project": {
+                    "environment": {
                       "type": "string"
                     },
                     "file": {
@@ -2331,12 +2328,6 @@
         "triggerNodeId": "start"
       },
       {
-        "id": "sha",
-        "direction": "in",
-        "type": "string",
-        "triggerNodeId": "start"
-      },
-      {
         "id": "runUrl",
         "direction": "in",
         "type": "string",
@@ -2359,10 +2350,33 @@
         "id": "failedTests",
         "direction": "in",
         "type": "array",
+        "schema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "environment": {
+                "type": "string"
+              },
+              "file": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "error": {
+                "type": "string"
+              }
+            },
+            "required": []
+          }
+        },
+        "defaultValue": [],
         "triggerNodeId": "start"
       },
       {
-        "id": "projects",
+        "id": "environments",
         "direction": "in",
         "type": "string",
         "defaultValue": "studio-*,vsix-*",
@@ -2424,7 +2438,7 @@
               "items": {
                 "type": "object",
                 "properties": {
-                  "project": {
+                  "environment": {
                     "type": "string"
                   },
                   "file": {
@@ -2592,7 +2606,7 @@
         "schema": {
           "type": "object",
           "properties": {
-            "project": {
+            "environment": {
               "type": "string"
             },
             "file": {
@@ -2742,7 +2756,7 @@
               "items": {
                 "type": "object",
                 "properties": {
-                  "project": {
+                  "environment": {
                     "type": "string"
                   },
                   "file": {
@@ -2771,7 +2785,7 @@
               "items": {
                 "type": "object",
                 "properties": {
-                  "project": {
+                  "environment": {
                     "type": "string"
                   },
                   "file": {

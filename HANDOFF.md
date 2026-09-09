@@ -206,8 +206,8 @@ Trigger inputs:
 | `runUrl` | string | — | link to the Actions run |
 | `reportUrl` | string | — | link to the Playwright report |
 | `slackTs` | string | `""` | `thread_ts` of the Slack message to reply under; empty posts top-level |
-| `failedTests` | array | — | `[{ project, file, title, error }]` from the nightly |
-| `projects` | string | `studio-*` | glob; `selectTests` drops tests from non-matching projects |
+| `failedTests` | array | — | `[{ environment, file, title, error }]` from the nightly |
+| `environments` | string | `studio-*,vsix-*` | glob over Playwright project names; `selectTests` drops non-matching tests |
 | `maxTests` | number | `1` | how many of the surviving tests to investigate |
 | `repoUrl` | string | `https://github.com/UiPath/flow-workbench` | repo VmAgent checks out |
 | `branch` | string | `develop` | branch VmAgent checks out |
@@ -277,7 +277,7 @@ Open:
 - `vm-agent 11` deployment is wedged (three Maestro jobs `Terminating` after `jobs stop --strategy Kill`). Uninstall
   it once Orchestrator clears them; report the Kill behaviour to the Maestro team.
 - Slack "edit one message" request: the connector has no update op; needs an HTTP `chat.update` with a token asset.
-- vsix runs on the VM now (see "vsix projects" below); `projects` defaults to `studio-*,vsix-*`.
+- vsix runs on the VM now (see "vsix projects" below); `environments` defaults to `studio-*,vsix-*`.
 - `maxTests` stays 1 until the pool grows; also verify iteration scoping before raising it.
 - Slack renders `<`/`>` from the hypothesis escaped (`&lt;nav&gt;`); strip them in `summarize`.
 - VmAgent still reproduced the Map-operation failure on `develop` after #3758 merged; #3758 may not cover it.
