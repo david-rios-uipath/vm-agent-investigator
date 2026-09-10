@@ -1,0 +1,55 @@
+{
+  "runId": "34443718151",
+  "runUrl": "https://github.com/UiPath/flow-workbench/actions/runs/34443718151",
+  "reportUrl": "https://theater.uipath.co/flow/ae845339838430015e53dc23511f7a96e0d0f4eb/",
+  "slackTs": "1789025219.832649",
+  "environments": "studio-*,vsix-*",
+  "maxTests": 1,
+  "repoUrl": "https://github.com/UiPath/flow-workbench",
+  "branch": "develop",
+  "claudeModel": "claude-sonnet-5",
+  "failedTests": [
+    {
+      "environment": "vsix-staging-linux",
+      "file": "specs/inline-agents/agent-tools-vsix.spec.ts",
+      "title": "tools handle: a published MCP server tool attaches and wires to the agent @vsix",
+      "error": "Error: MCP loading completed, but no server tool row was rendered — verify the tenant has an MCP server with tools, that `canvas.nodes.mcp` reached the webview, and that the server's subtype is in `canvas.nodes.mcp-subtypes`."
+    },
+    {
+      "environment": "vsix-staging-linux",
+      "file": "specs/inline-agents/agent-tools-vsix.spec.ts",
+      "title": "context handle: a published context-grounding index attaches and wires to the agent @vsix",
+      "error": "Error: No context-grounding index available on the test tenant — provision one under Indexes, or investigate the context fan-out."
+    },
+    {
+      "environment": "vsix-staging-windows",
+      "file": "specs/inline-agents/agent-tools-vsix.spec.ts",
+      "title": "tools handle: a published MCP server tool attaches and wires to the agent @vsix",
+      "error": "Error: MCP loading completed, but no server tool row was rendered — verify the tenant has an MCP server with tools, that `canvas.nodes.mcp` reached the webview, and that the server's subtype is in `canvas.nodes.mcp-subtypes`."
+    },
+    {
+      "environment": "vsix-staging-windows",
+      "file": "specs/inline-agents/agent-tools-vsix.spec.ts",
+      "title": "context handle: a published context-grounding index attaches and wires to the agent @vsix",
+      "error": "Error: No context-grounding index available on the test tenant — provision one under Indexes, or investigate the context fan-out."
+    },
+    {
+      "environment": "vsix-staging-macos",
+      "file": "specs/inline-agents/agent-tools-vsix.spec.ts",
+      "title": "tools handle: a published MCP server tool attaches and wires to the agent @vsix",
+      "error": "Error: MCP loading completed, but no server tool row was rendered — verify the tenant has an MCP server with tools, that `canvas.nodes.mcp` reached the webview, and that the server's subtype is in `canvas.nodes.mcp-subtypes`."
+    },
+    {
+      "environment": "vsix-staging-macos",
+      "file": "specs/inline-agents/agent-tools-vsix.spec.ts",
+      "title": "context handle: a published context-grounding index attaches and wires to the agent @vsix",
+      "error": "Error: No context-grounding index available on the test tenant — provision one under Indexes, or investigate the context fan-out."
+    },
+    {
+      "environment": "vsix-alpha-windows",
+      "file": "specs/vsix/smoke.spec.ts",
+      "title": "signs in, builds and debugs a Script flow, then packages and deploys it @vsix @smoke",
+      "error": "Error: Timed out waiting for FlowEditor webview frame (extensionId=uipath.uipath-maestro)."
+    }
+  ]
+}

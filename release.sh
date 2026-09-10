@@ -43,7 +43,10 @@ print('NightlyOrchestrator bindings_v2:', orch)
 assert '4a7879cf-7494-4ada-9e83-ea487a4b55cb' in orch, \
     'VmAgent flow binding missing from orchestrator package - not publishing'
 PY
-PUB=$(uip solution publish "$ZIP" --output json 2>&1)
+# `|| true`: without it set -e aborts on the assignment and the guard never prints.
+# A version that already exists 400s here, and on 2026-09-10 that silence let
+# `deploy run` install a stale 1.1.13 while the script looked like it merely failed.
+PUB=$(uip solution publish "$ZIP" --output json 2>&1) || true
 echo "$PUB" | grep -q "\"PackageVersion\": \"$VERSION\"" || { echo "publish of $VERSION failed (a version that already exists is rejected):"; echo "$PUB" | grep -E '"Message"|"Result"' | head -3; exit 1; }
 echo "published $VERSION"
 
