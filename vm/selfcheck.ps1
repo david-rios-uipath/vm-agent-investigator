@@ -129,6 +129,21 @@ foreach ($c in @('unknown', 'absent', 'passing')) {
   Assert (Test-NeedsRepro @{ classification = $c }) "$c needs a local repro"
 }
 
+# Test-PlaywrightRanTests: the 2026-09-10 run exited 1 without running a test and was reported
+# as reproduced. The reporter's tally is the only proof a test executed.
+$noTests = @'
+[WebServer] $ vite "--port" "9090" "--strictPort"
+Error: No tests found.
+Make sure that arguments are regular expressions matching test files.
+'@
+Assert (-not (Test-PlaywrightRanTests $noTests)) 'a collection abort is not a test run'
+Assert (-not (Test-PlaywrightRanTests '')) 'empty output is not a test run'
+Assert (-not (Test-PlaywrightRanTests "Running 1 test using 1 worker`nsome log line")) 'a start banner alone is not a test run'
+Assert (Test-PlaywrightRanTests "  1) [vsix-staging] > spec.ts > title`n`n  2 failed`n  54 passed (40.9m)") 'a failed tally counts as a test run'
+Assert (Test-PlaywrightRanTests "  54 passed (40.9m)") 'a passed tally counts as a test run'
+Assert (Test-PlaywrightRanTests "  1 flaky`n  53 passed (44.4m)") 'a flaky tally counts as a test run'
+Assert (Test-PlaywrightRanTests "  2 did not run") 'a did-not-run tally still means Playwright got past collection'
+
 # New-CommitSubject, lifted verbatim out of run-phase.ps1.
 function New-CommitSubject([string]$Title, [string]$Summary, [string]$Spec, [string]$Scope) {
   $t = $Title.Trim()
