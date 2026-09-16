@@ -183,6 +183,44 @@
       }
     },
     {
+      "id": "hasSlackThreadStart",
+      "type": "core.logic.decision",
+      "typeVersion": "1.3",
+      "display": {
+        "label": "Posting in a Slack thread?",
+        "subLabel": "no slackTs = a manual or smoke run, stay silent",
+        "icon": "trending-up-down"
+      },
+      "inputs": {
+        "trueLabel": "True",
+        "falseLabel": "False",
+        "expression": {
+          "type": "jsExpression",
+          "expression": "!!$vars.start.output.slackTs",
+          "fieldType": "boolean"
+        }
+      }
+    },
+    {
+      "id": "hasSlackThreadEnd",
+      "type": "core.logic.decision",
+      "typeVersion": "1.3",
+      "display": {
+        "label": "Posting in a Slack thread?",
+        "subLabel": "the summary goes nowhere without a thread to reply in",
+        "icon": "trending-up-down"
+      },
+      "inputs": {
+        "trueLabel": "True",
+        "falseLabel": "False",
+        "expression": {
+          "type": "jsExpression",
+          "expression": "!!$vars.start.output.slackTs",
+          "fieldType": "boolean"
+        }
+      }
+    },
+    {
       "id": "fetchFailures",
       "type": "uipath.core.rpa-workflow.ca36341d-ecec-4ba6-aa76-134d0afe4ba7",
       "typeVersion": "1.0.0",
@@ -876,7 +914,7 @@
         "script": {
           "type": "literal",
           "fieldType": "string",
-          "expression": "const s = $vars.start.output;\nconst sel = $vars.selectTests.output || { groups: [], total: 0, totalTests: 0 };\nconst base = (path) => String(path || '').split('/').pop().replace(/\\.(spec|test)?\\.?tsx?$/i, '').replace(/\\.[a-z]+$/i, '').toLowerCase();\nconst prList = ((($vars.parsePrs || {}).output || {}).prs || []).filter(p => p && p.number).map(p => ({ number: p.number, title: p.title || '', url: p.url || '', state: p.state || 'open', files: (p.files || []).map(String) }));\n// A group is covered when an open PR touches its spec file or a page object named in its error.\nconst tokens = (t) => {\n  const set = new Set([base(t.file)]);\n  const first = String(t.error || '').split('\\n')[0];\n  for (const m of first.matchAll(/\\b([A-Z][A-Za-z0-9]+(?:Page|Dialog|Panel|Rail|Service|Client|Store))\\b/g)) set.add(m[1].toLowerCase());\n  return set;\n};\nconst covered = [];\nconst open = [];\nfor (const t of sel.groups || []) {\n  const tk = tokens(t);\n  let hit = null;\n  for (const pr of prList) {\n    const f = pr.files.find(x => base(x) === base(t.file) || tk.has(base(x)));\n    if (f) { hit = { number: pr.number, title: pr.title, url: pr.url, state: pr.state, file: f }; break; }\n  }\n  if (hit) covered.push({ ...t, coveredBy: hit }); else open.push(t);\n}\nconst max = Number(s.maxTests) > 0 ? Number(s.maxTests) : 1;\nconst selected = open.slice(0, max);\n// Named, so the digest says what the cap dropped instead of only how many.\nconst skippedGroups = open.slice(max).map(t => ({ file: t.file, title: t.title, siblings: t.siblings || [] }));\nreturn { selected, covered, skippedGroups, skipped: skippedGroups.length, total: sel.total, totalTests: sel.totalTests, prs: prList };"
+          "expression": "const s = $vars.start.output;\nconst sel = $vars.selectTests.output || { groups: [], total: 0, totalTests: 0 };\nconst base = (path) => String(path || '').split('/').pop().replace(/\\.(spec|test)?\\.?tsx?$/i, '').replace(/\\.[a-z]+$/i, '').toLowerCase();\nconst prList = ((($vars.parsePrs || {}).output || {}).prs || []).filter(p => p && p.number).map(p => ({ number: p.number, title: p.title || '', url: p.url || '', state: p.state || 'open', files: (p.files || []).map(String) }));\n// A group is covered when an open PR touches its spec file or a page object named in its error.\nconst tokens = (t) => {\n  const set = new Set([base(t.file)]);\n  const first = String(t.error || '').split('\\n')[0];\n  for (const m of first.matchAll(/\\b([A-Z][A-Za-z0-9]+(?:Page|Dialog|Panel|Rail|Service|Client|Store))\\b/g)) set.add(m[1].toLowerCase());\n  return set;\n};\nconst covered = [];\nconst open = [];\nfor (const t of sel.groups || []) {\n  const tk = tokens(t);\n  let hit = null;\n  for (const pr of prList) {\n    const f = pr.files.find(x => base(x) === base(t.file) || tk.has(base(x)));\n    if (f) { hit = { number: pr.number, title: pr.title, url: pr.url, state: pr.state, file: f }; break; }\n  }\n  if (hit) covered.push({ ...t, coveredBy: hit }); else open.push(t);\n}\n// An absent maxTests means \"one\", but an explicit 0 means zero: it is how a release is smoke-tested\n// without spending a VmAgent run. Only a missing/blank value falls back.\nconst maxRaw = s.maxTests;\nconst max = (maxRaw === undefined || maxRaw === null || maxRaw === '') ? 1 : Math.max(0, Math.floor(Number(maxRaw) || 0));\nconst selected = open.slice(0, max);\n// Named, so the digest says what the cap dropped instead of only how many.\nconst skippedGroups = open.slice(max).map(t => ({ file: t.file, title: t.title, siblings: t.siblings || [] }));\nreturn { selected, covered, skippedGroups, skipped: skippedGroups.length, total: sel.total, totalTests: sel.totalTests, prs: prList };"
         }
       },
       "outputs": {
@@ -1188,7 +1226,21 @@
       "id": "e-start-ack",
       "sourceNodeId": "start",
       "sourcePort": "output",
+      "targetNodeId": "hasSlackThreadStart",
+      "targetPort": "input"
+    },
+    {
+      "id": "e_hasSlackThreadStart_true_ack",
+      "sourceNodeId": "hasSlackThreadStart",
+      "sourcePort": "true",
       "targetNodeId": "ackInSlackThread",
+      "targetPort": "input"
+    },
+    {
+      "id": "e_hasSlackThreadStart_false_fetchFailures",
+      "sourceNodeId": "hasSlackThreadStart",
+      "sourcePort": "false",
+      "targetNodeId": "fetchFailures",
       "targetPort": "input"
     },
     {
@@ -1258,7 +1310,21 @@
       "id": "e_summarize_slack",
       "sourceNodeId": "summarize",
       "sourcePort": "success",
+      "targetNodeId": "hasSlackThreadEnd",
+      "targetPort": "input"
+    },
+    {
+      "id": "e_hasSlackThreadEnd_true_reply",
+      "sourceNodeId": "hasSlackThreadEnd",
+      "sourcePort": "true",
       "targetNodeId": "replyInSlackThread1",
+      "targetPort": "input"
+    },
+    {
+      "id": "e_hasSlackThreadEnd_false_end",
+      "sourceNodeId": "hasSlackThreadEnd",
+      "sourcePort": "false",
+      "targetNodeId": "end",
       "targetPort": "input"
     },
     {
@@ -1579,6 +1645,136 @@
       },
       "debug": {
         "runtime": "bpmnEngine"
+      }
+    },
+    {
+      "nodeType": "core.logic.decision",
+      "version": "1.3",
+      "category": "control-flow",
+      "description": "Branch on a true or false condition",
+      "tags": [
+        "control-flow",
+        "if",
+        "loop",
+        "switch"
+      ],
+      "sortOrder": 61,
+      "display": {
+        "label": "Decision",
+        "icon": "trending-up-down"
+      },
+      "handleConfiguration": [
+        {
+          "position": "left",
+          "handles": [
+            {
+              "id": "input",
+              "type": "target",
+              "handleType": "input"
+            }
+          ],
+          "visible": true
+        },
+        {
+          "position": "right",
+          "handles": [
+            {
+              "id": "true",
+              "type": "source",
+              "handleType": "output",
+              "label": "{inputs.trueLabel}"
+            },
+            {
+              "id": "false",
+              "type": "source",
+              "handleType": "output",
+              "label": "{inputs.falseLabel}"
+            }
+          ],
+          "visible": true
+        }
+      ],
+      "debug": {
+        "runtime": "clientScript"
+      },
+      "model": {
+        "type": "bpmn:InclusiveGateway"
+      },
+      "inputDefinition": {
+        "type": "object",
+        "properties": {
+          "expression": {
+            "type": "string",
+            "minLength": 1,
+            "errorMessage": "Add a condition"
+          },
+          "trueLabel": {
+            "type": "string"
+          },
+          "falseLabel": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "expression"
+        ]
+      },
+      "outputDefinition": {
+        "matchedCase": {
+          "type": "string",
+          "description": "The label of the matched branch (true/false label)",
+          "var": "matchedCase"
+        },
+        "matchedCaseId": {
+          "type": "string",
+          "description": "The branch that was taken (true or false)",
+          "var": "matchedCaseId"
+        }
+      },
+      "inputDefaults": {
+        "trueLabel": "True",
+        "falseLabel": "False"
+      },
+      "form": {
+        "id": "decision-properties",
+        "title": "Decision configuration",
+        "sections": [
+          {
+            "id": "condition",
+            "title": "Condition",
+            "fields": [
+              {
+                "name": "inputs.expression",
+                "type": "custom",
+                "component": "code-editor",
+                "componentProps": {
+                  "singleLine": true,
+                  "mode": "expression",
+                  "toggleable": false,
+                  "language": "javascript",
+                  "returnType": "boolean",
+                  "validationMode": "expression",
+                  "showVariableButton": true,
+                  "placeholder": "$vars.httpRequest1.output.statusCode >= 200 && $vars.httpRequest1.output.statusCode < 300"
+                },
+                "label": "Condition",
+                "description": "The condition must be a JavaScript expression that evaluates to true or false."
+              },
+              {
+                "name": "inputs.trueLabel",
+                "type": "text",
+                "label": "True branch label",
+                "description": "This label appears on the true branch."
+              },
+              {
+                "name": "inputs.falseLabel",
+                "type": "text",
+                "label": "False branch label",
+                "description": "This label appears on the false branch."
+              }
+            ]
+          }
+        ]
       }
     },
     {
@@ -3342,6 +3538,42 @@
         }
       },
       {
+        "id": "hasSlackThreadStart.matchedCase",
+        "type": "string",
+        "description": "The label of the matched branch (true/false label)",
+        "binding": {
+          "nodeId": "hasSlackThreadStart",
+          "outputId": "matchedCase"
+        }
+      },
+      {
+        "id": "hasSlackThreadStart.matchedCaseId",
+        "type": "string",
+        "description": "The branch that was taken (true or false)",
+        "binding": {
+          "nodeId": "hasSlackThreadStart",
+          "outputId": "matchedCaseId"
+        }
+      },
+      {
+        "id": "hasSlackThreadEnd.matchedCase",
+        "type": "string",
+        "description": "The label of the matched branch (true/false label)",
+        "binding": {
+          "nodeId": "hasSlackThreadEnd",
+          "outputId": "matchedCase"
+        }
+      },
+      {
+        "id": "hasSlackThreadEnd.matchedCaseId",
+        "type": "string",
+        "description": "The branch that was taken (true or false)",
+        "binding": {
+          "nodeId": "hasSlackThreadEnd",
+          "outputId": "matchedCaseId"
+        }
+      },
+      {
         "id": "ackInSlackThread.output",
         "type": "object",
         "description": "The return value of the connector.",
@@ -3445,6 +3677,28 @@
         "collapsed": false
       },
       "ackInSlackThread": {
+        "position": {
+          "x": 0,
+          "y": 0
+        },
+        "size": {
+          "width": 96,
+          "height": 96
+        },
+        "collapsed": false
+      },
+      "hasSlackThreadStart": {
+        "position": {
+          "x": 0,
+          "y": 0
+        },
+        "size": {
+          "width": 96,
+          "height": 96
+        },
+        "collapsed": false
+      },
+      "hasSlackThreadEnd": {
         "position": {
           "x": 0,
           "y": 0

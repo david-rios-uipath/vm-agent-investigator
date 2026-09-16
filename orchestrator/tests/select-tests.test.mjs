@@ -151,6 +151,42 @@ console.log('spend ok');
 }
 console.log('skipped naming ok');
 
+// maxTests=0 selects nothing. A release smoke test sets it to prove fetch + grouping without
+// spending a VmAgent run; 1.1.15 coerced 0 to 1 and investigated for real.
+{
+  const sel = run('selectTests', { start: { output: input } });
+  const prsOut = { prs: [], ok: false };
+  const dry = run('pickTests', { start: { output: { ...input, maxTests: 0 } }, selectTests: { output: sel }, parsePrs: { output: prsOut } });
+  assert.equal(dry.selected.length, 0, 'nothing is investigated');
+  assert.equal(dry.skipped, sel.total, 'every group is reported as skipped instead');
+  // Absent still means one, which is what the nightly relies on.
+  const { maxTests, ...noMax } = input;
+  assert.equal(run('pickTests', { start: { output: noMax }, selectTests: { output: sel }, parsePrs: { output: prsOut } }).selected.length, 1);
+}
+console.log('maxTests=0 ok');
+
+// The Slack gates: no slackTs, no post. 1.1.15 sent both messages to the channel root because
+// thread_ts resolved to undefined, which Slack accepts as a top-level message.
+{
+  const gate = (id, slackTs) => {
+    const n = flow.nodes.find((x) => x.id === id);
+    assert.equal(n.type, 'core.logic.decision', `${id} is a decision`);
+    return new Function('$vars', `return (${n.inputs.expression.expression});`)({ start: { output: { slackTs } } });
+  };
+  for (const id of ['hasSlackThreadStart', 'hasSlackThreadEnd']) {
+    assert.equal(gate(id, '1789544198.781659'), true, `${id} posts when a thread exists`);
+    assert.equal(gate(id, ''), false, `${id} stays silent without one`);
+    assert.equal(gate(id, undefined), false, `${id} stays silent when the field is absent`);
+  }
+  // False must bypass the connector, not dead-end the flow.
+  const to = (src, port) => flow.edges.filter((e) => e.sourceNodeId === src && e.sourcePort === port).map((e) => e.targetNodeId);
+  assert.deepEqual(to('hasSlackThreadStart', 'false'), ['fetchFailures']);
+  assert.deepEqual(to('hasSlackThreadStart', 'true'), ['ackInSlackThread']);
+  assert.deepEqual(to('hasSlackThreadEnd', 'false'), ['end']);
+  assert.deepEqual(to('hasSlackThreadEnd', 'true'), ['replyInSlackThread1']);
+}
+console.log('slack gates ok');
+
 // summarize
 {
   const pick = run('pickTests', { start: { output: night2 }, selectTests: { output: sel2 }, parsePrs: { output: prsOut } });
