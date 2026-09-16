@@ -48,8 +48,14 @@ function Get-CiHistory([string]$RepoUrl, [string]$Branch, [string]$TestCommand, 
   # ponytail: nightly workflow file is fixed; make it a flow input if a second repo ever uses this
   # The vsix projects run inside this same nightly, as jobs of the reusable playwright-vsix.yml.
   $workflow = 'playwright-ci.yml'
-  try { $runs = (Invoke-RestMethod "$api/actions/workflows/$workflow/runs?event=schedule&branch=$Branch&per_page=8" -Headers $h).workflow_runs }
+  # `event=schedule` combined with `branch=` returns a stale, wrongly-ordered set from this
+  # endpoint: on 2026-09-16 it answered with runs from June to August while the unfiltered
+  # branch query returned every nightly through 09-16, all of them event=schedule. Every verdict
+  # built on it compared against six-week-old nightlies. Filter client-side instead.
+  try { $runs = @((Invoke-RestMethod "$api/actions/workflows/$workflow/runs?branch=$Branch&per_page=30" -Headers $h).workflow_runs |
+                  Where-Object { $_.event -eq 'schedule' } | Select-Object -First 8) }
   catch { $r.summary = 'GitHub API error listing runs: ' + $_.Exception.Message; return $r }
+  if (-not $runs -or $runs.Count -eq 0) { $r.summary = "no scheduled $workflow runs on $Branch"; return $r }
 
   $savedLog = $false
   $runSignals = @{}; $runExcerpts = @{}; $newestTarget = ''

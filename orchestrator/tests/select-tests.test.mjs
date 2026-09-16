@@ -128,12 +128,19 @@ console.log('recordResult ok');
   const pick = run('pickTests', { start: { output: night2 }, selectTests: { output: sel2 }, parsePrs: { output: { prs: [], ok: false } } });
   const row = (costUsd) => ({ environment: 'studio-alpha', file: 'specs/a.spec.ts', title: 'a test', siblings: [],
     reproduced: false, fixVerified: false, prUrl: '', hypothesis: '', failed: false, errorMessage: '', relatedPrs: [], costUsd });
-  const text = run('summarize', { start: { output: night2 }, pickTests: { output: pick }, investigate: { output: [row(4.25), row(2.5)] } }).text;
-  // Last clause of the head, after the report link.
-  assert.match(text, /· \$6\.75 Claude spend\n/);
-  // No cost reported (older VmAgent, or every run faulted) prints no spend clause at all.
-  const free = run('summarize', { start: { output: night2 }, pickTests: { output: pick }, investigate: { output: [row(0)] } }).text;
-  assert.doesNotMatch(free, /Claude spend/);
+  // Spend is its own follow-up message now, so the digest never carries it.
+  const paid = run('summarize', { start: { output: night2 }, pickTests: { output: pick }, investigate: { output: [row(4.25), row(2.5)] } });
+  assert.doesNotMatch(paid.text, /Claude spend/);
+  assert.match(paid.costText, /\$6\.75 Claude spend\* on 2 investigations/);
+  // Zero still posts, saying so: silence left it unclear whether the run was free or the number lost.
+  const free = run('summarize', { start: { output: night2 }, pickTests: { output: pick }, investigate: { output: [row(0)] } });
+  assert.doesNotMatch(free.text, /Claude spend/);
+  assert.match(free.costText, /No Claude spend/);
+  // Every exit path carries one, including the two early returns.
+  const none = run('summarize', { start: { output: night2 }, pickTests: { output: { total: 0, skipped: 0, selected: [], covered: [], totalTests: 0 } }, investigate: { output: [] } });
+  assert.match(none.costText, /No Claude spend/);
+  const unread = run('summarize', { start: { output: { ...night2, failedCount: 101 } }, pickTests: { output: { total: 0, skipped: 0, selected: [], covered: [], totalTests: 0, fetched: 0 } }, investigate: { output: [] } });
+  assert.match(unread.costText, /No Claude spend/);
 }
 console.log('spend ok');
 
@@ -190,12 +197,21 @@ console.log('slack gates ok');
 // summarize
 {
   const pick = run('pickTests', { start: { output: night2 }, selectTests: { output: sel2 }, parsePrs: { output: prsOut } });
+  // error and testCommand come from the group, carried through recordResult.
+  const g0 = sel2.groups.find((g) => g.file === 'specs/data-transform/data-transform.spec.ts');
   const row = { environment: 'studio-alpha', file: 'specs/data-transform/data-transform.spec.ts', title: 'should add a Map operation with field mappings',
     reproduced: true, fixVerified: true, prUrl: 'https://github.com/UiPath/flow-workbench/pull/3729', hypothesis: 'neighbor rail intercepts click', failed: false, errorMessage: '',
+    error: 'Error: a `.flow` entry never appeared', testCommand: g0.testCommand,
     siblings: ['should write a Custom Script operation in a Data Transform node'], relatedPrs: [{ number: 3758, title: 't', url: 'https://github.com/UiPath/flow-workbench/pull/3758', state: 'merged' }] };
   const text = run('summarize', { start: { output: night2 }, pickTests: { output: pick }, investigate: { output: [{ recordResult: { output: row } }] } }).text;
   assert.match(text, /VmAgent investigated 1 of 3 studio failure groups\* \(6 tests, <https:\/\/github\.com\/UiPath\/flow-workbench\/actions\/runs\/34089391590\|run 34089391590>\) · <https:\/\/theater\.uipath\.co\/flow\/[0-9a-f]+\/\|report>/);
-  assert.match(text, /data-transform\.spec\.ts › should add a Map operation with field mappings` \(\+1 same cause: `should write a Custom Script operation in a Data Transform node`\) — reproduced, fix verified, <https:\/\/github\.com\/UiPath\/flow-workbench\/pull\/3729\|draft PR>, related merged <https:\/\/github\.com\/UiPath\/flow-workbench\/pull\/3758\|PR #3758>/);
+  // Siblings are a count, not a list: one cause used to print 86 test names.
+  assert.match(text, /data-transform\.spec\.ts › should add a Map operation with field mappings` \+1 more in this spec — reproduced, fix verified, <https:\/\/github\.com\/UiPath\/flow-workbench\/pull\/3729\|draft PR>, related merged <https:\/\/github\.com\/UiPath\/flow-workbench\/pull\/3758\|PR #3758>/);
+  assert.doesNotMatch(text, /should write a Custom Script operation in a Data Transform node/);
+  // Cause and repro replace the names, and the repro path must be the one that exists on disk.
+  assert.match(text, /\*repro\* `corepack pnpm exec playwright test --config e2e\/playwright\.config\.ts e2e\/specs\/data-transform\/data-transform\.spec\.ts --project studio-alpha/);
+  // Backticks inside the error would close the code span early; they are swapped for quotes.
+  assert.match(text, /\*cause\* `Error: a '\.flow' entry never appeared`/);
   assert.match(text, /should add a Group by operation with aggregations` \(\+2 same cause\) — likely already fixed by merged <https:\/\/github\.com\/UiPath\/flow-workbench\/pull\/3758\|PR #3758> \(touches `StudioProjectsPage\.ts`\)/);
   assert.match(text, /1 not investigated \(maxTests=1\)/);
   const flat = run('summarize', { start: { output: night2 }, pickTests: { output: pick }, investigate: { output: [row] } }).text;
