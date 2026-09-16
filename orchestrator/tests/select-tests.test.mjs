@@ -12,6 +12,24 @@ const run = (id, $vars) => new Function('$vars', scriptOf(id))($vars);
 const input = JSON.parse(readFileSync(new URL('../../inputs/orchestrator-34015558366.json', import.meta.url)));
 const night2 = JSON.parse(readFileSync(new URL('../../inputs/orchestrator-34089391590.json', import.meta.url)));
 
+// selectTests reading the VM's compact line instead of an inline payload. The fixture is the real
+// stdout of fetchFailures' PowerShell over run 35062181090 (101 tests, 60 KB of JSON: the night
+// that broke StartJobs' 10000-char InputArguments cap).
+{
+  const Stdout = readFileSync(new URL('../../inputs/fetch-failures-35062181090.stdout.txt', import.meta.url), 'utf8');
+  const out = run('selectTests', { start: { output: { runId: '35062181090', failedCount: 101 } }, fetchFailures: { output: { Stdout } } });
+  assert.equal(out.fetched, 101, 'every row survives the VM hop');
+  assert.equal(out.totalTests, 94, 'same file+title across shards collapses');
+  assert.equal(out.total, 4, '94 tests, 4 causes');
+  assert.equal(out.groups[0].siblings.length, 85, 'one broken tenant explains 86 tests across many specs');
+  assert.match(out.groups[0].error, /^Error: StudioCanvasPage/);
+  assert.ok(out.groups[0].error.length <= 160, 'the VM truncates to what causeKey reads');
+  // A trigger that still sends failures inline keeps working; the VM line wins when both exist.
+  const inline = run('selectTests', { start: { output: { ...input } }, fetchFailures: { output: { Stdout: '' } } });
+  assert.equal(inline.fetched, 0);
+  assert.equal(inline.totalTests, 3);
+}
+
 // selectTests: studio only, dedupe, group by cause, stable order, command shape
 {
   const out = run('selectTests', { start: { output: input } });
@@ -23,20 +41,20 @@ const night2 = JSON.parse(readFileSync(new URL('../../inputs/orchestrator-340893
     'corepack pnpm exec playwright test --config e2e/playwright.config.ts e2e/specs/data-transform/data-transform.spec.ts --project studio-alpha --grep "should add a Map operation with field mappings"');
 }
 {
-  const out = run('selectTests', { start: { output: { ...input, projects: 'studio-*,vsix-*' } } });
+  const out = run('selectTests', { start: { output: { ...input, environments: 'studio-*,vsix-*' } } });
   assert.equal(out.totalTests, 4, 'vsix rows dedupe across platforms into one');
   assert.equal(out.total, 3);
 }
 {
-  // The fixtures all set `projects`, so the default was never exercised - and the default is
+  // The fixtures all set `environments`, so the default was never exercised - and the default is
   // what the nightly actually runs with when the payload omits it.
-  const { projects, ...noProjects } = input;
-  const out = run('selectTests', { start: { output: noProjects } });
+  const { environments, ...noEnvironments } = input;
+  const out = run('selectTests', { start: { output: noEnvironments } });
   assert.equal(out.totalTests, 4, 'the default includes vsix');
-  assert.ok(out.groups.some((g) => g.project.startsWith('vsix-')), 'a vsix group survives the default filter');
+  assert.ok(out.groups.some((g) => g.environment.startsWith('vsix-')), 'a vsix group survives the default filter');
 }
 {
-  const out = run('selectTests', { start: { output: { ...input, failedTests: [{ project: 'studio-alpha', file: 'specs/a.spec.ts', title: 'has "quotes" and (parens) $1' }] } } });
+  const out = run('selectTests', { start: { output: { ...input, failedTests: [{ environment: 'studio-alpha', file: 'specs/a.spec.ts', title: 'has "quotes" and (parens) $1' }] } } });
   assert.match(out.groups[0].testCommand, /--grep "has \\"quotes\\" and \\\(parens\\\) \\\$1"$/);
 }
 {
@@ -98,13 +116,45 @@ console.log('pickTests ok');
   assert.deepEqual(out.relatedPrs.map((p) => p.number), [3758]);
   const failed = run('recordResult', { investigate: { currentItem: t }, pickTests: { output: pick }, callVmAgent: { output: {}, error: { message: 'boom' } } });
   assert.equal(failed.failed, true); assert.equal(failed.errorMessage, 'boom');
+  const costed = run('recordResult', { investigate: { currentItem: t }, pickTests: { output: pick },
+    callVmAgent: { output: { reproduced: true, costUsd: 4.5 } } });
+  assert.equal(costed.costUsd, 4.5);
+  assert.equal(failed.costUsd, 0, 'a faulted run contributes nothing');
 }
 console.log('recordResult ok');
+
+// summarize: total Claude spend is the sum over the runs
+{
+  const pick = run('pickTests', { start: { output: night2 }, selectTests: { output: sel2 }, parsePrs: { output: { prs: [], ok: false } } });
+  const row = (costUsd) => ({ environment: 'studio-alpha', file: 'specs/a.spec.ts', title: 'a test', siblings: [],
+    reproduced: false, fixVerified: false, prUrl: '', hypothesis: '', failed: false, errorMessage: '', relatedPrs: [], costUsd });
+  const text = run('summarize', { start: { output: night2 }, pickTests: { output: pick }, investigate: { output: [row(4.25), row(2.5)] } }).text;
+  // Last clause of the head, after the report link.
+  assert.match(text, /· \$6\.75 Claude spend\n/);
+  // No cost reported (older VmAgent, or every run faulted) prints no spend clause at all.
+  const free = run('summarize', { start: { output: night2 }, pickTests: { output: pick }, investigate: { output: [row(0)] } }).text;
+  assert.doesNotMatch(free, /Claude spend/);
+}
+console.log('spend ok');
+
+// summarize: the cap names what it dropped, not just how many
+{
+  const pick = run('pickTests', { start: { output: night2 }, selectTests: { output: sel2 }, parsePrs: { output: { prs: [], ok: false } } });
+  assert.equal(pick.skipped, 2);
+  assert.deepEqual(pick.skippedGroups.map((g) => g.title), pick.selected.length === 1
+    ? sel2.groups.slice(1).map((g) => g.title) : []);
+  const text = run('summarize', { start: { output: night2 }, pickTests: { output: pick }, investigate: { output: [] } }).text;
+  assert.match(text, /2 not investigated \(maxTests=1\): `[^`]+ \u203a [^`]+`(?: \(\+\d+\))?, `[^`]+ \u203a [^`]+`/);
+  // A pickTests output from before this change still renders the bare count.
+  const legacy = run('summarize', { start: { output: night2 }, pickTests: { output: { total: 3, totalTests: 6, skipped: 2, selected: [], covered: [] } }, investigate: { output: [] } }).text;
+  assert.match(legacy, /_2 not investigated \(maxTests=1\)_/);
+}
+console.log('skipped naming ok');
 
 // summarize
 {
   const pick = run('pickTests', { start: { output: night2 }, selectTests: { output: sel2 }, parsePrs: { output: prsOut } });
-  const row = { project: 'studio-alpha', file: 'specs/data-transform/data-transform.spec.ts', title: 'should add a Map operation with field mappings',
+  const row = { environment: 'studio-alpha', file: 'specs/data-transform/data-transform.spec.ts', title: 'should add a Map operation with field mappings',
     reproduced: true, fixVerified: true, prUrl: 'https://github.com/UiPath/flow-workbench/pull/3729', hypothesis: 'neighbor rail intercepts click', failed: false, errorMessage: '',
     siblings: ['should write a Custom Script operation in a Data Transform node'], relatedPrs: [{ number: 3758, title: 't', url: 'https://github.com/UiPath/flow-workbench/pull/3758', state: 'merged' }] };
   const text = run('summarize', { start: { output: night2 }, pickTests: { output: pick }, investigate: { output: [{ recordResult: { output: row } }] } }).text;

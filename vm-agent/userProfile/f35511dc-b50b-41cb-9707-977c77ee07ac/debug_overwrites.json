@@ -1,1 +1,44 @@
-{"docVersion":"1.0","tenants":[{"tenantKey":"be014e6a-4c8c-4642-82c5-3c1131ab46bb","resources":[{"solutionResourceKey":"4a7879cf-7494-4ada-9e83-ea487a4b55cb","reprovisioningIndex":4,"overwrite":{"resourceKey":"4a7879cf-7494-4ada-9e83-ea487a4b55cb","resourceName":"VmAgent","folderFullyQualifiedName":"f35511dc-b50b-41cb-9707-977c77ee07ac's workspace/Debug_vm-agent","type":"Install"}}]}]}
+{
+  "docVersion": "1.0",
+  "tenants": [
+    {
+      "tenantKey": "be014e6a-4c8c-4642-82c5-3c1131ab46bb",
+      "resources": [
+        {
+          "solutionResourceKey": "4a7879cf-7494-4ada-9e83-ea487a4b55cb",
+          "reprovisioningIndex": 4,
+          "overwrite": {
+            "resourceKey": "4a7879cf-7494-4ada-9e83-ea487a4b55cb",
+            "resourceName": "VmAgent",
+            "folderFullyQualifiedName": "f35511dc-b50b-41cb-9707-977c77ee07ac's workspace/Debug_vm-agent",
+            "type": "Install"
+          }
+        },
+        {
+          "solutionResourceKey": "898947e5-957a-4539-9ece-bef59d428d15",
+          "overwrite": {
+            "resourceKey": "898947e5-957a-4539-9ece-bef59d428d15",
+            "resourceName": "Agent",
+            "type": "Reference",
+            "kind": "Process",
+            "folderFullyQualifiedName": "Shared",
+            "folderKey": "717ede25-7494-44d5-9d65-5dab660653f6",
+            "folderPath": "717ede25-7494-44d5-9d65-5dab660653f6"
+          }
+        },
+        {
+          "solutionResourceKey": "8b5a0920-5535-472a-b842-af535d5fdc5d",
+          "overwrite": {
+            "resourceKey": "8b5a0920-5535-472a-b842-af535d5fdc5d",
+            "resourceName": "VmAgent",
+            "type": "Reference",
+            "kind": "Process",
+            "folderFullyQualifiedName": "f35511dc-b50b-41cb-9707-977c77ee07ac's workspace/vm-agent-priv",
+            "folderKey": "acdeb1c6-2dde-4f6d-bf7c-6ac49a6bfb9d",
+            "folderPath": "fba71dbe-cb58-43fb-bfb5-81cb3128873f.586bf49b-2cf0-42f1-b50a-8ecb22711ce4.acdeb1c6-2dde-4f6d-bf7c-6ac49a6bfb9d"
+          }
+        }
+      ]
+    }
+  ]
+}

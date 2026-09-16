@@ -16,7 +16,10 @@ set -euo pipefail
 VERSION="${1:?version, e.g. 1.0.19}"
 INPUT="${2:-/tmp/job-input.json}"
 PROCESS="${3:-VmAgent}"
-PKG="vm-agent 8"; DEPLOY="vm-agent 12"; FOLDER="Shared/vm-agent 12"; OUT=/tmp/vm-agent-pkg
+# Deployed under e2e-investigator (2026-09-13): the child StartJob to e2e-investigator.vm-exec-vm
+# is impersonated by an arbitrary assignee of the deployment folder, so the deployment folder must
+# inherit e2e-investigator access or the job start fails with 170007.
+PKG="vm-agent 8"; DEPLOY="vm-agent 13"; PARENT="e2e-investigator"; FOLDER="$PARENT/$DEPLOY"; OUT=/tmp/vm-agent-pkg
 cd "$(dirname "$0")"
 
 mkdir -p "$OUT"
@@ -65,7 +68,7 @@ n=0; until [ $n -ge 18 ] || [ "$(uip or jobs list --folder-path "$FOLDER" --outp
 import sys,json;t=sys.stdin.read();i=t.find('{');d=json.loads(t[i:]);print(len([x for x in d['Data'] if x.get('State') in ('Running','Stopping','Pending','Suspended')]))")" = "0" ]; do sleep 10; n=$((n+1)); done
 uip solution deploy uninstall "$DEPLOY" --yes --output json | grep -E '"Status"|"Message"' | head -1 || true
 uip solution deploy run -n "$DEPLOY" --package-name "$PKG" --package-version "$VERSION" --folder-name "${DEPLOY}" \
-  --parent-folder-path "Shared" --config-file deploy-config.json --timeout 600 --output json | grep -E '"Status"|"Message"' | head -2
+  --parent-folder-path "$PARENT" --config-file deploy-config.json --timeout 600 --output json | grep -E '"Status"|"Message"' | head -2
 
 KEY=$(uip or processes list --folder-path "$FOLDER" --output json | python3 -c "
 import sys,json;t=sys.stdin.read();i=t.find('{');d=json.loads(t[i:]);items=d['Data'] if isinstance(d['Data'],list) else d['Data']['Processes']

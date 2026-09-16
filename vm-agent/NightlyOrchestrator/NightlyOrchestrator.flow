@@ -58,6 +58,12 @@
               "maxFixAttempts": {
                 "type": "number"
               },
+              "failedTestsArtifact": {
+                "type": "string"
+              },
+              "failedCount": {
+                "type": "number"
+              },
               "failedTests": {
                 "type": "array",
                 "items": {
@@ -106,7 +112,7 @@
           },
           "bodyParameters": {
             "channel": "C0AH25MT3L5",
-            "messageToSend": "=js:(`:mag: *VmAgent picking up* <${$vars.start.output.runUrl}|run ${$vars.start.output.runId}> — ${($vars.start.output.failedTests || []).length} failed test${($vars.start.output.failedTests || []).length === 1 ? '' : 's'}.`)",
+            "messageToSend": "=js:(() => { const s = $vars.start.output; const n = Number(s.failedCount) || (s.failedTests || []).length; return `:mag: *VmAgent picking up* <${s.runUrl}|run ${s.runId}>` + (n ? ` — ${n} failed test${n === 1 ? '' : 's'}.` : '.'); })()",
             "thread_ts": "=js:($vars.start.output.slackTs || undefined)",
             "mrkdwn": true
           },
@@ -177,6 +183,108 @@
       }
     },
     {
+      "id": "fetchFailures",
+      "type": "uipath.core.rpa-workflow.ca36341d-ecec-4ba6-aa76-134d0afe4ba7",
+      "typeVersion": "1.0.0",
+      "display": {
+        "label": "Failed tests (nightly artifact on the VM)",
+        "subLabel": "downloads the run's failed-tests artifact, prints compact FAILED_JSON",
+        "icon": "rpa"
+      },
+      "inputs": {
+        "Script": {
+          "type": "jsExpression",
+          "expression": "(() => {\n  const s = $vars.start.output;\n  // Sanitized: these come from the CI trigger and are interpolated into single-quoted PowerShell.\n  const repo = String(s.repoUrl || 'https://github.com/UiPath/flow-workbench').replace(/^https?:\\/\\/github\\.com\\//, '').replace(/\\.git$/, '').replace(/[^A-Za-z0-9_.\\/-]/g, '');\n  const runId = String(s.runId || '').replace(/[^0-9]/g, '');\n  const artifact = String(s.failedTestsArtifact || 'failed-tests').replace(/[^A-Za-z0-9_.-]/g, '');\n  return \"$repo = '\" + repo + \"'\\n$runId = '\" + runId + \"'\\n$artifact = '\" + artifact + \"'\\n\" + `$ErrorActionPreference = 'Stop'\\n[Net.ServicePointManager]::SecurityProtocol = 'Tls12'\\n# The failed-tests artifact is far too big for a Maestro instance variable (60 KB on a bad night:\\n# 101 tests with multi-line errors), so the VM downloads it and prints one compact line. Each error\\n# keeps only its first line, 160 chars - exactly what selectTests' causeKey reads - and distinct\\n# lines are emitted once in 'e', with the per-test rows in 'r' indexing into it.\\n$h = @{ 'User-Agent' = 'vm-agent'; 'Accept' = 'application/vnd.github+json' }\\nif ($env:GH_TOKEN) { $h['Authorization'] = \"token $($env:GH_TOKEN)\" }\\n$errs = New-Object System.Collections.ArrayList\\n$seen = @{}\\n$rows = @()\\ntry {\\n  $arts = Invoke-RestMethod -Headers $h -Uri \"https://api.github.com/repos/$repo/actions/runs/$runId/artifacts?per_page=100\"\\n  $a = $arts.artifacts | Where-Object { $_.name -eq $artifact } | Select-Object -First 1\\n  if (-not $a) { throw \"run $runId has no '$artifact' artifact\" }\\n  $zip = Join-Path $env:TEMP 'failed-tests.zip'\\n  $dir = Join-Path $env:TEMP 'failed-tests'\\n  Invoke-WebRequest -Headers $h -Uri $a.archive_download_url -OutFile $zip\\n  if (Test-Path $dir) { Remove-Item $dir -Recurse -Force }\\n  Expand-Archive -Path $zip -DestinationPath $dir -Force\\n  $f = Get-ChildItem $dir -Recurse -Filter '*.json' | Select-Object -First 1\\n  if (-not $f) { throw \"artifact '$artifact' holds no .json file\" }\\n  foreach ($t in @(Get-Content $f.FullName -Raw | ConvertFrom-Json)) {\\n    $e = ''\\n    if ($t.error) { $e = @($t.error -split [char]10 | ForEach-Object { $_.Trim() } | Where-Object { $_ })[0] }\\n    if ($null -eq $e) { $e = '' }\\n    if ($e.Length -gt 160) { $e = $e.Substring(0, 160) }\\n    if (-not $seen.ContainsKey($e)) { $seen[$e] = $errs.Add($e) }\\n    $rows += [pscustomobject]@{ p = $t.environment; f = $t.file; t = $t.title; i = $seen[$e] }\\n  }\\n} catch { Write-Output \"[failures] $_\" }\\n$json = [pscustomobject]@{ e = @($errs); r = @($rows) } | ConvertTo-Json -Compress -Depth 5\\n# vm-exec returns the last 32000 chars of stdout only, and non-ASCII survives the hop badly.\\n$json = [regex]::Replace($json, '[^ -~]', '?')\\nWrite-Output \"[failures] $($rows.Count) failed tests, $($errs.Count) distinct causes\"\\nWrite-Output \"FAILED_JSON=$json\"\\nexit 0`;\n})()",
+          "fieldType": "string"
+        },
+        "WorkDir": {
+          "type": "literal",
+          "expression": "C:\\vm-agent",
+          "fieldType": "string"
+        },
+        "RunId": {
+          "type": "jsExpression",
+          "expression": "'failures-' + String($vars.start.output.runId || 'manual')",
+          "fieldType": "string"
+        },
+        "StateKey": {
+          "type": "literal",
+          "expression": "",
+          "fieldType": "string"
+        },
+        "TimeoutMinutes": {
+          "type": "literal",
+          "expression": "5",
+          "fieldType": "number"
+        },
+        "MaxOutputChars": 32000,
+        "errorHandlingEnabled": true
+      },
+      "outputs": {
+        "output": {
+          "type": "object",
+          "source": "=this",
+          "var": "output",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "ExitCode": {
+                "type": "integer",
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "Stdout": {
+                "type": "string"
+              },
+              "OutputBlobPath": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "error": {
+          "type": "object",
+          "description": "Error information if the node fails",
+          "source": "=Error",
+          "var": "error",
+          "schema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "type": "object",
+            "required": [
+              "code",
+              "message",
+              "detail",
+              "category",
+              "status"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Error code as a string"
+              },
+              "message": {
+                "type": "string",
+                "description": "High-level error message"
+              },
+              "detail": {
+                "type": "string",
+                "description": "Detailed error description"
+              },
+              "category": {
+                "type": "string",
+                "description": "Error category"
+              },
+              "status": {
+                "type": "integer",
+                "description": "HTTP status code"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
       "id": "selectTests",
       "type": "core.action.script",
       "typeVersion": "1.1",
@@ -189,7 +297,7 @@
         "script": {
           "type": "literal",
           "fieldType": "string",
-          "expression": "const s = $vars.start.output;\nconst globs = String(s.environments || 'studio-*,vsix-*').split(',').map(g => g.trim()).filter(Boolean);\nconst matches = (p) => globs.some(g => new RegExp('^' + g.split('*').map(x => x.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')).join('.*') + '$').test(p));\n// One row per distinct test (same file+title across shards/platforms collapses).\nconst seen = new Set();\nconst rows = [];\nfor (const t of (s.failedTests || [])) {\n  if (!t || !matches(t.environment || '')) continue;\n  const key = t.file + '::' + t.title;\n  if (seen.has(key)) continue;\n  seen.add(key);\n  rows.push(t);\n}\nrows.sort((a, b) => (a.file + a.title).localeCompare(b.file + b.title));\n// Tests whose first error line matches (digits/hashes ignored) share a cause. A named `Error:` groups\n// across spec files (shared infra failure); a bare timeout/locator message only within its file.\nconst norm = (e) => String(e || '').replace(/\\x1b\\[[0-9;]*m/g, '').split('\\n').map(l => l.trim()).find(Boolean) || '';\nconst causeKey = (t) => {\n  const n = norm(t.error).replace(/[0-9a-f]{8,}/gi, '#').replace(/\\d+/g, '#').slice(0, 160);\n  if (!n) return t.file + '::title:' + t.title;\n  return /^\\w*Error: /.test(n) && !/^TimeoutError/.test(n) ? 'err::' + n : t.file + '::' + n;\n};\nconst groups = [];\nconst byKey = new Map();\nfor (const t of rows) {\n  const k = causeKey(t);\n  const g = byKey.get(k);\n  if (g) { g.siblings.push(g.file === t.file ? t.title : `${t.file.split('/').pop()} › ${t.title}`); continue; }\n  const ng = { ...t, siblings: [] }; byKey.set(k, ng); groups.push(ng);\n}\n// Biggest cause first: it explains the most red.\ngroups.sort((a, b) => b.siblings.length - a.siblings.length);\nconst grep = (title) => String(title).replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&').replace(/\"/g, '\\\\\"');\nconst groups2 = groups.map(t => ({\n  environment: t.environment, file: t.file, title: t.title, error: t.error || '', siblings: t.siblings,\n  testCommand: `corepack pnpm exec playwright test --config e2e/playwright.config.ts e2e/${t.file} --project ${t.environment} --grep \"${grep(t.title)}\"`\n}));\nreturn { groups: groups2, total: groups2.length, totalTests: rows.length };"
+          "expression": "const s = $vars.start.output;\nconst globs = String(s.environments || 'studio-*,vsix-*').split(',').map(g => g.trim()).filter(Boolean);\nconst matches = (p) => globs.some(g => new RegExp('^' + g.split('*').map(x => x.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')).join('.*') + '$').test(p));\n// One row per distinct test (same file+title across shards/platforms collapses).\n// Failures come from the VM: fetchFailures downloads the run's artifact and prints one compact\n// FAILED_JSON line - distinct first error lines in `e`, one row per test in `r` indexing into it.\n// A trigger that still passes `failedTests` inline keeps working, which is how the unit test feeds it.\nconst fromVm = () => {\n  const out = ($vars.fetchFailures && $vars.fetchFailures.output) || {};\n  const lines = String(out.Stdout || '').split('\\n');\n  for (let i = lines.length - 1; i >= 0; i--) {\n    const l = lines[i].trim();\n    if (!l.startsWith('FAILED_JSON=')) continue;\n    try {\n      const d = JSON.parse(l.slice('FAILED_JSON='.length)) || {};\n      // ConvertTo-Json collapses a one-element array to a scalar, so accept both shapes.\n      const errs = Array.isArray(d['e']) ? d['e'] : (d['e'] ? [d['e']] : []);\n      const raw = Array.isArray(d['r']) ? d['r'] : (d['r'] ? [d['r']] : []);\n      return raw.map(r => ({ environment: r['p'], file: r['f'], title: r['t'], error: errs[r['i']] || '' }));\n    } catch (e) { return []; }\n  }\n  return [];\n};\nconst fetched = fromVm();\nconst incoming = fetched.length ? fetched : (s.failedTests || []);\nconst seen = new Set();\nconst rows = [];\nfor (const t of incoming) {\n  if (!t || !matches(t.environment || '')) continue;\n  const key = t.file + '::' + t.title;\n  if (seen.has(key)) continue;\n  seen.add(key);\n  rows.push(t);\n}\nrows.sort((a, b) => (a.file + a.title).localeCompare(b.file + b.title));\n// Tests whose first error line matches (digits/hashes ignored) share a cause. A named `Error:` groups\n// across spec files (shared infra failure); a bare timeout/locator message only within its file.\nconst norm = (e) => String(e || '').replace(/\\x1b\\[[0-9;]*m/g, '').split('\\n').map(l => l.trim()).find(Boolean) || '';\nconst causeKey = (t) => {\n  const n = norm(t.error).replace(/[0-9a-f]{8,}/gi, '#').replace(/\\d+/g, '#').slice(0, 160);\n  if (!n) return t.file + '::title:' + t.title;\n  return /^\\w*Error: /.test(n) && !/^TimeoutError/.test(n) ? 'err::' + n : t.file + '::' + n;\n};\nconst groups = [];\nconst byKey = new Map();\nfor (const t of rows) {\n  const k = causeKey(t);\n  const g = byKey.get(k);\n  if (g) { g.siblings.push(g.file === t.file ? t.title : `${t.file.split('/').pop()} › ${t.title}`); continue; }\n  const ng = { ...t, siblings: [] }; byKey.set(k, ng); groups.push(ng);\n}\n// Biggest cause first: it explains the most red.\ngroups.sort((a, b) => b.siblings.length - a.siblings.length);\nconst grep = (title) => String(title).replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&').replace(/\"/g, '\\\\\"');\nconst groups2 = groups.map(t => ({\n  environment: t.environment, file: t.file, title: t.title, error: t.error || '', siblings: t.siblings,\n  testCommand: `corepack pnpm exec playwright test --config e2e/playwright.config.ts e2e/${t.file} --project ${t.environment} --grep \"${grep(t.title)}\"`\n}));\nreturn { groups: groups2, total: groups2.length, totalTests: rows.length, fetched: fetched.length };"
         }
       },
       "outputs": {
@@ -484,7 +592,7 @@
         },
         "error": {
           "type": "object",
-          "description": "Error information if the flow fails",
+          "description": "Error information if the node fails",
           "source": "=Error",
           "var": "error",
           "schema": {
@@ -537,7 +645,7 @@
         "script": {
           "type": "literal",
           "fieldType": "string",
-          "expression": "const t = $vars.investigate.currentItem;\nconst r = ($vars.callVmAgent && $vars.callVmAgent.output) || null;\nconst e = ($vars.callVmAgent && $vars.callVmAgent.error) || null;\nconst base = (p) => String(p || '').split('/').pop().replace(/\\.(spec|test)?\\.?tsx?$/i, '').replace(/\\.[a-z]+$/i, '').toLowerCase();\nconst words = new Set();\nfor (const m of String((r && r.hypothesis) || '').matchAll(/\\b([A-Za-z][A-Za-z0-9-]+)\\.(tsx?|ts|css)\\b|\\b([A-Z][A-Za-z0-9]+(?:Page|Dialog|Panel|Rail|Service|Client|Store))\\b/g)) words.add((m[1] || m[3]).toLowerCase());\nconst relatedPrs = (($vars.pickTests.output || {}).prs || []).filter(pr => (pr.files || []).some(x => words.has(base(x)))).map(pr => ({ number: pr.number, title: pr.title, url: pr.url, state: pr.state || 'open' }));\nreturn {\n  environment: t.environment, file: t.file, title: t.title, siblings: t.siblings || [],\n  reproduced: !!(r && r.reproduced), fixVerified: !!(r && r.fixVerified),\n  prUrl: (r && r.prUrl) || '', hypothesis: (r && r.hypothesis) || '',\n  failed: !r || !!e, relatedPrs, errorMessage: e ? String(e.message || e.code || 'VmAgent faulted') : ''\n};"
+          "expression": "const t = $vars.investigate.currentItem;\nconst r = ($vars.callVmAgent && $vars.callVmAgent.output) || null;\nconst e = ($vars.callVmAgent && $vars.callVmAgent.error) || null;\nconst base = (p) => String(p || '').split('/').pop().replace(/\\.(spec|test)?\\.?tsx?$/i, '').replace(/\\.[a-z]+$/i, '').toLowerCase();\nconst words = new Set();\nfor (const m of String((r && r.hypothesis) || '').matchAll(/\\b([A-Za-z][A-Za-z0-9-]+)\\.(tsx?|ts|css)\\b|\\b([A-Z][A-Za-z0-9]+(?:Page|Dialog|Panel|Rail|Service|Client|Store))\\b/g)) words.add((m[1] || m[3]).toLowerCase());\nconst relatedPrs = (($vars.pickTests.output || {}).prs || []).filter(pr => (pr.files || []).some(x => words.has(base(x)))).map(pr => ({ number: pr.number, title: pr.title, url: pr.url, state: pr.state || 'open' }));\nreturn {\n  environment: t.environment, file: t.file, title: t.title, siblings: t.siblings || [],\n  reproduced: !!(r && r.reproduced), fixVerified: !!(r && r.fixVerified),\n  prUrl: (r && r.prUrl) || '', hypothesis: (r && r.hypothesis) || '',\n  costUsd: Number((r && r.costUsd) || 0),\n  failed: !r || !!e, relatedPrs, errorMessage: e ? String(e.message || e.code || 'VmAgent faulted') : ''\n};"
         }
       },
       "outputs": {
@@ -627,7 +735,7 @@
         "script": {
           "type": "literal",
           "fieldType": "string",
-          "expression": "const s = $vars.start.output;\nconst sel = $vars.pickTests.output || { total: 0, totalTests: 0, skipped: 0, selected: [], covered: [] };\nconst rows = ($vars.investigate.output || []).map(i => { const o = (i && i.recordResult && i.recordResult.output) || i; return o && o.title ? o : null; }).filter(Boolean);\nconst nTests = sel.totalTests || sel.total;\nconst head = `:robot_face: *VmAgent investigated ${rows.length} of ${sel.total} ${String(s.environments || 'studio-*,vsix-*').replace(/-?\\*/g, '').replace(/,/g, '/')} failure groups* (${nTests} tests, <${s.runUrl}|run ${s.runId}>)`;\nif (sel.total === 0) return { text: `:robot_face: VmAgent: no ${String(s.environments || 'studio-*,vsix-*').replace(/-?\\*/g, '').replace(/,/g, '/')} failures to investigate in <${s.runUrl}|run ${s.runId}>.` };\nconst spec = (f) => String(f).split('/').pop();\nconst lines = rows.map(r => {\n  if (r.failed) return `• \\`${spec(r.file)} › ${r.title}\\` — investigation faulted: ${r.errorMessage}`;\n  const parts = [r.reproduced ? 'reproduced' : 'not reproduced', r.fixVerified ? 'fix verified' : 'no verified fix', r.prUrl ? `<${r.prUrl}|draft PR>` : 'no PR'];\n  for (const pr of (r.relatedPrs || [])) parts.push(`related ${pr.state === 'merged' ? 'merged' : 'open'} <${pr.url}|PR #${pr.number}>`);\n  const sib = (r.siblings && r.siblings.length) ? ` (+${r.siblings.length} same cause: ${r.siblings.map(x => '`' + x + '`').join(', ')})` : '';\n  return `• \\`${spec(r.file)} › ${r.title}\\`${sib} — ${parts.join(', ')}` + (r.hypothesis ? `\\n    _${r.hypothesis.length > 700 ? r.hypothesis.slice(0, 700).replace(/\\s+\\S*$/, '') + '…' : r.hypothesis}_` : '');\n});\nfor (const c of (sel.covered || [])) {\n  const sib = (c.siblings && c.siblings.length) ? ` (+${c.siblings.length} same cause)` : '';\n  const verb = c.coveredBy.state === 'merged' ? 'likely already fixed by merged' : 'not investigated: open';\n  lines.push(`• \\`${spec(c.file)} › ${c.title}\\`${sib} — ${verb} <${c.coveredBy.url}|PR #${c.coveredBy.number}> (touches \\`${c.coveredBy.file.split('/').pop()}\\`)`);\n}\nif (sel.skipped > 0) lines.push(`_${sel.skipped} not investigated (maxTests=${s.maxTests})_`);\nreturn { text: [head, ...lines].join('\\n') };\n"
+          "expression": "const s = $vars.start.output;\nconst sel = $vars.pickTests.output || { total: 0, totalTests: 0, skipped: 0, selected: [], covered: [] };\nconst rows = ($vars.investigate.output || []).map(i => { const o = (i && i.recordResult && i.recordResult.output) || i; return o && o.title ? o : null; }).filter(Boolean);\nconst nTests = sel.totalTests || sel.total;\n// Model spend for this nightly: the sum of what each VmAgent run cost.\nconst spend = rows.reduce((a, r) => a + (Number(r.costUsd) || 0), 0);\nconst head = `:robot_face: *VmAgent investigated ${rows.length} of ${sel.total} ${String(s.environments || 'studio-*,vsix-*').replace(/-?\\*/g, '').replace(/,/g, '/')} failure groups* (${nTests} tests, <${s.runUrl}|run ${s.runId}>)` + (s.reportUrl ? ` \\u00b7 <${s.reportUrl}|report>` : '') + (spend > 0 ? ` \\u00b7 $${spend.toFixed(2)} Claude spend` : '');\n// CI said the nightly had failures but nothing arrived: the artifact download failed, and silence\n// would read as a green night. Say so instead.\nif (sel.total === 0 && !sel.fetched && Number(s.failedCount) > 0) return { text: `:warning: VmAgent could not read the failed-tests artifact for <${s.runUrl}|run ${s.runId}> (${s.failedCount} failed tests reported). Nothing investigated.` };\nif (sel.total === 0) return { text: `:robot_face: VmAgent: no ${String(s.environments || 'studio-*,vsix-*').replace(/-?\\*/g, '').replace(/,/g, '/')} failures to investigate in <${s.runUrl}|run ${s.runId}>.` };\nconst spec = (f) => String(f).split('/').pop();\nconst lines = rows.map(r => {\n  if (r.failed) return `• \\`${spec(r.file)} › ${r.title}\\` — investigation faulted: ${r.errorMessage}`;\n  const parts = [r.reproduced ? 'reproduced' : 'not reproduced', r.fixVerified ? 'fix verified' : 'no verified fix', r.prUrl ? `<${r.prUrl}|draft PR>` : 'no PR'];\n  for (const pr of (r.relatedPrs || [])) parts.push(`related ${pr.state === 'merged' ? 'merged' : 'open'} <${pr.url}|PR #${pr.number}>`);\n  const sib = (r.siblings && r.siblings.length) ? ` (+${r.siblings.length} same cause: ${r.siblings.map(x => '`' + x + '`').join(', ')})` : '';\n  return `• \\`${spec(r.file)} › ${r.title}\\`${sib} — ${parts.join(', ')}` + (r.hypothesis ? `\\n    _${r.hypothesis.length > 700 ? r.hypothesis.slice(0, 700).replace(/\\s+\\S*$/, '') + '…' : r.hypothesis}_` : '');\n});\nfor (const c of (sel.covered || [])) {\n  const sib = (c.siblings && c.siblings.length) ? ` (+${c.siblings.length} same cause)` : '';\n  const verb = c.coveredBy.state === 'merged' ? 'likely already fixed by merged' : 'not investigated: open';\n  lines.push(`• \\`${spec(c.file)} › ${c.title}\\`${sib} — ${verb} <${c.coveredBy.url}|PR #${c.coveredBy.number}> (touches \\`${c.coveredBy.file.split('/').pop()}\\`)`);\n}\nif (sel.skipped > 0) {\n  const shown = (sel.skippedGroups || []).slice(0, 5).map(g => `\\`${spec(g.file)} \\u203a ${g.title}\\`` + ((g.siblings || []).length ? ` (+${g.siblings.length})` : ''));\n  const more = sel.skipped > shown.length ? `, +${sel.skipped - shown.length} more` : '';\n  lines.push(`_${sel.skipped} not investigated (maxTests=${s.maxTests})${shown.length ? ': ' + shown.join(', ') + more : ''}_`);\n}\nreturn { text: [head, ...lines].join('\\n') };\n"
         }
       },
       "outputs": {
@@ -768,7 +876,7 @@
         "script": {
           "type": "literal",
           "fieldType": "string",
-          "expression": "const s = $vars.start.output;\nconst sel = $vars.selectTests.output || { groups: [], total: 0, totalTests: 0 };\nconst base = (path) => String(path || '').split('/').pop().replace(/\\.(spec|test)?\\.?tsx?$/i, '').replace(/\\.[a-z]+$/i, '').toLowerCase();\nconst prList = ((($vars.parsePrs || {}).output || {}).prs || []).filter(p => p && p.number).map(p => ({ number: p.number, title: p.title || '', url: p.url || '', state: p.state || 'open', files: (p.files || []).map(String) }));\n// A group is covered when an open PR touches its spec file or a page object named in its error.\nconst tokens = (t) => {\n  const set = new Set([base(t.file)]);\n  const first = String(t.error || '').split('\\n')[0];\n  for (const m of first.matchAll(/\\b([A-Z][A-Za-z0-9]+(?:Page|Dialog|Panel|Rail|Service|Client|Store))\\b/g)) set.add(m[1].toLowerCase());\n  return set;\n};\nconst covered = [];\nconst open = [];\nfor (const t of sel.groups || []) {\n  const tk = tokens(t);\n  let hit = null;\n  for (const pr of prList) {\n    const f = pr.files.find(x => base(x) === base(t.file) || tk.has(base(x)));\n    if (f) { hit = { number: pr.number, title: pr.title, url: pr.url, state: pr.state, file: f }; break; }\n  }\n  if (hit) covered.push({ ...t, coveredBy: hit }); else open.push(t);\n}\nconst max = Number(s.maxTests) > 0 ? Number(s.maxTests) : 1;\nconst selected = open.slice(0, max);\nreturn { selected, covered, skipped: open.length - selected.length, total: sel.total, totalTests: sel.totalTests, prs: prList };"
+          "expression": "const s = $vars.start.output;\nconst sel = $vars.selectTests.output || { groups: [], total: 0, totalTests: 0 };\nconst base = (path) => String(path || '').split('/').pop().replace(/\\.(spec|test)?\\.?tsx?$/i, '').replace(/\\.[a-z]+$/i, '').toLowerCase();\nconst prList = ((($vars.parsePrs || {}).output || {}).prs || []).filter(p => p && p.number).map(p => ({ number: p.number, title: p.title || '', url: p.url || '', state: p.state || 'open', files: (p.files || []).map(String) }));\n// A group is covered when an open PR touches its spec file or a page object named in its error.\nconst tokens = (t) => {\n  const set = new Set([base(t.file)]);\n  const first = String(t.error || '').split('\\n')[0];\n  for (const m of first.matchAll(/\\b([A-Z][A-Za-z0-9]+(?:Page|Dialog|Panel|Rail|Service|Client|Store))\\b/g)) set.add(m[1].toLowerCase());\n  return set;\n};\nconst covered = [];\nconst open = [];\nfor (const t of sel.groups || []) {\n  const tk = tokens(t);\n  let hit = null;\n  for (const pr of prList) {\n    const f = pr.files.find(x => base(x) === base(t.file) || tk.has(base(x)));\n    if (f) { hit = { number: pr.number, title: pr.title, url: pr.url, state: pr.state, file: f }; break; }\n  }\n  if (hit) covered.push({ ...t, coveredBy: hit }); else open.push(t);\n}\nconst max = Number(s.maxTests) > 0 ? Number(s.maxTests) : 1;\nconst selected = open.slice(0, max);\n// Named, so the digest says what the cap dropped instead of only how many.\nconst skippedGroups = open.slice(max).map(t => ({ file: t.file, title: t.title, siblings: t.siblings || [] }));\nreturn { selected, covered, skippedGroups, skipped: skippedGroups.length, total: sel.total, totalTests: sel.totalTests, prs: prList };"
         }
       },
       "outputs": {
@@ -1084,15 +1192,29 @@
       "targetPort": "input"
     },
     {
-      "id": "e_ack_output_selectTests",
+      "id": "e_ack_output_fetchFailures",
       "sourceNodeId": "ackInSlackThread",
+      "sourcePort": "output",
+      "targetNodeId": "fetchFailures",
+      "targetPort": "input"
+    },
+    {
+      "id": "e_ack_error_fetchFailures",
+      "sourceNodeId": "ackInSlackThread",
+      "sourcePort": "error",
+      "targetNodeId": "fetchFailures",
+      "targetPort": "input"
+    },
+    {
+      "id": "e_fetchFailures_output_selectTests",
+      "sourceNodeId": "fetchFailures",
       "sourcePort": "output",
       "targetNodeId": "selectTests",
       "targetPort": "input"
     },
     {
-      "id": "e_ack_error_selectTests",
-      "sourceNodeId": "ackInSlackThread",
+      "id": "e_fetchFailures_error_selectTests",
+      "sourceNodeId": "fetchFailures",
       "sourcePort": "error",
       "targetNodeId": "selectTests",
       "targetPort": "input"
@@ -1413,6 +1535,243 @@
           "description": "The return value of the connector.",
           "source": "=result.response",
           "var": "output"
+        },
+        "error": {
+          "type": "object",
+          "description": "Error information if the node fails",
+          "source": "=Error",
+          "var": "error",
+          "schema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "type": "object",
+            "required": [
+              "code",
+              "message",
+              "detail",
+              "category",
+              "status"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Error code as a string"
+              },
+              "message": {
+                "type": "string",
+                "description": "High-level error message"
+              },
+              "detail": {
+                "type": "string",
+                "description": "Detailed error description"
+              },
+              "category": {
+                "type": "string",
+                "description": "Error category"
+              },
+              "status": {
+                "type": "integer",
+                "description": "HTTP status code"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "debug": {
+        "runtime": "bpmnEngine"
+      }
+    },
+    {
+      "nodeType": "uipath.core.rpa-workflow.ca36341d-ecec-4ba6-aa76-134d0afe4ba7",
+      "version": "1.0.0",
+      "category": "rpa-workflow.published",
+      "runtimeConstraints": {
+        "exclude": [
+          "api-function"
+        ]
+      },
+      "description": "vm-exec bound in the VM-pool folder; referenced as an agent tool so calls run on the Windows robot VM",
+      "tags": [],
+      "sortOrder": 630,
+      "supportsErrorHandling": true,
+      "display": {
+        "label": "vm-exec-vm",
+        "icon": "rpa"
+      },
+      "handleConfiguration": [
+        {
+          "position": "left",
+          "handles": [
+            {
+              "id": "input",
+              "type": "target",
+              "handleType": "input"
+            }
+          ]
+        },
+        {
+          "position": "right",
+          "handles": [
+            {
+              "id": "output",
+              "type": "source",
+              "handleType": "output"
+            },
+            {
+              "id": "error",
+              "label": "Error",
+              "type": "source",
+              "handleType": "output",
+              "visible": "{inputs.errorHandlingEnabled}",
+              "constraints": {
+                "maxConnections": 1
+              }
+            }
+          ]
+        }
+      ],
+      "model": {
+        "type": "bpmn:ServiceTask",
+        "serviceType": "Orchestrator.StartJob",
+        "version": "v2",
+        "listingVersion": "1.0.8",
+        "bindings": {
+          "resource": "process",
+          "resourceSubType": "Process",
+          "resourceKey": "e2e-investigator.vm-exec-vm",
+          "orchestratorType": "process",
+          "values": [
+            {
+              "name": "name",
+              "propertyAttribute": "name",
+              "default": "vm-exec-vm"
+            },
+            {
+              "name": "folderPath",
+              "propertyAttribute": "folderPath",
+              "default": "e2e-investigator"
+            },
+            {
+              "name": "folderKey",
+              "propertyAttribute": "folderKey",
+              "default": "0b28296b-1f4a-4ea9-a3d5-8b0abaac1cf0"
+            }
+          ]
+        },
+        "context": [
+          {
+            "name": "name",
+            "type": "string",
+            "value": "<bindings.name>"
+          },
+          {
+            "name": "folderPath",
+            "type": "string",
+            "value": "<bindings.folderPath>"
+          },
+          {
+            "name": "_label",
+            "type": "string",
+            "value": "vm-exec-vm"
+          }
+        ]
+      },
+      "form": {
+        "id": "activity-properties",
+        "title": "RPA Workflow",
+        "sections": [
+          {
+            "id": "inputs",
+            "title": "Inputs",
+            "collapsible": true,
+            "defaultExpanded": true,
+            "fields": [
+              {
+                "name": "inputs.Script",
+                "type": "text",
+                "label": "Script"
+              },
+              {
+                "name": "inputs.WorkDir",
+                "type": "text",
+                "label": "WorkDir"
+              },
+              {
+                "name": "inputs.RunId",
+                "type": "text",
+                "label": "RunId"
+              },
+              {
+                "name": "inputs.StateKey",
+                "type": "text",
+                "label": "StateKey"
+              },
+              {
+                "name": "inputs.TimeoutMinutes",
+                "type": "number",
+                "label": "TimeoutMinutes"
+              },
+              {
+                "name": "inputs.MaxOutputChars",
+                "type": "number",
+                "label": "MaxOutputChars"
+              }
+            ]
+          }
+        ]
+      },
+      "inputDefinition": {
+        "type": "object",
+        "properties": {
+          "Script": {
+            "type": "string"
+          },
+          "WorkDir": {
+            "type": "string"
+          },
+          "RunId": {
+            "type": "string"
+          },
+          "StateKey": {
+            "type": "string"
+          },
+          "TimeoutMinutes": {
+            "type": "number"
+          },
+          "MaxOutputChars": {
+            "type": "number"
+          }
+        }
+      },
+      "inputDefaults": {
+        "Script": "",
+        "WorkDir": "",
+        "RunId": "",
+        "StateKey": "",
+        "TimeoutMinutes": 0,
+        "MaxOutputChars": 0
+      },
+      "outputDefinition": {
+        "output": {
+          "type": "object",
+          "source": "=this",
+          "var": "output",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "ExitCode": {
+                "type": "integer",
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "Stdout": {
+                "type": "string"
+              },
+              "OutputBlobPath": {
+                "type": "string"
+              }
+            }
+          }
         },
         "error": {
           "type": "object",
@@ -2186,243 +2545,6 @@
       "model": {
         "type": "bpmn:EndEvent"
       }
-    },
-    {
-      "nodeType": "uipath.core.rpa-workflow.ca36341d-ecec-4ba6-aa76-134d0afe4ba7",
-      "version": "1.0.0",
-      "category": "rpa-workflow.published",
-      "runtimeConstraints": {
-        "exclude": [
-          "api-function"
-        ]
-      },
-      "description": "vm-exec bound in the VM-pool folder; referenced as an agent tool so calls run on the Windows robot VM",
-      "tags": [],
-      "sortOrder": 630,
-      "supportsErrorHandling": true,
-      "display": {
-        "label": "vm-exec-vm",
-        "icon": "rpa"
-      },
-      "handleConfiguration": [
-        {
-          "position": "left",
-          "handles": [
-            {
-              "id": "input",
-              "type": "target",
-              "handleType": "input"
-            }
-          ]
-        },
-        {
-          "position": "right",
-          "handles": [
-            {
-              "id": "output",
-              "type": "source",
-              "handleType": "output"
-            },
-            {
-              "id": "error",
-              "label": "Error",
-              "type": "source",
-              "handleType": "output",
-              "visible": "{inputs.errorHandlingEnabled}",
-              "constraints": {
-                "maxConnections": 1
-              }
-            }
-          ]
-        }
-      ],
-      "model": {
-        "type": "bpmn:ServiceTask",
-        "serviceType": "Orchestrator.StartJob",
-        "version": "v2",
-        "listingVersion": "1.0.8",
-        "bindings": {
-          "resource": "process",
-          "resourceSubType": "Process",
-          "resourceKey": "e2e-investigator.vm-exec-vm",
-          "orchestratorType": "process",
-          "values": [
-            {
-              "name": "name",
-              "propertyAttribute": "name",
-              "default": "vm-exec-vm"
-            },
-            {
-              "name": "folderPath",
-              "propertyAttribute": "folderPath",
-              "default": "e2e-investigator"
-            },
-            {
-              "name": "folderKey",
-              "propertyAttribute": "folderKey",
-              "default": "0b28296b-1f4a-4ea9-a3d5-8b0abaac1cf0"
-            }
-          ]
-        },
-        "context": [
-          {
-            "name": "name",
-            "type": "string",
-            "value": "<bindings.name>"
-          },
-          {
-            "name": "folderPath",
-            "type": "string",
-            "value": "<bindings.folderPath>"
-          },
-          {
-            "name": "_label",
-            "type": "string",
-            "value": "vm-exec-vm"
-          }
-        ]
-      },
-      "form": {
-        "id": "activity-properties",
-        "title": "RPA Workflow",
-        "sections": [
-          {
-            "id": "inputs",
-            "title": "Inputs",
-            "collapsible": true,
-            "defaultExpanded": true,
-            "fields": [
-              {
-                "name": "inputs.Script",
-                "type": "text",
-                "label": "Script"
-              },
-              {
-                "name": "inputs.WorkDir",
-                "type": "text",
-                "label": "WorkDir"
-              },
-              {
-                "name": "inputs.RunId",
-                "type": "text",
-                "label": "RunId"
-              },
-              {
-                "name": "inputs.StateKey",
-                "type": "text",
-                "label": "StateKey"
-              },
-              {
-                "name": "inputs.TimeoutMinutes",
-                "type": "number",
-                "label": "TimeoutMinutes"
-              },
-              {
-                "name": "inputs.MaxOutputChars",
-                "type": "number",
-                "label": "MaxOutputChars"
-              }
-            ]
-          }
-        ]
-      },
-      "inputDefinition": {
-        "type": "object",
-        "properties": {
-          "Script": {
-            "type": "string"
-          },
-          "WorkDir": {
-            "type": "string"
-          },
-          "RunId": {
-            "type": "string"
-          },
-          "StateKey": {
-            "type": "string"
-          },
-          "TimeoutMinutes": {
-            "type": "number"
-          },
-          "MaxOutputChars": {
-            "type": "number"
-          }
-        }
-      },
-      "inputDefaults": {
-        "Script": "",
-        "WorkDir": "",
-        "RunId": "",
-        "StateKey": "",
-        "TimeoutMinutes": 0,
-        "MaxOutputChars": 0
-      },
-      "outputDefinition": {
-        "output": {
-          "type": "object",
-          "source": "=this",
-          "var": "output",
-          "schema": {
-            "type": "object",
-            "properties": {
-              "ExitCode": {
-                "type": "integer",
-                "minimum": -2147483648,
-                "maximum": 2147483647
-              },
-              "Stdout": {
-                "type": "string"
-              },
-              "OutputBlobPath": {
-                "type": "string"
-              }
-            }
-          }
-        },
-        "error": {
-          "type": "object",
-          "description": "Error information if the node fails",
-          "source": "=Error",
-          "var": "error",
-          "schema": {
-            "$schema": "http://json-schema.org/draft-07/schema#",
-            "type": "object",
-            "required": [
-              "code",
-              "message",
-              "detail",
-              "category",
-              "status"
-            ],
-            "properties": {
-              "code": {
-                "type": "string",
-                "description": "Error code as a string"
-              },
-              "message": {
-                "type": "string",
-                "description": "High-level error message"
-              },
-              "detail": {
-                "type": "string",
-                "description": "Detailed error description"
-              },
-              "category": {
-                "type": "string",
-                "description": "Error category"
-              },
-              "status": {
-                "type": "integer",
-                "description": "HTTP status code"
-              }
-            },
-            "additionalProperties": false
-          }
-        }
-      },
-      "debug": {
-        "runtime": "bpmnEngine"
-      }
     }
   ],
   "variables": {
@@ -3153,6 +3275,73 @@
         }
       },
       {
+        "id": "fetchFailures.output",
+        "type": "object",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "ExitCode": {
+              "type": "integer",
+              "minimum": -2147483648,
+              "maximum": 2147483647
+            },
+            "Stdout": {
+              "type": "string"
+            },
+            "OutputBlobPath": {
+              "type": "string"
+            }
+          }
+        },
+        "binding": {
+          "nodeId": "fetchFailures",
+          "outputId": "output"
+        }
+      },
+      {
+        "id": "fetchFailures.error",
+        "type": "object",
+        "schema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "required": [
+            "code",
+            "message",
+            "detail",
+            "category",
+            "status"
+          ],
+          "properties": {
+            "code": {
+              "type": "string",
+              "description": "Error code as a string"
+            },
+            "message": {
+              "type": "string",
+              "description": "High-level error message"
+            },
+            "detail": {
+              "type": "string",
+              "description": "Detailed error description"
+            },
+            "category": {
+              "type": "string",
+              "description": "Error category"
+            },
+            "status": {
+              "type": "integer",
+              "description": "HTTP status code"
+            }
+          },
+          "additionalProperties": false
+        },
+        "description": "Error information if the node fails",
+        "binding": {
+          "nodeId": "fetchFailures",
+          "outputId": "error"
+        }
+      },
+      {
         "id": "ackInSlackThread.output",
         "type": "object",
         "description": "The return value of the connector.",
@@ -3208,8 +3397,8 @@
       "type": "string",
       "resource": "connection",
       "resourceKey": "ccf82d4b-3c2a-492f-bf8f-939b565366a2",
-      "propertyAttribute": "FolderKey",
-      "default": "0b28296b-1f4a-4ea9-a3d5-8b0abaac1cf0"
+      "default": "0b28296b-1f4a-4ea9-a3d5-8b0abaac1cf0",
+      "propertyAttribute": "FolderKey"
     },
     {
       "id": "bVmExecName",
@@ -3256,6 +3445,17 @@
         "collapsed": false
       },
       "ackInSlackThread": {
+        "position": {
+          "x": 0,
+          "y": 0
+        },
+        "size": {
+          "width": 96,
+          "height": 96
+        },
+        "collapsed": false
+      },
+      "fetchFailures": {
         "position": {
           "x": 0,
           "y": 0
@@ -3378,20 +3578,6 @@
       }
     },
     "edges": {
-      "e_ack_error_selectTests": {
-        "routedWaypoints": [
-          {
-            "id": "e_ack_error_selectTests-r0",
-            "x": 144,
-            "y": 64
-          },
-          {
-            "id": "e_ack_error_selectTests-r1",
-            "x": 144,
-            "y": 32
-          }
-        ]
-      },
       "e_ghPrs_error_parsePrs": {
         "routedWaypoints": [
           {
