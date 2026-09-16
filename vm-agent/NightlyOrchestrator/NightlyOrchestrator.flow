@@ -1242,6 +1242,10 @@
             "thread_ts": "=js:($vars.start.output.slackTs || undefined)",
             "mrkdwn": true
           },
+          "queryParameters": {
+            "send_as": "user"
+          },
+          "objectName": "send_message_to_channel_v2",
           "uiPathActivityTypeId": "37a305b2-89b1-315d-b73f-1778839a6c47",
           "errorState": {
             "issues": []
