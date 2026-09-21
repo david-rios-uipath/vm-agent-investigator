@@ -41,9 +41,16 @@ Details and dates: `LOG.md`.
 
 ## Blocked on a human
 
-The `SLACK_TOKEN` Credential asset in folder **`e2e-investigator`** is a placeholder with an
-empty password, so `vm-exec` injects nothing and the `report` phase will render its file and
-upload nothing. To turn the per-group reports on:
+**The Slack app is not approved for the workspace yet**, so there is no token with
+`files:write` to put in the asset. The `SLACK_TOKEN` Credential asset in folder
+**`e2e-investigator`** is still a placeholder with an empty password: `vm-exec` injects
+nothing, and the `report` phase renders its file into `state.zip` and uploads nothing. That is
+the safe state - no fault, no silence - but it is also why `summarize` **still carries the
+per-group cause / repro / finding lines**. Deleting them before the upload works would make
+the nightly say less than it does today; the block to delete is marked in the `summarize`
+script. Until then the only net change to the nightly message is the 3500-char cap.
+
+To turn the per-group reports on:
 
 1. Get a Slack app token with the **`files:write`** scope.
 2. **Invite that app to `#flow-dev-frontend` (`C0AH25MT3L5`)** — a bot identity previously got
@@ -52,7 +59,8 @@ upload nothing. To turn the per-group reports on:
 3. Set it as the password of `SLACK_TOKEN` in `e2e-investigator` (the process folder for
    `vm-exec-vm`). Not the deployment folder: `release.sh` recreates that one every time.
 
-Then `./probe-script.sh vm/probes/slack-upload.ps1` proves it in ~5 minutes.
+Then `./probe-script.sh vm/probes/slack-upload.ps1` proves it in ~5 minutes, and the marked
+block in `summarize` comes out.
 
 ## In the tree, not released
 
@@ -65,11 +73,13 @@ Then `./probe-script.sh vm/probes/slack-upload.ps1` proves it in ~5 minutes.
 
 ## Do this next
 
-1. **Per-group Slack reports.** `vm/selfcheck.ps1` passes locally; nothing else is verified.
-   In order: the `SLACK_TOKEN` prerequisite above, `./probe-script.sh
-   vm/probes/slack-upload.ps1`, then `./probe-phase.sh report <runId>` against a runId whose
-   `state.zip` still has a `notebook.md` (push first — the bootstrap fetches the ref), then one
-   `VmAgent` group end to end with `slackThreadTs` set to a scratch thread.
+1. **Per-group Slack reports.** `vm/selfcheck.ps1` passes locally; nothing else is verified,
+   and the upload is blocked on the app approval above. What does not need the token:
+   `./probe-phase.sh report <runId>` against a runId whose `state.zip` still has a
+   `notebook.md` (push first — the bootstrap fetches the ref), which proves the rendering and
+   the STATUS line. Once the token exists: `./probe-script.sh vm/probes/slack-upload.ps1`,
+   then one `VmAgent` group end to end with `slackThreadTs` set to a scratch thread, then drop
+   the marked block in `summarize`.
 2. **Release and run the queued-groups work.** `./release.sh <version>
    inputs/orchestrator-<latest>.json NightlyOrchestrator`, starting with a `maxTests: 0` canary.
 3. **Take PR #3756 out of draft** once one tenant-side CI run has proven the token exchange.

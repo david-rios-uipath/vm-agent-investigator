@@ -214,9 +214,12 @@ console.log('slack gates ok');
   // Siblings are a count, not a list: one cause used to print 86 test names.
   assert.match(text, /data-transform\.spec\.ts › should add a Map operation with field mappings` \+1 more in this spec — reproduced, fix verified, <https:\/\/github\.com\/UiPath\/flow-workbench\/pull\/3729\|draft PR>, related merged <https:\/\/github\.com\/UiPath\/flow-workbench\/pull\/3758\|PR #3758>/);
   assert.doesNotMatch(text, /should write a Custom Script operation in a Data Transform node/);
-  // Cause, repro and finding moved into the report the VM uploads per group; the roll-up is an
-  // index. Their absence here is the whole point of the change.
-  assert.doesNotMatch(text, /\*repro\*|\*cause\*|\*finding\*/);
+  // Cause and repro replace the names, and the repro path must be the one that exists on disk.
+  // These move into the VM's uploaded report once the SLACK_TOKEN is approved; until then the
+  // roll-up is still the only place a reader sees them.
+  assert.match(text, /\*repro\* `corepack pnpm exec playwright test --config e2e\/playwright\.config\.ts e2e\/specs\/data-transform\/data-transform\.spec\.ts --project studio-alpha/);
+  // Backticks inside the error would close the code span early; they are swapped for quotes.
+  assert.match(text, /\*cause\* `Error: a '\.flow' entry never appeared`/);
   assert.match(text, /should add a Group by operation with aggregations` \(\+2 same cause\) — likely already fixed by merged <https:\/\/github\.com\/UiPath\/flow-workbench\/pull\/3758\|PR #3758> \(touches `StudioProjectsPage\.ts`\)/);
   assert.match(text, /1 not investigated: 1 over maxTests=1/);
   const flat = run('summarize', { start: { output: night2 }, pickTests: { output: pick }, investigate: { output: [row] } }).text;
