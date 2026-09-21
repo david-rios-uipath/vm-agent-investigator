@@ -21,6 +21,7 @@ SMOKE_ONLY=1 ./probe-phase.sh repro probe-1     # twice: the second prologue mus
 ./probe-phase.sh investigate <runId>
 ./probe-phase.sh fix <runId>
 ./probe-phase.sh pr <runId>
+./probe-phase.sh report <runId>                 # renders report.md; posts nothing
 ```
 
 `probe-phase.sh` calls `e2e-investigator/vm-exec-vm` directly with the bootstrap PowerShell that
@@ -40,8 +41,17 @@ uip or bucket-files list be6369c7-02a4-4b80-957b-e95d06177692 --folder-path "e2e
 ```
 
 **`probe-script.sh <file.ps1> [minutes]`** runs a script that is not a flow node at all, sending
-your working tree inline with no push. That is the cheapest way to ask the VM a question — the
-vsix session-0 question was settled with it.
+your working tree inline with no push (a `. vm/lib/x.ps1` line is inlined from the working tree
+too). That is the cheapest way to ask the VM a question — the vsix session-0 question was
+settled with it.
+
+```bash
+./probe-script.sh vm/probes/slack-upload.ps1    # set $THREAD_TS in the file first
+```
+
+That probe is where a missing `files:write` scope, a placeholder `SLACK_TOKEN` asset or an app
+that was never invited to `#flow-dev-frontend` shows up, before the `report` phase depends on
+any of them.
 
 ## Release
 

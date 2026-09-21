@@ -4,6 +4,7 @@ $ErrorActionPreference = 'Stop'
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $here 'lib/prologue.ps1')
 . (Join-Path $here 'lib/ci-history.ps1')
+. (Join-Path $here 'lib/report.ps1')
 
 function Assert([bool]$Cond, [string]$What) {
   if (-not $Cond) { throw "FAIL: $What" }
@@ -195,5 +196,74 @@ Assert ((Get-CiVerdict @($m.marks.Values | ForEach-Object { [string]$_ })) -eq '
 Assert ((Get-CiMarks $log 'connectors.spec.ts' '').target -eq '') 'no grep, no target marks'
 Assert ((Get-CiVerdict @()) -eq 'absent') 'no marks reads as absent'
 Assert ((Get-CiVerdict @('F')) -eq 'failed') 'a test that stayed red reads as failed'
+
+Write-Host ''
+
+# The report phase's pure half. The upload itself is probed separately
+# (vm/probes/slack-upload.ps1) - nothing here touches the network.
+$cmd = 'corepack pnpm exec playwright test --config e2e/playwright.config.ts e2e/specs/debug/debug-execution.spec.ts --project studio-alpha --grep "should run a debug session"'
+Assert ((Get-SpecName $cmd) -eq 'debug-execution') 'the spec name comes from the .spec.ts, not playwright.config.ts'
+Assert ((Get-SpecName 'playwright test --config e2e/playwright.config.ts') -eq 'playwright.config') 'with no spec file the config name is all there is'
+Assert ((Get-TestTitle $cmd) -eq 'should run a debug session') 'the test title comes from --grep'
+Assert ((Get-TestTitle 'playwright test x.spec.ts') -eq '') 'no --grep, no title'
+
+$rn = Join-Path ([System.IO.Path]::GetTempPath()) ('report-' + [guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Force -Path $rn | Out-Null
+Write-Utf8Lf (Join-Path $rn 'evidence.json') ((@{ source = 'vm'; exitCode = 1; reproduced = $true
+  excerpt = 'Error: locator not found'; ciClassification = 'regression' }) | ConvertTo-Json)
+Write-Utf8Lf (Join-Path $rn 'investigation.json') ((@{ complete = $true
+  hypothesis = 'The rail unmounts before the assertion runs' }) | ConvertTo-Json)
+Write-Utf8Lf (Join-Path $rn 'notebook.md') "# Notebook`n`nRuled out the backend."
+
+$facts = Get-ReportFacts $rn
+Assert ($facts.reproduced) 'reproduced comes off evidence.json'
+Assert (-not $facts.fixVerified) 'no fix-summary.json means no verified fix'
+$noFix = New-ReportBody -Facts $facts -Spec 'debug-execution' -Title 'should run a debug session' `
+  -TestCommand $cmd -RunId 'debug-execution-20260921-010101' -RunUrl 'https://ci/run/1'
+Assert ($noFix -match '(?m)^# debug-execution ') 'the title line names the spec'
+Assert ($noFix -match '(?m)^## Cause') 'the body has a Cause section'
+Assert ($noFix -match 'The rail unmounts') 'with no fixer problem statement the hypothesis is the cause'
+Assert ($noFix -match 'Ruled out the backend') 'the notebook is what was tried'
+Assert ($noFix -match '(?m)^## Notebook') "the notebook's own headings are pushed one level deeper"
+$nested = Format-Nested "# Top`n``````sh`n# not a heading`n``````"
+Assert ($nested -match '(?m)^## Top') 'a real heading is demoted'
+Assert ($nested -match '(?m)^# not a heading') 'a comment inside a fence is left alone'
+Assert ($noFix -match '\[nightly run\]\(https://ci/run/1\)') 'the run link is in the header line'
+Assert ($noFix -match 'no verified fix') 'the header says so when nothing was verified'
+Assert ($noFix -notmatch '(?m)^## Diff') 'no fix.patch, no Diff section'
+
+Write-Utf8Lf (Join-Path $rn 'fix.patch') "diff --git a/x b/x`n+await rail"
+Write-Utf8Lf (Join-Path $rn 'fix-summary.json') ((@{ title = 'Await the rail'; problem = 'The rail unmounts'
+  solution = 'Await the rail before asserting'; fixSummary = 'Added an await.'; confidence = 'high'
+  attempts = 2; verified = $true }) | ConvertTo-Json)
+Write-Utf8Lf (Join-Path $rn 'pr.json') ((@{ prUrl = 'https://github.com/o/r/pull/1'; branch = 'b'; commit = 'c' }) | ConvertTo-Json)
+$fixed = Get-ReportFacts $rn
+$withFix = New-ReportBody -Facts $fixed -Spec 'debug-execution' -Title 'should run a debug session' `
+  -TestCommand $cmd -RunId 'debug-execution-20260921-010101'
+Assert ($fixed.fixVerified) 'fixVerified comes off fix-summary.json'
+Assert ($withFix -match '(?m)^## Diff') 'a fix.patch renders the Diff section'
+Assert ($withFix -match 'await rail') 'the patch itself is in it'
+Assert ($withFix -match 'and passed\. Fixer confidence: \*\*high\*\*, on attempt 2') 'the verdict names confidence and attempt'
+Assert ($withFix -match '\[draft PR\]\(https://github.com/o/r/pull/1\)') 'the PR link is in the header line'
+
+# The verdict is the Slack message itself: one line, Slack link syntax, never a claim the
+# phase did not see.
+$v = New-ReportVerdict -Facts $facts -Spec 'debug-execution' -Title 'should run a debug session' -RunUrl 'https://ci/run/1'
+Assert ($v -notmatch "`n") 'the verdict is one line'
+Assert ($v -match 'reproduced, no verified fix, no PR') 'reproduced but unfixed reads correctly'
+Assert ($v -match '<https://ci/run/1\|nightly run>') 'the run link uses Slack link syntax'
+$vf = New-ReportVerdict -Facts $fixed -Spec 'debug-execution'
+Assert ($vf -match 'reproduced, fix verified, <https://github.com/o/r/pull/1\|draft PR>') 'a verified fix with a PR reads correctly'
+$notRepro = $facts.Clone(); $notRepro.reproduced = $false
+Assert ((New-ReportVerdict -Facts $notRepro -Spec 'x') -match 'not reproduced') 'a group that did not reproduce says so'
+Assert ((New-ReportVerdict -Facts $fixed -Spec 'a`b') -notmatch '`a`b`') 'a backtick in the name is stripped, not left to close the code span'
+
+# No channel or no thread = render only. This is what keeps a manual VmAgent run and
+# probe-phase.sh out of the nightly's Slack thread.
+$rf = Join-Path $rn 'report.md'
+Write-Utf8Lf $rf $withFix
+Assert (-not (Send-SlackFile -Path $rf -Channel '' -ThreadTs '123.456')) 'an empty channel skips the upload'
+Assert (-not (Send-SlackFile -Path $rf -Channel 'C0AH25MT3L5' -ThreadTs '')) 'an empty thread skips the upload'
+Remove-Item $rn -Recurse -Force
 
 Write-Host 'selfcheck passed'

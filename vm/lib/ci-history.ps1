@@ -39,9 +39,7 @@ function Get-CiHistory([string]$RepoUrl, [string]$Branch, [string]$TestCommand, 
   $project = [regex]::Match($TestCommand, '--project[= ]([\w-]+)').Groups[1].Value
   if (-not $specPath) { $r.summary = 'no *.spec.ts in the test command; CI history unavailable'; return $r }
   $spec = Split-Path $specPath -Leaf
-  # The --grep title names the one test this run is about; the spec can fail on a different one.
-  $gm = [regex]::Match($TestCommand, '--grep[= ]+(?:"([^"]*)"|''([^'']*)''|(\S+))')
-  $grep = if ($gm.Success) { @($gm.Groups[1].Value, $gm.Groups[2].Value, $gm.Groups[3].Value | Where-Object { $_ })[0] } else { '' }
+  $grep = Get-TestTitle $TestCommand
 
   $h = @{ Authorization = "Bearer $token"; Accept = 'application/vnd.github+json'; 'User-Agent' = 'vm-agent' }
   $api = "https://api.github.com/repos/$owner/$repo"

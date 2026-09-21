@@ -10,7 +10,7 @@ Exit 0 with a negative status (not reproduced, fix not verified) is a normal res
 A non-zero exit means the runner itself broke.
 #>
 param(
-  [Parameter(Mandatory)][ValidateSet('repro', 'investigate', 'fix', 'pr')][string] $Phase,
+  [Parameter(Mandatory)][ValidateSet('repro', 'investigate', 'fix', 'pr', 'report')][string] $Phase,
   [Parameter(Mandatory)][string] $RunId,
   [Parameter(Mandatory)][string] $RepoUrl,
   [Parameter(Mandatory)][string] $Branch,
@@ -18,7 +18,13 @@ param(
   [string] $Model = '',
   [int] $FixAttempt = 1,
   [int] $MaxFixAttempts = 3,
-  [switch] $SmokeOnly
+  [switch] $SmokeOnly,
+  # report phase only. An empty channel or thread means render the report and upload nothing:
+  # a manual VmAgent run and probe-phase.sh must stay silent in Slack.
+  [string] $SlackChannel = '',
+  [string] $SlackThreadTs = '',
+  [string] $RunUrl = '',
+  [string] $ReportUrl = ''
 )
 
 # 'Continue', not 'Stop': git, pnpm, npm and Playwright all write progress to stderr, and with
@@ -31,6 +37,7 @@ $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $here 'lib\prologue.ps1')
 . (Join-Path $here 'lib\ci-history.ps1')
 . (Join-Path $here 'lib\pr-body.ps1')
+. (Join-Path $here 'lib\report.ps1')
 
 $notes = Join-Path 'C:\vm-agent\notes' $RunId
 New-Item -ItemType Directory -Force -Path $notes | Out-Null
@@ -72,12 +79,17 @@ function Write-StateArchive {
 }
 
 Write-Output "[phase] $Phase runId=$RunId branch=$Branch"
-try {
-  Ensure-Tools
-  Refresh-Repo $RepoUrl $Branch
-} catch {
-  Write-Output "[phase] prologue failed: $_"
-  exit 1
+# report reads state and talks to Slack; it never touches the checkout. Skipping the prologue
+# keeps it inside its 10-minute budget even on a night where the lockfile moved and a refresh
+# would mean a full pnpm install.
+if ($Phase -ne 'report') {
+  try {
+    Ensure-Tools
+    Refresh-Repo $RepoUrl $Branch
+  } catch {
+    Write-Output "[phase] prologue failed: $_"
+    exit 1
+  }
 }
 
 # The platform segment is dropped for EXECUTION only - it names the runner that produced the
@@ -90,7 +102,7 @@ $IsVsix = Test-IsVsixCommand $TestCommand
 if ($RequestedProject -and $TestCommand -notmatch [regex]::Escape($RequestedProject)) {
   Write-Output "[phase] the nightly ran this on '$RequestedProject'; running it here as '$([regex]::Match($TestCommand, '--project[=\s]+"?([\w-]+)').Groups[1].Value)'"
 }
-if ($IsVsix) {
+if ($IsVsix -and $Phase -ne 'report') {
   try {
     Set-VsixHome
     Ensure-UipCli
@@ -547,9 +559,7 @@ switch ($Phase) {
   $summary = if (Test-Path $summaryFile) { Get-Content -Raw $summaryFile | ConvertFrom-Json } else { $null }
   $fixSummary = if ($summary) { [string]$summary.fixSummary } else { '' }
   $ownerRepo = (($RepoUrl -replace '^https://github.com/', '') -replace '\.git$', '').Trim('/')
-  # Prefer the .spec.ts: the plain .ts branch matches `playwright.config.ts` first, which is how
-  # run 130020's PR came out titled `- Spec: playwright.config` (same trap as deriveRunId).
-  $spec = if ($TestCommand -match '([\w.-]+?)\.spec\.ts\b') { $Matches[1] } elseif ($TestCommand -match '([\w.-]+?)\.ts\b') { $Matches[1] } else { 'e2e' }
+  $spec = Get-SpecName $TestCommand
   $prBranch = "e2e-investigator/$RunId"
 
   # e2e-only changes get the scope the repo uses for them.
@@ -632,6 +642,33 @@ switch ($Phase) {
   Write-Utf8Lf (Join-Path $notes 'pr.json') (([ordered]@{ prUrl = [string]$url; branch = $prBranch; commit = $commit }) | ConvertTo-Json -Depth 3)
   Reset-Tree
   Write-Status @{ prUrl = [string]$url; branch = $prBranch; commit = $commit }
+}
+
+'report' {
+  # Everything below comes off disk. The cloud summarizer's prose is deliberately not an input:
+  # it would have to travel through the bootstrap script, and notebooks are full of `$` and
+  # backticks - the reason pr-body.ps1 builds its text line by line in the first place.
+  $facts = Get-ReportFacts $notes
+  $spec = Get-SpecName $TestCommand
+  $title = Get-TestTitle $TestCommand
+  $body = New-ReportBody -Facts $facts -Spec $spec -Title $title -TestCommand $TestCommand `
+    -RunId $RunId -RunUrl $RunUrl -ReportUrl $ReportUrl
+  $reportFile = Join-Path $notes 'report.md'
+  Write-Utf8Lf $reportFile $body
+  Write-Output "[report] $($body.Length) chars -> $reportFile"
+
+  $verdict = New-ReportVerdict -Facts $facts -Spec $spec -Title $title -RunUrl $RunUrl
+  Write-Output "[report] $verdict"
+  $posted = Send-SlackFile -Path $reportFile -Channel $SlackChannel -ThreadTs $SlackThreadTs `
+    -Comment $verdict -Title "$spec - $title"
+
+  Write-Status @{
+    reportPosted = [bool]$posted
+    reportChars = $body.Length
+    reproduced = $facts.reproduced
+    fixVerified = $facts.fixVerified
+    prUrl = $facts.prUrl
+  }
 }
 
 }

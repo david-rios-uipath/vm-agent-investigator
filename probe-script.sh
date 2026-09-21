@@ -12,8 +12,12 @@ VMEXEC=CA36341D-ECEC-4BA6-AA76-134D0AFE4BA7   # e2e-investigator/vm-exec-vm
 cd "$(dirname "$0")"
 
 python3 - "$FILE" "$TIMEOUT" > /tmp/script_probe.json <<'PY'
-import json, sys
+import json, re, sys
 script = open(sys.argv[1], encoding='utf-8').read()
+# `. vm/lib/x.ps1` is inlined from the working tree: there is no checkout on the VM, and the
+# point of this runner is that what runs is what you edited, not what you pushed.
+script = re.sub(r'(?m)^\. (vm/lib/\S+\.ps1)\s*$',
+                lambda m: open(m.group(1), encoding='utf-8').read(), script)
 print(json.dumps({'Script': script, 'WorkDir': 'C:\\vm-agent',
                   'TimeoutMinutes': int(sys.argv[2]), 'MaxOutputChars': 32000}))
 PY

@@ -214,16 +214,22 @@ console.log('slack gates ok');
   // Siblings are a count, not a list: one cause used to print 86 test names.
   assert.match(text, /data-transform\.spec\.ts › should add a Map operation with field mappings` \+1 more in this spec — reproduced, fix verified, <https:\/\/github\.com\/UiPath\/flow-workbench\/pull\/3729\|draft PR>, related merged <https:\/\/github\.com\/UiPath\/flow-workbench\/pull\/3758\|PR #3758>/);
   assert.doesNotMatch(text, /should write a Custom Script operation in a Data Transform node/);
-  // Cause and repro replace the names, and the repro path must be the one that exists on disk.
-  assert.match(text, /\*repro\* `corepack pnpm exec playwright test --config e2e\/playwright\.config\.ts e2e\/specs\/data-transform\/data-transform\.spec\.ts --project studio-alpha/);
-  // Backticks inside the error would close the code span early; they are swapped for quotes.
-  assert.match(text, /\*cause\* `Error: a '\.flow' entry never appeared`/);
+  // Cause, repro and finding moved into the report the VM uploads per group; the roll-up is an
+  // index. Their absence here is the whole point of the change.
+  assert.doesNotMatch(text, /\*repro\*|\*cause\*|\*finding\*/);
   assert.match(text, /should add a Group by operation with aggregations` \(\+2 same cause\) — likely already fixed by merged <https:\/\/github\.com\/UiPath\/flow-workbench\/pull\/3758\|PR #3758> \(touches `StudioProjectsPage\.ts`\)/);
   assert.match(text, /1 not investigated: 1 over maxTests=1/);
   const flat = run('summarize', { start: { output: night2 }, pickTests: { output: pick }, investigate: { output: [row] } }).text;
   assert.match(flat, /should add a Map operation with field mappings/);
   const none = run('summarize', { start: { output: night2 }, pickTests: { output: { total: 0, skipped: 0, selected: [], covered: [], totalTests: 0 } }, investigate: { output: [] } }).text;
   assert.match(none, /no studio failures to investigate/);
+
+  // The per-field clips never protected the total. A busy night must still fit in one message.
+  const many = Array.from({ length: 80 }, (_, i) => ({ ...row, file: `specs/g${i}/g${i}.spec.ts`, title: `a fairly long test title number ${i}`, siblings: [] }));
+  const long = run('summarize', { start: { output: night2 }, pickTests: { output: pick }, investigate: { output: many } }).text;
+  assert.ok(long.length <= 3500, `roll-up is ${long.length} chars, over the cap`);
+  assert.match(long, /_\+\d+ more_$/, 'the clipped tail says how many lines were dropped');
+  assert.ok(long.split('\n').every((l) => l.length < 3500), 'the clip lands on a line boundary');
 }
 console.log('summarize ok');
 

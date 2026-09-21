@@ -1727,6 +1727,270 @@
       }
     },
     {
+      "id": "bootstrapReport",
+      "type": "core.action.script",
+      "typeVersion": "1.1",
+      "display": {
+        "label": "Bootstrap report",
+        "subLabel": "",
+        "icon": "code"
+      },
+      "inputs": {
+        "script": {
+          "type": "literal",
+          "expression": "// The VM gets the phase logic from this repo, not from the flow: a runner change is a git\n// push, not a solution release. `runnerRef` selects the ref to run.\nconst s = (v) => String(v ?? '').replace(/'/g, \"''\");\nconst runId = s($vars.deriveRunId.output);\nconst ref = s($vars.start.output.runnerRef || 'master');\nconst args = [\n  \"-Phase report\",\n  `-RunId '${runId}'`,\n  `-RepoUrl '${s($vars.start.output.repoUrl)}'`,\n  `-Branch '${s($vars.start.output.branch)}'`,\n  `-TestCommand '${s($vars.start.output.testCommand)}'`,\n  `-SlackChannel '${s($vars.start.output.slackChannel)}'`,\n  `-SlackThreadTs '${s($vars.start.output.slackThreadTs)}'`,\n  `-RunUrl '${s($vars.start.output.runUrl)}'`,\n  `-ReportUrl '${s($vars.start.output.reportUrl)}'`,\n\n].join(' ');\nconst repo = String($vars.start.output.runnerRepoUrl || '').replace(/\\.git$/, '').replace(/\\/+$/, '');\nconst rawBase = repo.replace('https://github.com/', 'https://raw.githubusercontent.com/') + '/' + ref;\nreturn `$ErrorActionPreference = 'Continue'\n$runner = 'C:\\\\vm-agent\\\\runner'\n$url = '${s(repo)}'\nif (-not $url) { Write-Output '[bootstrap] runnerRepoUrl is empty; nothing to clone'; exit 1 }\n$raw = '${s(rawBase)}/vm/bootstrap.ps1'\n$boot = Join-Path $env:TEMP 'vm-agent-bootstrap.ps1'\n$hdr = @{}\nif ($env:GIT_TOKEN) { $hdr['Authorization'] = \"token $($env:GIT_TOKEN)\" }\ntry { Invoke-WebRequest $raw -OutFile $boot -UseBasicParsing -Headers $hdr -ErrorAction Stop }\ncatch { Write-Output \"[bootstrap] could not fetch $raw : $_\"; exit 1 }\ntry { & $boot -RunnerRepoUrl $url -Ref '${ref}' -Runner $runner; if ($LASTEXITCODE -ne 0) { throw \"exit $LASTEXITCODE\" } }\ncatch { Write-Output \"[bootstrap] bootstrap.ps1 failed: $_\"; exit 1 }\n& \"$runner\\\\vm\\\\run-phase.ps1\" ${args}\nexit $LASTEXITCODE\n`",
+          "fieldType": "string"
+        }
+      },
+      "outputs": {
+        "output": {
+          "type": "any",
+          "description": "The return value of the script",
+          "source": "=result.response",
+          "var": "output"
+        },
+        "error": {
+          "type": "object",
+          "description": "Error information if the node fails",
+          "source": "=Error",
+          "var": "error",
+          "schema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "type": "object",
+            "required": [
+              "code",
+              "message",
+              "detail",
+              "category",
+              "status"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Error code as a string"
+              },
+              "message": {
+                "type": "string",
+                "description": "High-level error message"
+              },
+              "detail": {
+                "type": "string",
+                "description": "Detailed error description"
+              },
+              "category": {
+                "type": "string",
+                "description": "Error category"
+              },
+              "status": {
+                "type": "integer",
+                "description": "HTTP status code"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "id": "report",
+      "type": "uipath.core.rpa-workflow.ca36341d-ecec-4ba6-aa76-134d0afe4ba7",
+      "typeVersion": "1.0.0",
+      "display": {
+        "label": "Post report",
+        "subLabel": "",
+        "icon": "rpa"
+      },
+      "inputs": {
+        "Script": {
+          "type": "jsExpression",
+          "expression": "$vars.bootstrapReport.output",
+          "fieldType": "string"
+        },
+        "WorkDir": {
+          "type": "literal",
+          "expression": "C:\\vm-agent",
+          "fieldType": "string"
+        },
+        "RunId": {
+          "type": "jsExpression",
+          "expression": "$vars.deriveRunId.output",
+          "fieldType": "string"
+        },
+        "StateKey": {
+          "type": "jsExpression",
+          "expression": "$vars.deriveRunId.output + '/state.zip'",
+          "fieldType": "string"
+        },
+        "TimeoutMinutes": {
+          "type": "literal",
+          "expression": "10",
+          "fieldType": "number"
+        },
+        "MaxOutputChars": 32000,
+        "errorHandlingEnabled": true
+      },
+      "outputs": {
+        "output": {
+          "type": "object",
+          "source": "=this",
+          "var": "output",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "ExitCode": {
+                "type": "integer",
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "Stdout": {
+                "type": "string"
+              },
+              "OutputBlobPath": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "error": {
+          "type": "object",
+          "description": "Error information if the node fails",
+          "source": "=Error",
+          "var": "error",
+          "schema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "type": "object",
+            "required": [
+              "code",
+              "message",
+              "detail",
+              "category",
+              "status"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Error code as a string"
+              },
+              "message": {
+                "type": "string",
+                "description": "High-level error message"
+              },
+              "detail": {
+                "type": "string",
+                "description": "Detailed error description"
+              },
+              "category": {
+                "type": "string",
+                "description": "Error category"
+              },
+              "status": {
+                "type": "integer",
+                "description": "HTTP status code"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "id": "parseStatusReport",
+      "type": "core.action.script",
+      "typeVersion": "1.1",
+      "display": {
+        "label": "Parse report status",
+        "subLabel": "",
+        "icon": "code"
+      },
+      "inputs": {
+        "script": {
+          "type": "literal",
+          "expression": "// The runner prints exactly one STATUS_JSON= line, last. Parse that line and nothing else;\n// its absence means the runner itself broke.\nconst out = $vars.report.output || {};\nconst stdout = String(out.Stdout || '');\n// run-phase prints `cost $N` per claude call; a phase can make more than one.\nconst costUsd = (stdout.match(/cost \\$[0-9.]+/g) || []).reduce((a, m) => a + Number(m.slice(6)), 0);\nconst lines = stdout.split('\\n');\nfor (let i = lines.length - 1; i >= 0; i--) {\n  const l = lines[i].trim();\n  if (l.startsWith('STATUS_JSON=')) {\n    try { return { ...JSON.parse(l.slice('STATUS_JSON='.length)), costUsd }; } catch (e) { break; }\n  }\n}\nreturn { runnerFailed: true, exitCode: out.ExitCode, blobPath: out.OutputBlobPath || '', costUsd };",
+          "fieldType": "string"
+        }
+      },
+      "outputs": {
+        "output": {
+          "type": "any",
+          "description": "The return value of the script",
+          "source": "=result.response",
+          "var": "output",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "reportPosted": {
+                "type": "boolean"
+              },
+              "reportChars": {
+                "type": "number"
+              },
+              "reproduced": {
+                "type": "boolean"
+              },
+              "fixVerified": {
+                "type": "boolean"
+              },
+              "prUrl": {
+                "type": "string"
+              },
+              "runnerFailed": {
+                "type": "boolean"
+              },
+              "exitCode": {
+                "type": "number"
+              },
+              "blobPath": {
+                "type": "string"
+              },
+              "costUsd": {
+                "type": "number"
+              }
+            }
+          }
+        },
+        "error": {
+          "type": "object",
+          "description": "Error information if the node fails",
+          "source": "=Error",
+          "var": "error",
+          "schema": {
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "type": "object",
+            "required": [
+              "code",
+              "message",
+              "detail",
+              "category",
+              "status"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Error code as a string"
+              },
+              "message": {
+                "type": "string",
+                "description": "High-level error message"
+              },
+              "detail": {
+                "type": "string",
+                "description": "Detailed error description"
+              },
+              "category": {
+                "type": "string",
+                "description": "Error category"
+              },
+              "status": {
+                "type": "integer",
+                "description": "HTTP status code"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
       "id": "decisionReproRan",
       "type": "core.logic.decision",
       "typeVersion": "1.3",
@@ -1961,17 +2225,45 @@
       "targetPort": "input"
     },
     {
-      "id": "edge_investigationSummarizer_success_end_input",
-      "sourceNodeId": "investigationSummarizer",
-      "sourcePort": "success",
-      "targetNodeId": "end",
-      "targetPort": "input"
-    },
-    {
       "id": "xy-edge__parseStatusFixsuccess-decisionVerifyinput",
       "sourceNodeId": "parseStatusFix",
       "sourcePort": "success",
       "targetNodeId": "decisionVerify",
+      "targetPort": "input"
+    },
+    {
+      "id": "edge_investigationSummarizer_success_bootstrapReport_input",
+      "sourceNodeId": "investigationSummarizer",
+      "sourcePort": "success",
+      "targetNodeId": "bootstrapReport",
+      "targetPort": "input"
+    },
+    {
+      "id": "edge_bootstrapReport_success_report_input",
+      "sourceNodeId": "bootstrapReport",
+      "sourcePort": "success",
+      "targetNodeId": "report",
+      "targetPort": "input"
+    },
+    {
+      "id": "edge_report_output_parseStatusReport_input",
+      "sourceNodeId": "report",
+      "sourcePort": "output",
+      "targetNodeId": "parseStatusReport",
+      "targetPort": "input"
+    },
+    {
+      "id": "edge_report_error_parseStatusReport_input",
+      "sourceNodeId": "report",
+      "sourcePort": "error",
+      "targetNodeId": "parseStatusReport",
+      "targetPort": "input"
+    },
+    {
+      "id": "edge_parseStatusReport_success_end_input",
+      "sourceNodeId": "parseStatusReport",
+      "sourcePort": "success",
+      "targetNodeId": "end",
       "targetPort": "input"
     }
   ],
@@ -3166,6 +3458,34 @@
         "direction": "inout",
         "type": "number",
         "defaultValue": 0
+      },
+      {
+        "id": "slackChannel",
+        "direction": "in",
+        "type": "string",
+        "defaultValue": "",
+        "triggerNodeId": "start"
+      },
+      {
+        "id": "slackThreadTs",
+        "direction": "in",
+        "type": "string",
+        "defaultValue": "",
+        "triggerNodeId": "start"
+      },
+      {
+        "id": "runUrl",
+        "direction": "in",
+        "type": "string",
+        "defaultValue": "",
+        "triggerNodeId": "start"
+      },
+      {
+        "id": "reportUrl",
+        "direction": "in",
+        "type": "string",
+        "defaultValue": "",
+        "triggerNodeId": "start"
       }
     ],
     "nodes": [
@@ -4309,6 +4629,209 @@
           "nodeId": "endNotReproduced",
           "outputId": "costUsd"
         }
+      },
+      {
+        "id": "bootstrapReport.output",
+        "type": "any",
+        "description": "The return value of the script",
+        "binding": {
+          "nodeId": "bootstrapReport",
+          "outputId": "output"
+        }
+      },
+      {
+        "id": "bootstrapReport.error",
+        "type": "object",
+        "schema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "required": [
+            "code",
+            "message",
+            "detail",
+            "category",
+            "status"
+          ],
+          "properties": {
+            "code": {
+              "type": "string",
+              "description": "Error code as a string"
+            },
+            "message": {
+              "type": "string",
+              "description": "High-level error message"
+            },
+            "detail": {
+              "type": "string",
+              "description": "Detailed error description"
+            },
+            "category": {
+              "type": "string",
+              "description": "Error category"
+            },
+            "status": {
+              "type": "integer",
+              "description": "HTTP status code"
+            }
+          },
+          "additionalProperties": false
+        },
+        "description": "Error information if the node fails",
+        "binding": {
+          "nodeId": "bootstrapReport",
+          "outputId": "error"
+        }
+      },
+      {
+        "id": "report.output",
+        "type": "object",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "ExitCode": {
+              "type": "integer",
+              "minimum": -2147483648,
+              "maximum": 2147483647
+            },
+            "Stdout": {
+              "type": "string"
+            },
+            "OutputBlobPath": {
+              "type": "string"
+            }
+          }
+        },
+        "binding": {
+          "nodeId": "report",
+          "outputId": "output"
+        }
+      },
+      {
+        "id": "report.error",
+        "type": "object",
+        "schema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "required": [
+            "code",
+            "message",
+            "detail",
+            "category",
+            "status"
+          ],
+          "properties": {
+            "code": {
+              "type": "string",
+              "description": "Error code as a string"
+            },
+            "message": {
+              "type": "string",
+              "description": "High-level error message"
+            },
+            "detail": {
+              "type": "string",
+              "description": "Detailed error description"
+            },
+            "category": {
+              "type": "string",
+              "description": "Error category"
+            },
+            "status": {
+              "type": "integer",
+              "description": "HTTP status code"
+            }
+          },
+          "additionalProperties": false
+        },
+        "description": "Error information if the node fails",
+        "binding": {
+          "nodeId": "report",
+          "outputId": "error"
+        }
+      },
+      {
+        "id": "parseStatusReport.output",
+        "type": "any",
+        "description": "The return value of the script",
+        "binding": {
+          "nodeId": "parseStatusReport",
+          "outputId": "output"
+        },
+        "schema": {
+          "type": "object",
+          "properties": {
+            "reportPosted": {
+              "type": "boolean"
+            },
+            "reportChars": {
+              "type": "number"
+            },
+            "reproduced": {
+              "type": "boolean"
+            },
+            "fixVerified": {
+              "type": "boolean"
+            },
+            "prUrl": {
+              "type": "string"
+            },
+            "runnerFailed": {
+              "type": "boolean"
+            },
+            "exitCode": {
+              "type": "number"
+            },
+            "blobPath": {
+              "type": "string"
+            },
+            "costUsd": {
+              "type": "number"
+            }
+          }
+        }
+      },
+      {
+        "id": "parseStatusReport.error",
+        "type": "object",
+        "schema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "required": [
+            "code",
+            "message",
+            "detail",
+            "category",
+            "status"
+          ],
+          "properties": {
+            "code": {
+              "type": "string",
+              "description": "Error code as a string"
+            },
+            "message": {
+              "type": "string",
+              "description": "High-level error message"
+            },
+            "detail": {
+              "type": "string",
+              "description": "Detailed error description"
+            },
+            "category": {
+              "type": "string",
+              "description": "Error category"
+            },
+            "status": {
+              "type": "integer",
+              "description": "HTTP status code"
+            }
+          },
+          "additionalProperties": false
+        },
+        "description": "Error information if the node fails",
+        "binding": {
+          "nodeId": "parseStatusReport",
+          "outputId": "error"
+        }
       }
     ],
     "variableUpdates": {
@@ -4379,7 +4902,7 @@
       },
       "end": {
         "position": {
-          "x": 5560,
+          "x": 7056,
           "y": 144
         },
         "size": {
@@ -4693,6 +5216,39 @@
         "size": {
           "width": 544,
           "height": 248
+        },
+        "collapsed": false
+      },
+      "bootstrapReport": {
+        "position": {
+          "x": 5616,
+          "y": 144
+        },
+        "size": {
+          "width": 96,
+          "height": 96
+        },
+        "collapsed": false
+      },
+      "report": {
+        "position": {
+          "x": 6096,
+          "y": 144
+        },
+        "size": {
+          "width": 96,
+          "height": 96
+        },
+        "collapsed": false
+      },
+      "parseStatusReport": {
+        "position": {
+          "x": 6576,
+          "y": 144
+        },
+        "size": {
+          "width": 96,
+          "height": 96
         },
         "collapsed": false
       }

@@ -39,8 +39,25 @@ Details and dates: `LOG.md`.
   patch is sound and the spec passes; the fixer said `confidence: medium` and that is the honest
   reading.
 
+## Blocked on a human
+
+The `SLACK_TOKEN` Credential asset in folder **`e2e-investigator`** is a placeholder with an
+empty password, so `vm-exec` injects nothing and the `report` phase will render its file and
+upload nothing. To turn the per-group reports on:
+
+1. Get a Slack app token with the **`files:write`** scope.
+2. **Invite that app to `#flow-dev-frontend` (`C0AH25MT3L5`)** — a bot identity previously got
+   `channel_not_found` there precisely because it was not a member, which is why the connector
+   nodes run `send_as=user`.
+3. Set it as the password of `SLACK_TOKEN` in `e2e-investigator` (the process folder for
+   `vm-exec-vm`). Not the deployment folder: `release.sh` recreates that one every time.
+
+Then `./probe-script.sh vm/probes/slack-upload.ps1` proves it in ~5 minutes.
+
 ## In the tree, not released
 
+- Per-group Slack reports: the `report` phase, `vm/lib/report.ps1`, `Send-SlackFile`, and the
+  shrunken `summarize` roll-up (this branch).
 - The VM-side `fetchFailures` process, the cost report, and the queued (rather than dropped)
   failure groups — PR
   [#1](https://github.com/david-rios-uipath/vm-agent-investigator/pull/1). `ARCHITECTURE.md` does
@@ -48,19 +65,24 @@ Details and dates: `LOG.md`.
 
 ## Do this next
 
-1. **Release and run the queued-groups work.** `./release.sh <version>
+1. **Per-group Slack reports.** `vm/selfcheck.ps1` passes locally; nothing else is verified.
+   In order: the `SLACK_TOKEN` prerequisite above, `./probe-script.sh
+   vm/probes/slack-upload.ps1`, then `./probe-phase.sh report <runId>` against a runId whose
+   `state.zip` still has a `notebook.md` (push first — the bootstrap fetches the ref), then one
+   `VmAgent` group end to end with `slackThreadTs` set to a scratch thread.
+2. **Release and run the queued-groups work.** `./release.sh <version>
    inputs/orchestrator-<latest>.json NightlyOrchestrator`, starting with a `maxTests: 0` canary.
-2. **Take PR #3756 out of draft** once one tenant-side CI run has proven the token exchange.
-3. **Uninstall the wedged `vm-agent 11` deployment** once Orchestrator clears its three
+3. **Take PR #3756 out of draft** once one tenant-side CI run has proven the token exchange.
+4. **Uninstall the wedged `vm-agent 11` deployment** once Orchestrator clears its three
    `Terminating` Maestro jobs, and report the Kill behaviour to the Maestro team.
-4. **Prove the `pr` phase on a vsix run**, then one flow-driven vsix run end to end.
-5. **File the two flow-workbench defects** in `PRODUCT-FINDINGS.md` — they are real independent of
+5. **Prove the `pr` phase on a vsix run**, then one flow-driven vsix run end to end.
+6. **File the two flow-workbench defects** in `PRODUCT-FINDINGS.md` — they are real independent of
    this tooling and are currently filed nowhere.
 
 ## Open items / cleanup owed
 
-- Slack "edit one message": the connector has no update op; needs an HTTP `chat.update` with a
-  token asset.
+- Slack "edit one message" is dropped rather than owed: with one report per group there is
+  nothing left to edit. The upload path needs a real `SLACK_TOKEN` (see below).
 - Slack renders `<`/`>` from the hypothesis escaped (`&lt;nav&gt;`); strip them in `summarize`.
 - VmAgent still reproduced the Map-operation failure on `develop` after flow-workbench #3758
   merged; #3758 may not cover it.
