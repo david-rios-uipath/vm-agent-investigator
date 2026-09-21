@@ -100,15 +100,20 @@ worst a wrong entry can do is waste one night's slot.
 
 ## Throughput: sequential, not parallel
 
-`maxTests` is pinned at 1 because the loop is `parallel: true` - every selected test starts its own
-`VmAgent` job at once and the extras queue behind the single VM until they time out. A VmAgent run
-is 10-35 minutes and the nightly fires once a day.
+The `investigate` loop now runs sequentially: `parallel: false`, `breakEnabled: true`, with a new
+`withinBudget` decision node checked between iterations against a `budgetMinutes` input (default
+240, i.e. 4 hours). Concurrency is 1 by construction, so the earlier unproven iteration-scoping
+question — whether `recordResult` reading node-scoped `$vars.callVmAgent.output` was safe with
+more than one iteration in flight under `parallel: true` — is sidestepped rather than resolved:
+it simply doesn't arise when only one child ever runs at a time.
 
-A **sequential loop with a wall-clock budget** (say 4 hours) gets 6-10 groups a night on the same one
-VM, and sidesteps the unproven iteration-scoping question, which only bites with `parallel: true`.
-
-Cost: at ~$5-7 of model spend per investigation, 8 groups a night is roughly $50/night. That number
-should be a decision, not a surprise.
+Mechanically, a sequential loop with a 4-hour budget could admit 6-10 groups a night on the same
+one VM, since a VmAgent run is 10-35 minutes and the nightly fires into ~7 idle hours. The first
+rollout is deliberately more conservative than that ceiling: `maxTests` defaults to 4, not 6-10,
+capping a bad night's model spend at roughly $20-28 (at ~$5-7 per investigation) instead of the
+~$50/night that 8 groups would cost. Promoting the default to 6 groups (~$30-42/night) requires
+an explicit cost and tail-duration review after the first rollout, not just headroom in the
+mechanism.
 
 ## Out of scope
 

@@ -322,6 +322,17 @@ function Get-Tail([string]$Text, [int]$Max) {
   return "[truncated to last $Max chars]`n" + $Text.Substring($Text.Length - $Max)
 }
 
+# Did Playwright actually execute the targeted test, or did it abort before running anything?
+# A non-zero exit alone does not distinguish the two, and on 2026-09-10 a collection abort
+# ("Error: No tests found") was reported as reproduced=true, so a run that proved nothing about
+# the product read as a successful reproduction. Evidence a test ran is the reporter's tally
+# line; its absence means the process died before the first test.
+function Test-PlaywrightRanTests([string]$Stdout) {
+  if (-not $Stdout) { return $false }
+  if ($Stdout -match 'No tests found') { return $false }
+  return [bool]($Stdout -match '(?m)^\s*\d+\s+(failed|passed|flaky|skipped|did not run|interrupted)\b')
+}
+
 # PowerShell 5.1's `>` redirection writes UTF-16LE and git apply then reports "No valid
 # patches in input" (FINDINGS-uip.md). Always write patches through this.
 function Write-Utf8Lf([string]$Path, [string]$Text) {

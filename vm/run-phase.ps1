@@ -277,8 +277,17 @@ switch ($Phase) {
     Write-Output "[repro] CI history already settled this as $($ci.classification); the test was not re-run"
   }
 
+  # A VM run only reproduces anything if a test actually ran. Playwright exits non-zero for a
+  # collection abort too ("No tests found" from a --grep that matched nothing, a config error),
+  # and calling that reproduced=true sends the investigator after a product bug that this run
+  # never observed. The CI path has no local output to check.
+  $testsRan = if ($source -eq 'vm' -and -not $SmokeOnly) { Test-PlaywrightRanTests $stdout } else { $true }
+  if (-not $testsRan) {
+    Write-Output '[repro] Playwright printed no test tally: it aborted before running the test, so nothing was reproduced'
+    $stdout = "The reproduction run never executed the test: Playwright aborted before the first test (no reporter tally in its output; see test-output.log). This is a runner/command problem, not a product failure - the nightly failure is neither reproduced nor ruled out.`n`n$stdout"
+  }
   # Exit 124 is the runner's timeout, not a test verdict.
-  $reproduced = if ($source -eq 'ci') { $exit -ne 0 } else { $exit -ne 0 -and $exit -ne 124 }
+  $reproduced = if ($source -eq 'ci') { $exit -ne 0 } else { $exit -ne 0 -and $exit -ne 124 -and $testsRan }
   $classification = if ($source -eq 'ci' -and $exit -eq 0) { 'flaky' } else { $ci.classification }
 
   $evidence = [ordered]@{
@@ -286,6 +295,7 @@ switch ($Phase) {
     requestedProject = $RequestedProject
     exitCode = $exit
     reproduced = $reproduced
+    testsRan = $testsRan
     excerpt = Get-Tail $stdout 8000
     ciHistory = $ciHistory
     ciClassification = $classification
@@ -297,6 +307,7 @@ switch ($Phase) {
 
   Write-Status @{
     reproduced = $reproduced
+    testsRan = $testsRan
     source = $source
     exitCode = $exit
     classification = $classification

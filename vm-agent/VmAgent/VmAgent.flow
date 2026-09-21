@@ -91,6 +91,14 @@
             "fieldType": "number"
           },
           "type": "number"
+        },
+        "costUsd": {
+          "source": {
+            "type": "jsExpression",
+            "expression": "(($vars.parseStatusRepro.output ?? {}).costUsd ?? 0) + (($vars.parseStatusInvestigate.output ?? {}).costUsd ?? 0) + ($vars.fixCostCarry ?? 0) + (($vars.parseStatusFix.output ?? {}).costUsd ?? 0) + (($vars.parseStatusPr.output ?? {}).costUsd ?? 0)",
+            "fieldType": "number"
+          },
+          "type": "number"
         }
       }
     },
@@ -570,6 +578,14 @@
             "fieldType": "number"
           },
           "type": "number"
+        },
+        "costUsd": {
+          "source": {
+            "type": "jsExpression",
+            "expression": "(($vars.parseStatusRepro.output ?? {}).costUsd ?? 0) + (($vars.parseStatusInvestigate.output ?? {}).costUsd ?? 0) + ($vars.fixCostCarry ?? 0) + (($vars.parseStatusFix.output ?? {}).costUsd ?? 0) + (($vars.parseStatusPr.output ?? {}).costUsd ?? 0)",
+            "fieldType": "number"
+          },
+          "type": "number"
         }
       }
     },
@@ -833,7 +849,7 @@
       "inputs": {
         "script": {
           "type": "literal",
-          "expression": "// The runner prints exactly one STATUS_JSON= line, last. Parse that line and nothing else;\n// its absence means the runner itself broke.\nconst out = $vars.repro.output || {};\nconst lines = String(out.Stdout || '').split('\\n');\nfor (let i = lines.length - 1; i >= 0; i--) {\n  const l = lines[i].trim();\n  if (l.startsWith('STATUS_JSON=')) {\n    try { return JSON.parse(l.slice('STATUS_JSON='.length)); } catch (e) { break; }\n  }\n}\nreturn { runnerFailed: true, exitCode: out.ExitCode, blobPath: out.OutputBlobPath || '' };",
+          "expression": "// The runner prints exactly one STATUS_JSON= line, last. Parse that line and nothing else;\n// its absence means the runner itself broke.\nconst out = $vars.repro.output || {};\nconst stdout = String(out.Stdout || '');\n// run-phase prints `cost $N` per claude call; a phase can make more than one.\nconst costUsd = (stdout.match(/cost \\$[0-9.]+/g) || []).reduce((a, m) => a + Number(m.slice(6)), 0);\nconst lines = stdout.split('\\n');\nfor (let i = lines.length - 1; i >= 0; i--) {\n  const l = lines[i].trim();\n  if (l.startsWith('STATUS_JSON=')) {\n    try { return { ...JSON.parse(l.slice('STATUS_JSON='.length)), costUsd }; } catch (e) { break; }\n  }\n}\nreturn { runnerFailed: true, exitCode: out.ExitCode, blobPath: out.OutputBlobPath || '', costUsd };",
           "fieldType": "string"
         }
       },
@@ -869,6 +885,9 @@
               },
               "blobPath": {
                 "type": "string"
+              },
+              "costUsd": {
+                "type": "number"
               }
             }
           }
@@ -1093,7 +1112,7 @@
       "inputs": {
         "script": {
           "type": "literal",
-          "expression": "// The runner prints exactly one STATUS_JSON= line, last. Parse that line and nothing else;\n// its absence means the runner itself broke.\nconst out = $vars.investigate.output || {};\nconst lines = String(out.Stdout || '').split('\\n');\nfor (let i = lines.length - 1; i >= 0; i--) {\n  const l = lines[i].trim();\n  if (l.startsWith('STATUS_JSON=')) {\n    try { return JSON.parse(l.slice('STATUS_JSON='.length)); } catch (e) { break; }\n  }\n}\nreturn { runnerFailed: true, exitCode: out.ExitCode, blobPath: out.OutputBlobPath || '' };",
+          "expression": "// The runner prints exactly one STATUS_JSON= line, last. Parse that line and nothing else;\n// its absence means the runner itself broke.\nconst out = $vars.investigate.output || {};\nconst stdout = String(out.Stdout || '');\n// run-phase prints `cost $N` per claude call; a phase can make more than one.\nconst costUsd = (stdout.match(/cost \\$[0-9.]+/g) || []).reduce((a, m) => a + Number(m.slice(6)), 0);\nconst lines = stdout.split('\\n');\nfor (let i = lines.length - 1; i >= 0; i--) {\n  const l = lines[i].trim();\n  if (l.startsWith('STATUS_JSON=')) {\n    try { return { ...JSON.parse(l.slice('STATUS_JSON='.length)), costUsd }; } catch (e) { break; }\n  }\n}\nreturn { runnerFailed: true, exitCode: out.ExitCode, blobPath: out.OutputBlobPath || '', costUsd };",
           "fieldType": "string"
         }
       },
@@ -1126,6 +1145,9 @@
               },
               "blobPath": {
                 "type": "string"
+              },
+              "costUsd": {
+                "type": "number"
               }
             }
           }
@@ -1350,7 +1372,7 @@
       "inputs": {
         "script": {
           "type": "literal",
-          "expression": "// The runner prints exactly one STATUS_JSON= line, last. Parse that line and nothing else;\n// its absence means the runner itself broke.\nconst out = $vars.fixVerify.output || {};\nconst lines = String(out.Stdout || '').split('\\n');\nfor (let i = lines.length - 1; i >= 0; i--) {\n  const l = lines[i].trim();\n  if (l.startsWith('STATUS_JSON=')) {\n    try { return JSON.parse(l.slice('STATUS_JSON='.length)); } catch (e) { break; }\n  }\n}\nreturn { runnerFailed: true, exitCode: out.ExitCode, blobPath: out.OutputBlobPath || '' };",
+          "expression": "// The runner prints exactly one STATUS_JSON= line, last. Parse that line and nothing else;\n// its absence means the runner itself broke.\nconst out = $vars.fixVerify.output || {};\nconst stdout = String(out.Stdout || '');\n// run-phase prints `cost $N` per claude call; a phase can make more than one.\nconst costUsd = (stdout.match(/cost \\$[0-9.]+/g) || []).reduce((a, m) => a + Number(m.slice(6)), 0);\nconst lines = stdout.split('\\n');\nfor (let i = lines.length - 1; i >= 0; i--) {\n  const l = lines[i].trim();\n  if (l.startsWith('STATUS_JSON=')) {\n    try { return { ...JSON.parse(l.slice('STATUS_JSON='.length)), costUsd }; } catch (e) { break; }\n  }\n}\nreturn { runnerFailed: true, exitCode: out.ExitCode, blobPath: out.OutputBlobPath || '', costUsd };",
           "fieldType": "string"
         }
       },
@@ -1395,6 +1417,9 @@
               },
               "blobPath": {
                 "type": "string"
+              },
+              "costUsd": {
+                "type": "number"
               }
             }
           }
@@ -1619,7 +1644,7 @@
       "inputs": {
         "script": {
           "type": "literal",
-          "expression": "// The runner prints exactly one STATUS_JSON= line, last. Parse that line and nothing else;\n// its absence means the runner itself broke.\nconst out = $vars.openPr.output || {};\nconst lines = String(out.Stdout || '').split('\\n');\nfor (let i = lines.length - 1; i >= 0; i--) {\n  const l = lines[i].trim();\n  if (l.startsWith('STATUS_JSON=')) {\n    try { return JSON.parse(l.slice('STATUS_JSON='.length)); } catch (e) { break; }\n  }\n}\nreturn { runnerFailed: true, exitCode: out.ExitCode, blobPath: out.OutputBlobPath || '' };",
+          "expression": "// The runner prints exactly one STATUS_JSON= line, last. Parse that line and nothing else;\n// its absence means the runner itself broke.\nconst out = $vars.openPr.output || {};\nconst stdout = String(out.Stdout || '');\n// run-phase prints `cost $N` per claude call; a phase can make more than one.\nconst costUsd = (stdout.match(/cost \\$[0-9.]+/g) || []).reduce((a, m) => a + Number(m.slice(6)), 0);\nconst lines = stdout.split('\\n');\nfor (let i = lines.length - 1; i >= 0; i--) {\n  const l = lines[i].trim();\n  if (l.startsWith('STATUS_JSON=')) {\n    try { return { ...JSON.parse(l.slice('STATUS_JSON='.length)), costUsd }; } catch (e) { break; }\n  }\n}\nreturn { runnerFailed: true, exitCode: out.ExitCode, blobPath: out.OutputBlobPath || '', costUsd };",
           "fieldType": "string"
         }
       },
@@ -1652,6 +1677,9 @@
               },
               "blobPath": {
                 "type": "string"
+              },
+              "costUsd": {
+                "type": "number"
               }
             }
           }
@@ -1734,6 +1762,18 @@
           "expression": "($vars.parseStatusInvestigate.output || {})['runnerFailed'] !== true",
           "fieldType": "boolean"
         }
+      }
+    },
+    {
+      "id": "sticky-5",
+      "type": "stickyNote",
+      "typeVersion": "1.0.0",
+      "display": {
+        "label": "stickyNote"
+      },
+      "inputs": {
+        "color": "blue",
+        "content": "* as a customer -- what would we need to do to get coding agents to work well here?\n* e.g. would coded agents work here?"
       }
     }
   ],
@@ -3115,6 +3155,17 @@
         "type": "string",
         "defaultValue": "",
         "triggerNodeId": "start"
+      },
+      {
+        "id": "costUsd",
+        "direction": "out",
+        "type": "number"
+      },
+      {
+        "id": "fixCostCarry",
+        "direction": "inout",
+        "type": "number",
+        "defaultValue": 0
       }
     ],
     "nodes": [
@@ -4242,6 +4293,22 @@
           "nodeId": "terminateSetupFailed",
           "outputId": "fixAttempts"
         }
+      },
+      {
+        "id": "end.costUsd",
+        "type": "number",
+        "binding": {
+          "nodeId": "end",
+          "outputId": "costUsd"
+        }
+      },
+      {
+        "id": "endNotReproduced.costUsd",
+        "type": "number",
+        "binding": {
+          "nodeId": "endNotReproduced",
+          "outputId": "costUsd"
+        }
       }
     ],
     "variableUpdates": {
@@ -4251,6 +4318,14 @@
           "expression": {
             "type": "jsExpression",
             "expression": "$vars.fixAttempts + 1",
+            "fieldType": "string"
+          }
+        },
+        {
+          "variableId": "fixCostCarry",
+          "expression": {
+            "type": "jsExpression",
+            "expression": "($vars.fixCostCarry ?? 0) + (($vars.parseStatusFix.output ?? {}).costUsd ?? 0)",
             "fieldType": "string"
           }
         }
@@ -4370,8 +4445,8 @@
       },
       "terminateSetupFailed": {
         "position": {
-          "x": 0,
-          "y": 0
+          "x": 2000,
+          "y": 816
         },
         "size": {
           "width": 96,
@@ -4609,6 +4684,17 @@
           "height": 96
         },
         "collapsed": false
+      },
+      "sticky-5": {
+        "position": {
+          "x": 2272,
+          "y": 592
+        },
+        "size": {
+          "width": 544,
+          "height": 248
+        },
+        "collapsed": false
       }
     },
     "edges": {
@@ -4645,6 +4731,20 @@
             "id": "edge_decisionResume_true_bootstrapFix_input-r1",
             "x": 432,
             "y": 32
+          }
+        ]
+      },
+      "edge_decisionReproRan_false_terminateSetupFailed_input": {
+        "waypoints": [
+          {
+            "id": "wp-cda2b2c3-efbe-4564-bb15-0fd352fdde01",
+            "x": 1840,
+            "y": 207.9937438112452
+          },
+          {
+            "id": "wp-b70fdca1-a8d4-44ed-aaa8-6c7b18a9ab32",
+            "x": 1840,
+            "y": 864.0000343351221
           }
         ]
       },
@@ -4685,6 +4785,30 @@
             "id": "edge_decisionInvestigated_true_bootstrapFix_input-r1",
             "x": 2160,
             "y": 32
+          }
+        ]
+      },
+      "edge_decisionInvestigated_false_terminateSetupFailed_input": {
+        "waypoints": [
+          {
+            "id": "wp-dba12f9f-1231-4537-9a2d-07eb717729a2",
+            "x": 2816,
+            "y": 207.99379348270006
+          },
+          {
+            "id": "wp-1883e4bb-11d7-404e-9a55-8e2d14e365c2",
+            "x": 2816,
+            "y": 480
+          },
+          {
+            "id": "wp-3f67b372-5321-45b4-807a-bee1dfbc2d2b",
+            "x": 1840,
+            "y": 480
+          },
+          {
+            "id": "wp-eb646310-1de4-43bb-b663-cc2f3105a98f",
+            "x": 1840,
+            "y": 864.0000343351221
           }
         ]
       },

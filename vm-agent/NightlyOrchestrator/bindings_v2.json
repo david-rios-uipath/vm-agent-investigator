@@ -17,7 +17,7 @@
         }
       },
       "metadata": {
-        "ActivityName": "VmAgent",
+        "ActivityName": "Failed tests (nightly artifact on the VM)",
         "BindingsVersion": "2.2",
         "DisplayLabel": "name",
         "SolutionsSupport": "true",
@@ -36,7 +36,7 @@
         }
       },
       "metadata": {
-        "ActivityName": "Reply in Slack thread",
+        "ActivityName": "Send 'start' notification in Slack thread",
         "BindingsVersion": "2.2",
         "DisplayLabel": "uipath-salesforce-slack connection",
         "UseConnectionService": "true",
@@ -44,22 +44,32 @@
       }
     },
     {
-      "resource": "connection",
-      "key": "3e9ae2b7-85a6-4271-8c23-5a620eed56e3",
-      "id": "connection3e9ae2b7-85a6-4271-8c23-5a620eed56e3",
+      "resource": "process",
+      "key": "e2e-investigator.vm-exec-vm",
+      "id": "processe2e-investigator.vm-exec-vm",
       "value": {
-        "ConnectionId": {
-          "defaultValue": "3e9ae2b7-85a6-4271-8c23-5a620eed56e3",
+        "folderKey": {
+          "defaultValue": "0b28296b-1f4a-4ea9-a3d5-8b0abaac1cf0",
           "isExpression": false,
-          "displayName": "uipath-microsoft-github connection"
+          "displayName": "Folder key"
+        },
+        "folderPath": {
+          "defaultValue": "e2e-investigator",
+          "isExpression": false,
+          "displayName": "Folder path"
+        },
+        "name": {
+          "defaultValue": "vm-exec-vm",
+          "isExpression": false,
+          "displayName": "Process name"
         }
       },
       "metadata": {
-        "ActivityName": "List open PRs",
+        "ActivityName": "Failed tests (nightly artifact on the VM)",
         "BindingsVersion": "2.2",
-        "DisplayLabel": "uipath-microsoft-github connection",
-        "UseConnectionService": "true",
-        "Connector": "uipath-microsoft-github"
+        "DisplayLabel": "name",
+        "SolutionsSupport": "true",
+        "subType": "Process"
       }
     }
   ]
