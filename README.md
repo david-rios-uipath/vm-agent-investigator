@@ -37,9 +37,15 @@ checkout, pulls its state from a storage bucket, pushes it back) and emits one
 
 Read in this order:
 
-1. `HANDOFF.md` — current state, how to run it, what is verified
-2. `FINDINGS-uip.md` — UiPath CLI/platform traps
-3. `DESIGN-phase-runner.md` — why the reasoning moved onto the VM
+1. `STATUS.md` — what is deployed, what is proven, what to do next
+2. `RUNBOOK.md` — every command: probe, release, read a run, diagnose a fault
+3. `ARCHITECTURE.md` — the two flows and the phase runner, as built
+4. `TRAPS.md` — things that were silently wrong and cost a run to find
+5. `FINDINGS-uip.md` — UiPath CLI/platform traps
+
+Then, only if you need them: `PRODUCT-FINDINGS.md` (flow-workbench bugs the agent found,
+none filed), `LOG.md` (dated run write-ups), `DESIGN-phase-runner.md` and `PLAN.md` (why the
+reasoning moved onto the VM, and the superseded shape).
 
 ## Local checks
 

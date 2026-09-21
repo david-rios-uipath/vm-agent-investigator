@@ -182,3 +182,33 @@ Each item was observed directly, not inferred. `uip` was `1.201.0-preview.131`.
 - The Claude Code auto-mode classifier blocks foreground `sleep N` and reading
   `~/.uipath/config.json`; use `until … done` loops with `run_in_background: true` and never
   reach for stored credentials.
+
+## Added 2026-09-08, bringing up the phase runner and the orchestrator
+
+- **Pack RPA processes with the pinned toolchain.** Robot 25.10 on this pool runs .NET 8; `uip`
+  1.201 packs `net10.0`, and the job faults in four seconds with `NU1202: Package vm-exec 1.0.4 is
+  not compatible with net8.0`. 1.0.4 shipped exactly that way and had to be rolled forward to
+  1.0.5, packed with CLI `1.197.0-dev.7683` plus a local .NET 8 SDK at `~/.dotnet8`.
+  `release-vm-exec.sh` bootstraps that toolchain and asserts the packaged `lib/` target before
+  publishing.
+- **The working path for bumping a cross-folder RPA process** is `uip rpa pack` + `uip rpa publish`
+  to the tenant feed, then `uip or processes update-version` — *not* a solution pack. A solution
+  pack's in-solution copy of the process is not what the flow's RPA nodes invoke.
+- **`uip or jobs stop --strategy Kill` on a Maestro flow job leaves it in `Terminating`
+  permanently**, and `deploy uninstall` then fails validation for the whole folder. `vm-agent 11`
+  is wedged this way. Cancel the *instance* instead.
+- **`pack` derives `packageName` from the solution package name** for projects with no stored
+  `spec.packageName` — `vm-agent 8` yields `vm-agent.8.Flow.NightlyOrchestrator`, capital `Flow`.
+  Older projects keep the `vm-agent.7.…` names they were packed with, so the two coexist in one
+  solution. Read the name out of the zip rather than guessing:
+  `unzip -l /tmp/vm-agent-pkg/*.zip | grep nupkg`.
+- **Maestro caps total instance variable size.** The Integration Service GitHub connector returns
+  ~20 KB per PR and the flow faulted with "The instance's variables exceed the maximum allowed
+  size" at only 10 PRs; 153 PRs with patches also stalled a parallel loop for 10+ minutes. Fetch
+  bulk data on the VM and pass back one compact line.
+- **`uip maestro flow node add` does not let you choose the node id.** `replyInSlackThread1` is
+  named that because the CLI said so; bindings and docs must follow it.
+- **A folder created by `deploy run` gets a new key on every redeploy**, so any script that takes
+  `-f <folderKey>` must re-resolve it rather than caching one.
+- The pipeline/`$LASTEXITCODE` trap under "Workflow-level" above cost two separate runs in the
+  phase runner. The incident record is in `TRAPS.md`.

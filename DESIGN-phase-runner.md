@@ -1,7 +1,8 @@
 # Design: phase-runner restructure of `VmAgent`
 
 Written 2026-09-04 for an agent or human implementing this without prior context.
-Read `HANDOFF.md` and `FINDINGS-uip.md` first; the traps there still apply.
+Historical: this restructure is implemented and released. For the shape as built read
+`ARCHITECTURE.md`; for the traps it encodes, `TRAPS.md` and `FINDINGS-uip.md`.
 
 ## Problem
 

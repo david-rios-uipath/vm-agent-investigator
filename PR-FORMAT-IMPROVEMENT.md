@@ -89,7 +89,7 @@ if Change 1 and 2 already make the body readable.
 
 1. Apply the edits to `VmAgent.flow`.
 2. `git diff` the nested `agent.json` and the tool `resource.json` files — editing the
-   flow regenerates them and silently reverts hand-made fixes (see HANDOFF, `ea140a8`).
+   flow regenerates them and silently reverts hand-made fixes (see `TRAPS.md`, `ea140a8`).
 3. `./release.sh 1.0.25 inputs/debug-execution-fixer.json` — the fixer-resume input path,
    so the run reaches `openPr` without a full investigation.
 4. Read the resulting draft PR body. Success is: a `**Cause:**`/`**Change:**` pair, at
