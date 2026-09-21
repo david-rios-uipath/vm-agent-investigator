@@ -150,11 +150,17 @@ console.log('spend ok');
   assert.equal(pick.skipped, 2);
   assert.deepEqual(pick.skippedGroups.map((g) => g.title), pick.selected.length === 1
     ? sel2.groups.slice(1).map((g) => g.title) : []);
-  const text = run('summarize', { start: { output: night2 }, pickTests: { output: pick }, investigate: { output: [] } }).text;
-  assert.match(text, /2 not investigated \(maxTests=1\): `[^`]+ \u203a [^`]+`(?: \(\+\d+\))?, `[^`]+ \u203a [^`]+`/);
-  // A pickTests output from before this change still renders the bare count.
+  // A row for the one selected test means it was investigated, not budget-deferred, so this
+  // isolates the cap reason: only the two maxTests-skipped groups should show up as "over maxTests".
+  const selectedRow = { environment: 'studio-alpha', file: pick.selected[0].file, title: pick.selected[0].title,
+    reproduced: false, fixVerified: false, prUrl: '', hypothesis: '', failed: false, errorMessage: '', relatedPrs: [], siblings: [] };
+  const text = run('summarize', { start: { output: night2 }, pickTests: { output: pick }, investigate: { output: [selectedRow] } }).text;
+  assert.match(text, /2 not investigated: 2 over maxTests=1: `[^`]+ \u203a [^`]+`(?: \(\+\d+\))?, `[^`]+ \u203a [^`]+`/);
+  assert.doesNotMatch(text, /past the .* budget/, 'nothing is budget-deferred once every selected test has a row');
+  // A pickTests output from before this change (no skippedGroups, no deadline) still renders,
+  // naming only the cap reason since there is nothing to compute a budget-deferred count from.
   const legacy = run('summarize', { start: { output: night2 }, pickTests: { output: { total: 3, totalTests: 6, skipped: 2, selected: [], covered: [] } }, investigate: { output: [] } }).text;
-  assert.match(legacy, /_2 not investigated \(maxTests=1\)_/);
+  assert.match(legacy, /_2 not investigated: 2 over maxTests=1_/);
 }
 console.log('skipped naming ok');
 
@@ -166,9 +172,9 @@ console.log('skipped naming ok');
   const dry = run('pickTests', { start: { output: { ...input, maxTests: 0 } }, selectTests: { output: sel }, parsePrs: { output: prsOut } });
   assert.equal(dry.selected.length, 0, 'nothing is investigated');
   assert.equal(dry.skipped, sel.total, 'every group is reported as skipped instead');
-  // Absent still means one, which is what the nightly relies on.
+  // Absent still means four, which is what the nightly relies on.
   const { maxTests, ...noMax } = input;
-  assert.equal(run('pickTests', { start: { output: noMax }, selectTests: { output: sel }, parsePrs: { output: prsOut } }).selected.length, 1);
+  assert.equal(run('pickTests', { start: { output: noMax }, selectTests: { output: sel }, parsePrs: { output: prsOut } }).selected.length, Math.min(4, sel.total));
 }
 console.log('maxTests=0 ok');
 
@@ -213,10 +219,122 @@ console.log('slack gates ok');
   // Backticks inside the error would close the code span early; they are swapped for quotes.
   assert.match(text, /\*cause\* `Error: a '\.flow' entry never appeared`/);
   assert.match(text, /should add a Group by operation with aggregations` \(\+2 same cause\) — likely already fixed by merged <https:\/\/github\.com\/UiPath\/flow-workbench\/pull\/3758\|PR #3758> \(touches `StudioProjectsPage\.ts`\)/);
-  assert.match(text, /1 not investigated \(maxTests=1\)/);
+  assert.match(text, /1 not investigated: 1 over maxTests=1/);
   const flat = run('summarize', { start: { output: night2 }, pickTests: { output: pick }, investigate: { output: [row] } }).text;
   assert.match(flat, /should add a Map operation with field mappings/);
   const none = run('summarize', { start: { output: night2 }, pickTests: { output: { total: 0, skipped: 0, selected: [], covered: [], totalTests: 0 } }, investigate: { output: [] } }).text;
   assert.match(none, /no studio failures to investigate/);
 }
 console.log('summarize ok');
+
+// pickTests: default cap is four. maxTests=0 still selecting nothing is already covered by the
+// "maxTests=0 ok" section above.
+{
+  const groups = Array.from({ length: 6 }, (_, i) => ({ environment: 'studio-alpha', file: `specs/g${i}.spec.ts`, title: `test ${i}`, error: '', siblings: [], testCommand: 'x' }));
+  const selFake = { groups, total: groups.length, totalTests: groups.length, fetched: groups.length, invalidRows: 0 };
+  const prsOut2 = { prs: [], ok: false };
+  const { maxTests, ...noMax } = night2;
+  const missing = run('pickTests', { start: { output: noMax }, selectTests: { output: selFake }, parsePrs: { output: prsOut2 } });
+  assert.equal(missing.selected.length, 4, 'missing maxTests caps at 4, not 1');
+  assert.equal(missing.skipped, 2, 'the remaining two are named as skipped, not silently dropped');
+  const blank = run('pickTests', { start: { output: { ...night2, maxTests: '' } }, selectTests: { output: selFake }, parsePrs: { output: prsOut2 } });
+  assert.equal(blank.selected.length, 4, 'blank maxTests also caps at 4');
+}
+console.log('default cap is four ok');
+
+// pickTests: deadline is immediate when the budget is zero, so withinBudget reads false on the
+// very first check and the sequential loop breaks without admitting a child.
+{
+  const sel = run('selectTests', { start: { output: input } });
+  const out = run('pickTests', { start: { output: { ...input, budgetMinutes: 0 } }, selectTests: { output: sel }, parsePrs: { output: { prs: [], ok: false } } });
+  const now = Date.now();
+  assert.ok(out.deadline <= now, `deadline ${out.deadline} should be at or before ${now}`);
+  assert.equal(Date.now() < (out.deadline || 0), false, 'withinBudget is already false for this deadline');
+}
+console.log('deadline is immediate when the budget is zero ok');
+
+// pickTests: blank, missing, and invalid budgetMinutes all fall back to 240 minutes.
+{
+  const sel = run('selectTests', { start: { output: input } });
+  const prsOut3 = { prs: [], ok: false };
+  const expectFallback = (out, label) => {
+    const target = Date.now() + 240 * 60000;
+    assert.ok(Math.abs(out.deadline - target) < 5000, label); // 5s tolerance for test runtime, not an exact-ms assertion
+  };
+  const { budgetMinutes, ...noBudget } = input;
+  expectFallback(run('pickTests', { start: { output: noBudget }, selectTests: { output: sel }, parsePrs: { output: prsOut3 } }), 'missing budgetMinutes falls back to 240m');
+  expectFallback(run('pickTests', { start: { output: { ...input, budgetMinutes: '' } }, selectTests: { output: sel }, parsePrs: { output: prsOut3 } }), 'blank budgetMinutes falls back to 240m');
+  expectFallback(run('pickTests', { start: { output: { ...input, budgetMinutes: 'not-a-number' } }, selectTests: { output: sel }, parsePrs: { output: prsOut3 } }), 'invalid budgetMinutes falls back to 240m');
+}
+console.log('budgetMinutes fallback ok');
+
+// summarize: the digest names the budget reason and the cap reason separately when both apply.
+{
+  const selectedA = { file: 'specs/a.spec.ts', title: 'test a', siblings: [] };
+  const selectedB = { file: 'specs/b.spec.ts', title: 'test b', siblings: [] };
+  const skippedGroups = [{ file: 'specs/c.spec.ts', title: 'test c', siblings: [] }];
+  const pick = { total: 3, totalTests: 3, selected: [selectedA, selectedB], covered: [], skipped: skippedGroups.length, skippedGroups, invalidRows: 0 };
+  // A only got a row (investigated); B never did (ran out of budget before its turn).
+  const rowA = { environment: 'studio-alpha', file: selectedA.file, title: selectedA.title,
+    reproduced: true, fixVerified: false, prUrl: '', hypothesis: '', failed: false, errorMessage: '', relatedPrs: [], siblings: [] };
+  const text = run('summarize', { start: { output: { ...night2, maxTests: 1, budgetMinutes: 240 } }, pickTests: { output: pick }, investigate: { output: [rowA] } }).text;
+  assert.match(text, /2 not investigated: 1 past the 4h budget, 1 over maxTests=1/);
+  assert.match(text, /`b\.spec\.ts › test b`/, 'the budget-deferred group is named');
+  assert.match(text, /`c\.spec\.ts › test c`/, 'the cap-skipped group is named');
+}
+console.log('the digest names the budget reason and the cap reason separately ok');
+
+// summarize: a faulted child still counts as investigated, so it must not also show up as
+// budget-deferred - recordResult already emits a row for it.
+{
+  const selectedA = { file: 'specs/a.spec.ts', title: 'test a', siblings: [] };
+  const pick = { total: 1, totalTests: 1, selected: [selectedA], covered: [], skipped: 0, skippedGroups: [], invalidRows: 0 };
+  const failedRow = { environment: 'studio-alpha', file: selectedA.file, title: selectedA.title,
+    failed: true, errorMessage: 'boom', reproduced: false, fixVerified: false, prUrl: '', hypothesis: '', relatedPrs: [] };
+  const text = run('summarize', { start: { output: night2 }, pickTests: { output: pick }, investigate: { output: [{ recordResult: { output: failedRow } }] } }).text;
+  assert.doesNotMatch(text, /not investigated/, 'a faulted-but-recorded test is not reported as dropped');
+  assert.match(text, /investigation faulted: boom/);
+}
+console.log('a faulted child still counts as investigated ok');
+
+// selectTests: a quote/semicolon in file, or an invalid environment, is dropped before it can
+// reach a shell command - this is validation of untrusted artifact data at the shell boundary.
+{
+  const maliciousStart = { ...input, failedTests: [
+    { environment: 'studio-alpha', file: 'specs/a";rm -rf /.spec.ts', title: 'evil file' },
+    { environment: 'studio-alpha; rm -rf /', file: 'specs/b.spec.ts', title: 'evil env' },
+    { environment: 'studio-alpha', file: 'specs/ok.spec.ts', title: 'fine test' },
+  ] };
+  const out = run('selectTests', { start: { output: maliciousStart } });
+  assert.equal(out.invalidRows, 2, 'both malicious rows are dropped and counted');
+  assert.equal(out.totalTests, 1, 'only the clean row survives');
+  assert.ok(!out.groups.some((g) => /rm -rf/.test(g.file) || /rm -rf/.test(g.environment)), 'no group carries an injected row');
+  for (const g of out.groups) {
+    // The command legitimately wraps the (escaped) title in quotes via --grep; strip that
+    // trailing quoted span before checking that nothing injected slipped in around it.
+    const withoutGrep = g.testCommand.replace(/--grep "(?:[^"\\]|\\.)*"$/, '--grep');
+    assert.ok(!/[;"]/.test(withoutGrep), 'no quote or semicolon reaches testCommand outside the escaped --grep value');
+  }
+}
+console.log('a quote or semicolon in file never reaches testCommand ok');
+console.log('an invalid environment is dropped ok');
+
+// Structural: the investigate loop is sequential with a break port, gated by a withinBudget
+// decision node that lives inside it and is wired to that break port.
+{
+  const investigateNode = flow.nodes.find((n) => n.id === 'investigate');
+  assert.equal(investigateNode.inputs.parallel, false, 'investigate loop is sequential');
+  assert.equal(investigateNode.inputs.breakEnabled, true, 'investigate loop can break');
+  const withinBudgetNode = flow.nodes.find((n) => n.id === 'withinBudget');
+  assert.ok(withinBudgetNode, 'withinBudget node exists');
+  assert.equal(withinBudgetNode.parentId, 'investigate', 'withinBudget lives inside the investigate loop');
+  const breakEdges = flow.edges.filter((e) => e.targetPort === 'break');
+  assert.equal(breakEdges.length, 1, 'exactly one edge targets the loop break port');
+  assert.equal(breakEdges[0].sourceNodeId, 'withinBudget', 'the break edge comes from withinBudget');
+  // Mirrors the gate() helper above, but for a decision expression that reads $vars.pickTests
+  // instead of $vars.start.
+  const gate = (deadline) => new Function('$vars', `return (${withinBudgetNode.inputs.expression.expression});`)({ pickTests: { output: { deadline } } });
+  assert.equal(gate(Date.now() - 60000), false, 'withinBudget is false once the deadline has passed');
+  assert.equal(gate(Date.now() + 60000), true, 'withinBudget is true before the deadline');
+}
+console.log('withinBudget structural checks ok');

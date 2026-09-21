@@ -191,11 +191,13 @@ sentence claimed a pass without reading `verified`.
 > kill Maestro flow jobs, cancel the instance instead. CI (`start-nightly-investigation.sh`) targets the new folder.
 
 A second flow in the same solution (`vm-agent/NightlyOrchestrator/`). It takes one nightly
-Playwright run's failures, fans the first `maxTests` of them out over `VmAgent` (one child job
-each), and posts a single summary back into the Slack thread that reported the failure.
+Playwright run's failures and works through the first `maxTests` of them one at a time over
+`VmAgent` (one child job each, sequentially, until the wall-clock budget runs out), then posts a
+single summary back into the Slack thread that reported the failure.
 
-Shape: `start -> selectTests -> investigate` (parallel loop: `callVmAgent -> recordResult`)
-`-> summarize -> replyInSlackThread1 -> end`. Eight nodes.
+Shape: `start -> selectTests -> investigate` (sequential loop with a budget check:
+`withinBudget -> callVmAgent -> recordResult`) `-> summarize -> replyInSlackThread1 -> end`.
+17 nodes.
 
 Trigger inputs:
 
@@ -208,7 +210,8 @@ Trigger inputs:
 | `slackTs` | string | `""` | `thread_ts` of the Slack message to reply under; empty posts top-level |
 | `failedTests` | array | — | `[{ environment, file, title, error }]` from the nightly |
 | `environments` | string | `studio-*,vsix-*` | glob over Playwright project names; `selectTests` drops non-matching tests |
-| `maxTests` | number | `1` | how many of the surviving tests to investigate |
+| `maxTests` | number | `4` | how many uncovered failure groups to investigate tonight (workload cap, not concurrency) |
+| `budgetMinutes` | number | `240` | wall-clock budget for the investigate queue; the loop admits no new child past the deadline |
 | `repoUrl` | string | `https://github.com/UiPath/flow-workbench` | repo VmAgent checks out |
 | `branch` | string | `develop` | branch VmAgent checks out |
 | `claudeModel` | string | `claude-sonnet-5` | model the phases pass to `claude -p` on the VM; empty would fall through to the CLI's account default, which is Opus |
@@ -216,19 +219,45 @@ Trigger inputs:
 Sample payloads: `inputs/orchestrator-34015558366.json` (2026-09-06 nightly),
 `inputs/orchestrator-34089391590.json` (2026-09-07 nightly, 6 tests, 3 causes).
 
+**Operational contract for `maxTests` and `budgetMinutes`.** `maxTests: 0` is a no-child
+canary — it's how a release gets smoke-tested without spending a `VmAgent` run. `budgetMinutes:
+0` is an immediate-break canary — the loop breaks on its first `withinBudget` check before
+starting anything. The normal, automatic nightly run uses the defaults: 4 groups and 240
+minutes. An exceptional manual run must use an explicitly calculated budget, no greater than
+`240` minus the number of minutes elapsed since 02:00 ET; if that calculation isn't done, use
+`budgetMinutes: 0` instead. Do not manually kick off a non-zero-budget run after 02:00 ET — the
+three-hour child reserve no longer fits before the working day starts. If an observed child tail
+ever runs longer than three hours, the fix is to reduce the default budget immediately, not to
+raise `maxTests`.
+
+At 4 groups a night and roughly $5-7 of model spend per investigation, a bad night costs
+$20-28, versus roughly $6 today. Promoting the default from 4 groups to 6 (a $30-42 bad night)
+needs explicit approval after reviewing actual cost and observed tail duration from the first
+rollout — it should not happen as an incidental bump.
+
 - **One `VmAgent` per failure cause, not per test.** `selectTests` dedupes `file + title` across
   shards, then groups by the first error line (digits/hashes ignored): a named `Error:` groups
   across spec files (shared infra failure, e.g. the auth-redirect error), a bare
   `TimeoutError`/locator message only within its file. Biggest group is investigated first; the
   rest of a group is listed as siblings in the Slack row. `total` counts groups, `totalTests` tests.
 
-- **`maxTests` must equal the robot pool's VM count — today that is 1.** The loop is
-  `parallel: true`, so each selected test starts its own `VmAgent` job at once; with one VM the
-  extra jobs queue behind the first and time out. Grow `maxTests` only when the pool grows.
-- Second reason: `recordResult` reads `$vars.callVmAgent.output`, which is node-scoped, while
-  `currentItem` is iteration-scoped; with `parallel: true` and more than one iteration,
-  cross-iteration reads are possible unless the runtime scopes node outputs per iteration.
-  Unproven — verify with 2 tests before raising `maxTests` above 1.
+- **The loop is sequential, so concurrency is 1 by construction.** `investigate` runs
+  `parallel: false` with `breakEnabled: true`: one `VmAgent` child at a time, in order, rather
+  than fanning every selected group out at once. `maxTests` is now the *nightly workload cap*,
+  not a concurrency limit — it just says how many groups we're willing to spend the night on.
+  Going sequential also retires the earlier worry about `recordResult` reading node-scoped
+  `$vars.callVmAgent.output` while `currentItem` is iteration-scoped: that only mattered under
+  `parallel: true`, where more than one iteration could be in flight at once. A bigger robot pool
+  is not an excuse to raise `maxTests` further — it calls for batching instead: chunk `selected`
+  into groups of N and nest a parallel inner loop inside a sequential outer one.
+- **Wall-clock budget.** `budgetMinutes` (default 240) is turned into a `deadline` inside
+  `pickTests`, and a new `withinBudget` decision node runs between iterations of the loop —
+  before each new `VmAgent` child is started, not while one is running. That means the
+  worst-case overrun is the budget plus one child run: a VmAgent child has no timeout input of
+  its own, but its four phase nodes are each `TimeoutMinutes: 45`, so once a child has been
+  admitted, reserve three hours for it. The scheduled run starts around 02:00 ET, so with the
+  240-minute default the loop admits no new child after roughly 06:00 ET and the whole run
+  finishes by roughly 09:00 ET, ahead of the working day.
 - **Slack replies work through the `thread_ts` body field** of the connector's
   `send_message_to_channel_v2`. `thread_ts` is `=js:$vars.start.output.slackTs || undefined`, so
   an empty `slackTs` posts a top-level message instead of failing (unverified: no run has reached

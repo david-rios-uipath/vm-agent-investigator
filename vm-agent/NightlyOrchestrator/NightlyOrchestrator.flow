@@ -55,6 +55,9 @@
               "maxTests": {
                 "type": "number"
               },
+              "budgetMinutes": {
+                "type": "number"
+              },
               "maxFixAttempts": {
                 "type": "number"
               },
@@ -335,7 +338,7 @@
         "script": {
           "type": "literal",
           "fieldType": "string",
-          "expression": "const s = $vars.start.output;\nconst globs = String(s.environments || 'studio-*,vsix-*').split(',').map(g => g.trim()).filter(Boolean);\nconst matches = (p) => globs.some(g => new RegExp('^' + g.split('*').map(x => x.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')).join('.*') + '$').test(p));\n// One row per distinct test (same file+title across shards/platforms collapses).\n// Failures come from the VM: fetchFailures downloads the run's artifact and prints one compact\n// FAILED_JSON line - distinct first error lines in `e`, one row per test in `r` indexing into it.\n// A trigger that still passes `failedTests` inline keeps working, which is how the unit test feeds it.\nconst fromVm = () => {\n  const out = ($vars.fetchFailures && $vars.fetchFailures.output) || {};\n  const lines = String(out.Stdout || '').split('\\n');\n  for (let i = lines.length - 1; i >= 0; i--) {\n    const l = lines[i].trim();\n    if (!l.startsWith('FAILED_JSON=')) continue;\n    try {\n      const d = JSON.parse(l.slice('FAILED_JSON='.length)) || {};\n      // ConvertTo-Json collapses a one-element array to a scalar, so accept both shapes.\n      const errs = Array.isArray(d['e']) ? d['e'] : (d['e'] ? [d['e']] : []);\n      const raw = Array.isArray(d['r']) ? d['r'] : (d['r'] ? [d['r']] : []);\n      return raw.map(r => ({ environment: r['p'], file: r['f'], title: r['t'], error: errs[r['i']] || '' }));\n    } catch (e) { return []; }\n  }\n  return [];\n};\nconst fetched = fromVm();\nconst incoming = fetched.length ? fetched : (s.failedTests || []);\nconst seen = new Set();\nconst rows = [];\nfor (const t of incoming) {\n  if (!t || !matches(t.environment || '')) continue;\n  const key = t.file + '::' + t.title;\n  if (seen.has(key)) continue;\n  seen.add(key);\n  rows.push(t);\n}\nrows.sort((a, b) => (a.file + a.title).localeCompare(b.file + b.title));\n// Tests whose first error line matches (digits/hashes ignored) share a cause. A named `Error:` groups\n// across spec files (shared infra failure); a bare timeout/locator message only within its file.\nconst norm = (e) => String(e || '').replace(/\\x1b\\[[0-9;]*m/g, '').split('\\n').map(l => l.trim()).find(Boolean) || '';\nconst causeKey = (t) => {\n  const n = norm(t.error).replace(/[0-9a-f]{8,}/gi, '#').replace(/\\d+/g, '#').slice(0, 160);\n  if (!n) return t.file + '::title:' + t.title;\n  return /^\\w*Error: /.test(n) && !/^TimeoutError/.test(n) ? 'err::' + n : t.file + '::' + n;\n};\nconst groups = [];\nconst byKey = new Map();\nfor (const t of rows) {\n  const k = causeKey(t);\n  const g = byKey.get(k);\n  if (g) { g.siblings.push(g.file === t.file ? t.title : `${t.file.split('/').pop()} › ${t.title}`); continue; }\n  const ng = { ...t, siblings: [] }; byKey.set(k, ng); groups.push(ng);\n}\n// Biggest cause first: it explains the most red.\ngroups.sort((a, b) => b.siblings.length - a.siblings.length);\nconst grep = (title) => String(title).replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&').replace(/\"/g, '\\\\\"');\n// The repro command has to be paste-able. A `file` that already carries its root is used as is;\n// a bare path gets the e2e/ root the older extractor left off. Getting this wrong is worse than\n// printing no command, so the artifact should carry the full path and this is the fallback.\nconst specPath = (f) => { const p = String(f || ''); return /^(e2e|tests?|src)\\//.test(p) ? p : 'e2e/' + p; };\nconst groups2 = groups.map(t => ({\n  environment: t.environment, file: t.file, title: t.title, error: t.error || '', siblings: t.siblings,\n  testCommand: `corepack pnpm exec playwright test --config e2e/playwright.config.ts ${specPath(t.file)} --project ${t.environment} --grep \"${grep(t.title)}\"`\n}));\nreturn { groups: groups2, total: groups2.length, totalTests: rows.length, fetched: fetched.length };"
+          "expression": "const s = $vars.start.output;\nconst globs = String(s.environments || 'studio-*,vsix-*').split(',').map(g => g.trim()).filter(Boolean);\nconst matches = (p) => globs.some(g => new RegExp('^' + g.split('*').map(x => x.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')).join('.*') + '$').test(p));\n// One row per distinct test (same file+title across shards/platforms collapses).\n// Failures come from the VM: fetchFailures downloads the run's artifact and prints one compact\n// FAILED_JSON line - distinct first error lines in `e`, one row per test in `r` indexing into it.\n// A trigger that still passes `failedTests` inline keeps working, which is how the unit test feeds it.\nconst fromVm = () => {\n  const out = ($vars.fetchFailures && $vars.fetchFailures.output) || {};\n  const lines = String(out.Stdout || '').split('\\n');\n  for (let i = lines.length - 1; i >= 0; i--) {\n    const l = lines[i].trim();\n    if (!l.startsWith('FAILED_JSON=')) continue;\n    try {\n      const d = JSON.parse(l.slice('FAILED_JSON='.length)) || {};\n      // ConvertTo-Json collapses a one-element array to a scalar, so accept both shapes.\n      const errs = Array.isArray(d['e']) ? d['e'] : (d['e'] ? [d['e']] : []);\n      const raw = Array.isArray(d['r']) ? d['r'] : (d['r'] ? [d['r']] : []);\n      return raw.map(r => ({ environment: r['p'], file: r['f'], title: r['t'], error: errs[r['i']] || '' }));\n    } catch (e) { return []; }\n  }\n  return [];\n};\nconst fetched = fromVm();\nconst incoming = fetched.length ? fetched : (s.failedTests || []);\nconst seen = new Set();\nconst rows = [];\nfor (const t of incoming) {\n  if (!t || !matches(t.environment || '')) continue;\n  const key = t.file + '::' + t.title;\n  if (seen.has(key)) continue;\n  seen.add(key);\n  rows.push(t);\n}\nrows.sort((a, b) => (a.file + a.title).localeCompare(b.file + b.title));\n// Artifact rows feed a shell command below (testCommand). A file must be a relative Playwright\n// spec path with no traversal, and an environment must look like the name the glob above matches.\nconst validFile = (f) => typeof f === 'string' && /^[A-Za-z0-9_.\\/-]+$/.test(f) && !f.split('/').includes('..') && /\\.spec\\.tsx?$/.test(f);\nconst validEnv = (e) => typeof e === 'string' && /^[a-z0-9-]+$/i.test(e);\nconst invalidRows = rows.filter(t => !validFile(t.file) || !validEnv(t.environment)).length;\nconst validRows = rows.filter(t => validFile(t.file) && validEnv(t.environment));\n// Tests whose first error line matches (digits/hashes ignored) share a cause. A named `Error:` groups\n// across spec files (shared infra failure); a bare timeout/locator message only within its file.\nconst norm = (e) => String(e || '').replace(/\\x1b\\[[0-9;]*m/g, '').split('\\n').map(l => l.trim()).find(Boolean) || '';\nconst causeKey = (t) => {\n  const n = norm(t.error).replace(/[0-9a-f]{8,}/gi, '#').replace(/\\d+/g, '#').slice(0, 160);\n  if (!n) return t.file + '::title:' + t.title;\n  return /^\\w*Error: /.test(n) && !/^TimeoutError/.test(n) ? 'err::' + n : t.file + '::' + n;\n};\nconst groups = [];\nconst byKey = new Map();\nfor (const t of validRows) {\n  const k = causeKey(t);\n  const g = byKey.get(k);\n  if (g) { g.siblings.push(g.file === t.file ? t.title : `${t.file.split('/').pop()} › ${t.title}`); continue; }\n  const ng = { ...t, siblings: [] }; byKey.set(k, ng); groups.push(ng);\n}\n// Biggest cause first: it explains the most red.\ngroups.sort((a, b) => b.siblings.length - a.siblings.length);\nconst grep = (title) => String(title).replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&').replace(/\"/g, '\\\\\"');\n// The repro command has to be paste-able. A `file` that already carries its root is used as is;\n// a bare path gets the e2e/ root the older extractor left off. Getting this wrong is worse than\n// printing no command, so the artifact should carry the full path and this is the fallback.\nconst specPath = (f) => { const p = String(f || ''); return /^(e2e|tests?|src)\\//.test(p) ? p : 'e2e/' + p; };\nconst groups2 = groups.map(t => ({\n  environment: t.environment, file: t.file, title: t.title, error: t.error || '', siblings: t.siblings,\n  testCommand: `corepack pnpm exec playwright test --config e2e/playwright.config.ts ${specPath(t.file)} --project ${t.environment} --grep \"${grep(t.title)}\"`\n}));\nreturn { groups: groups2, total: groups2.length, totalTests: validRows.length, fetched: fetched.length, invalidRows };"
         }
       },
       "outputs": {
@@ -351,6 +354,9 @@
                 "type": "number"
               },
               "totalTests": {
+                "type": "number"
+              },
+              "invalidRows": {
                 "type": "number"
               },
               "groups": {
@@ -399,12 +405,13 @@
       "typeVersion": "2.4",
       "display": {
         "label": "Investigate each test",
-        "subLabel": "parallel, one VmAgent per test",
+        "subLabel": "sequential queue, one VmAgent at a time, wall-clock budget",
         "icon": "repeat"
       },
       "inputs": {
         "collection": "=js:$vars.pickTests.output['selected']",
-        "parallel": true
+        "parallel": false,
+        "breakEnabled": true
       },
       "outputs": {
         "currentItem": {
@@ -540,6 +547,26 @@
           "var": "error"
         }
       }
+    },
+    {
+      "id": "withinBudget",
+      "type": "core.logic.decision",
+      "typeVersion": "1.3",
+      "display": {
+        "label": "Still inside the nightly budget?",
+        "subLabel": "breaks the queue once the wall-clock budget is spent",
+        "icon": "trending-up-down"
+      },
+      "inputs": {
+        "trueLabel": "within budget",
+        "falseLabel": "out of budget",
+        "expression": {
+          "type": "jsExpression",
+          "expression": "Date.now() < ($vars.pickTests.output['deadline'] || 0)",
+          "fieldType": "boolean"
+        }
+      },
+      "parentId": "investigate"
     },
     {
       "id": "callVmAgent",
@@ -773,7 +800,7 @@
         "script": {
           "type": "literal",
           "fieldType": "string",
-          "expression": "const s = $vars.start.output;\nconst sel = $vars.pickTests.output || { total: 0, totalTests: 0, skipped: 0, selected: [], covered: [] };\nconst rows = ($vars.investigate.output || []).map(i => { const o = (i && i.recordResult && i.recordResult.output) || i; return o && o.title ? o : null; }).filter(Boolean);\nconst nTests = sel.totalTests || sel.total;\n// Model spend for this nightly: the sum of what each VmAgent run cost.\nconst spend = rows.reduce((a, r) => a + (Number(r.costUsd) || 0), 0);\nconst head = `:robot_face: *VmAgent investigated ${rows.length} of ${sel.total} ${String(s.environments || 'studio-*,vsix-*').replace(/-?\\*/g, '').replace(/,/g, '/')} failure groups* (${nTests} tests, <${s.runUrl}|run ${s.runId}>)` + (s.reportUrl ? ` \\u00b7 <${s.reportUrl}|report>` : '');\n// Cost goes out as its own follow-up message, including when it is zero: a silent digest left it\n// unclear whether the run was free or the number was lost. `runs` counts the VmAgent runs charged.\nconst runs = rows.filter(r => !r.failed).length;\nconst costText = spend > 0\n  ? `:moneybag: *$${spend.toFixed(2)} Claude spend* on ${runs} investigation${runs === 1 ? '' : 's'} for <${s.runUrl}|run ${s.runId}>.`\n  : `:moneybag: *No Claude spend* for <${s.runUrl}|run ${s.runId}> — ${rows.length ? 'the investigation ended before any model call' : 'nothing was investigated'}.`;\n// CI said the nightly had failures but nothing arrived: the artifact download failed, and silence\n// would read as a green night. Say so instead.\nif (sel.total === 0 && !sel.fetched && Number(s.failedCount) > 0) return { text: `:warning: VmAgent could not read the failed-tests artifact for <${s.runUrl}|run ${s.runId}> (${s.failedCount} failed tests reported). Nothing investigated.`, costText };\nif (sel.total === 0) return { text: `:robot_face: VmAgent: no ${String(s.environments || 'studio-*,vsix-*').replace(/-?\\*/g, '').replace(/,/g, '/')} failures to investigate in <${s.runUrl}|run ${s.runId}>.`, costText };\nconst spec = (f) => String(f).split('/').pop();\n// Backticks are stripped, not escaped: Slack has no escape inside an inline code span, so an\n// error mentioning `.flow` would close the span early and mangle the rest of the line.\nconst clip = (t, n) => { const s = String(t || '').replace(/`/g, '\\'').replace(/\\s+/g, ' ').trim(); return s.length > n ? s.slice(0, n).replace(/\\s+\\S*$/, '') + '…' : s; };\n// A cause with 86 tests used to print 86 test names. The count and the spread across specs say\n// the same thing in one clause; the cause and the repro command are what a reader acts on.\nconst sibSummary = (r) => {\n  const sibs = r.siblings || [];\n  if (!sibs.length) return '';\n  const specs = new Set([spec(r.file)]);\n  for (const s of sibs) { const i = String(s).indexOf(' › '); if (i > 0) specs.add(String(s).slice(0, i)); }\n  return specs.size > 1 ? ` +${sibs.length} more across ${specs.size} specs` : ` +${sibs.length} more in this spec`;\n};\nconst lines = rows.map(r => {\n  if (r.failed) return `• \\`${spec(r.file)} › ${r.title}\\` — investigation faulted: ${r.errorMessage}`;\n  const parts = [r.reproduced ? 'reproduced' : 'not reproduced', r.fixVerified ? 'fix verified' : 'no verified fix', r.prUrl ? `<${r.prUrl}|draft PR>` : 'no PR'];\n  for (const pr of (r.relatedPrs || [])) parts.push(`related ${pr.state === 'merged' ? 'merged' : 'open'} <${pr.url}|PR #${pr.number}>`);\n  const out = [`• \\`${spec(r.file)} › ${r.title}\\`${sibSummary(r)} — ${parts.join(', ')}`];\n  if (r.error) out.push(`    *cause* \\`${clip(r.error, 220)}\\``);\n  if (r.testCommand) out.push(`    *repro* \\`${r.testCommand}\\``);\n  if (r.hypothesis) out.push(`    *finding* _${clip(r.hypothesis, 400)}_`);\n  return out.join('\\n');\n});\nfor (const c of (sel.covered || [])) {\n  const sib = (c.siblings && c.siblings.length) ? ` (+${c.siblings.length} same cause)` : '';\n  const verb = c.coveredBy.state === 'merged' ? 'likely already fixed by merged' : 'not investigated: open';\n  lines.push(`• \\`${spec(c.file)} › ${c.title}\\`${sib} — ${verb} <${c.coveredBy.url}|PR #${c.coveredBy.number}> (touches \\`${c.coveredBy.file.split('/').pop()}\\`)`);\n}\nif (sel.skipped > 0) {\n  const shown = (sel.skippedGroups || []).slice(0, 3).map(g => `\\`${spec(g.file)} \\u203a ${g.title}\\`` + ((g.siblings || []).length ? ` (+${g.siblings.length})` : ''));\n  const more = sel.skipped > shown.length ? `, +${sel.skipped - shown.length} more` : '';\n  lines.push(`_${sel.skipped} not investigated (maxTests=${s.maxTests})${shown.length ? ': ' + shown.join(', ') + more : ''}_`);\n}\nreturn { text: [head, ...lines].join('\\n'), costText };\n"
+          "expression": "const s = $vars.start.output;\nconst sel = $vars.pickTests.output || { total: 0, totalTests: 0, skipped: 0, selected: [], covered: [] };\nconst rows = ($vars.investigate.output || []).map(i => { const o = (i && i.recordResult && i.recordResult.output) || i; return o && o.title ? o : null; }).filter(Boolean);\nconst nTests = sel.totalTests || sel.total;\n// Model spend for this nightly: the sum of what each VmAgent run cost.\nconst spend = rows.reduce((a, r) => a + (Number(r.costUsd) || 0), 0);\nconst head = `:robot_face: *VmAgent investigated ${rows.length} of ${sel.total} ${String(s.environments || 'studio-*,vsix-*').replace(/-?\\*/g, '').replace(/,/g, '/')} failure groups* (${nTests} tests, <${s.runUrl}|run ${s.runId}>)` + (s.reportUrl ? ` \\u00b7 <${s.reportUrl}|report>` : '');\n// Cost goes out as its own follow-up message, including when it is zero: a silent digest left it\n// unclear whether the run was free or the number was lost. `runs` counts the VmAgent runs charged.\nconst runs = rows.filter(r => !r.failed).length;\nconst costText = spend > 0\n  ? `:moneybag: *$${spend.toFixed(2)} Claude spend* on ${runs} investigation${runs === 1 ? '' : 's'} for <${s.runUrl}|run ${s.runId}>.`\n  : `:moneybag: *No Claude spend* for <${s.runUrl}|run ${s.runId}> — ${rows.length ? 'the investigation ended before any model call' : 'nothing was investigated'}.`;\n// CI said the nightly had failures but nothing arrived: the artifact download failed, and silence\n// would read as a green night. Say so instead.\nif (sel.total === 0 && !sel.fetched && Number(s.failedCount) > 0) return { text: `:warning: VmAgent could not read the failed-tests artifact for <${s.runUrl}|run ${s.runId}> (${s.failedCount} failed tests reported). Nothing investigated.`, costText };\nif (sel.total === 0) return { text: `:robot_face: VmAgent: no ${String(s.environments || 'studio-*,vsix-*').replace(/-?\\*/g, '').replace(/,/g, '/')} failures to investigate in <${s.runUrl}|run ${s.runId}>.`, costText };\nconst spec = (f) => String(f).split('/').pop();\n// Backticks are stripped, not escaped: Slack has no escape inside an inline code span, so an\n// error mentioning `.flow` would close the span early and mangle the rest of the line.\nconst clip = (t, n) => { const s = String(t || '').replace(/`/g, '\\'').replace(/\\s+/g, ' ').trim(); return s.length > n ? s.slice(0, n).replace(/\\s+\\S*$/, '') + '…' : s; };\n// A cause with 86 tests used to print 86 test names. The count and the spread across specs say\n// the same thing in one clause; the cause and the repro command are what a reader acts on.\nconst sibSummary = (r) => {\n  const sibs = r.siblings || [];\n  if (!sibs.length) return '';\n  const specs = new Set([spec(r.file)]);\n  for (const s of sibs) { const i = String(s).indexOf(' › '); if (i > 0) specs.add(String(s).slice(0, i)); }\n  return specs.size > 1 ? ` +${sibs.length} more across ${specs.size} specs` : ` +${sibs.length} more in this spec`;\n};\nconst lines = rows.map(r => {\n  if (r.failed) return `• \\`${spec(r.file)} › ${r.title}\\` — investigation faulted: ${r.errorMessage}`;\n  const parts = [r.reproduced ? 'reproduced' : 'not reproduced', r.fixVerified ? 'fix verified' : 'no verified fix', r.prUrl ? `<${r.prUrl}|draft PR>` : 'no PR'];\n  for (const pr of (r.relatedPrs || [])) parts.push(`related ${pr.state === 'merged' ? 'merged' : 'open'} <${pr.url}|PR #${pr.number}>`);\n  const out = [`• \\`${spec(r.file)} › ${r.title}\\`${sibSummary(r)} — ${parts.join(', ')}`];\n  if (r.error) out.push(`    *cause* \\`${clip(r.error, 220)}\\``);\n  if (r.testCommand) out.push(`    *repro* \\`${r.testCommand}\\``);\n  if (r.hypothesis) out.push(`    *finding* _${clip(r.hypothesis, 400)}_`);\n  return out.join('\\n');\n});\nfor (const c of (sel.covered || [])) {\n  const sib = (c.siblings && c.siblings.length) ? ` (+${c.siblings.length} same cause)` : '';\n  const verb = c.coveredBy.state === 'merged' ? 'likely already fixed by merged' : 'not investigated: open';\n  lines.push(`• \\`${spec(c.file)} › ${c.title}\\`${sib} — ${verb} <${c.coveredBy.url}|PR #${c.coveredBy.number}> (touches \\`${c.coveredBy.file.split('/').pop()}\\`)`);\n}\n// A selected group with no matching (file, title) result never got a turn before the budget ran\n// out; a group the cap dropped never entered the queue at all. Two different reasons, one line.\nconst budgetDeferred = (sel.selected || []).filter(t => !rows.some(r => r.file === t.file && r.title === t.title));\nconst capCount = sel.skipped || 0;\nconst budgetCount = budgetDeferred.length;\nconst notRun = capCount + budgetCount;\nif (notRun > 0) {\n  const rawBudget = s.budgetMinutes;\n  const budgetMinutes = (rawBudget === undefined || rawBudget === null || String(rawBudget).trim() === '') ? 240 : Number(rawBudget);\n  const budgetLabel = (Number.isFinite(budgetMinutes) && budgetMinutes > 0 && budgetMinutes % 60 === 0) ? `${budgetMinutes / 60}h` : `${budgetMinutes}m`;\n  const reasons = [];\n  if (budgetCount > 0) reasons.push(`${budgetCount} past the ${budgetLabel} budget`);\n  if (capCount > 0) reasons.push(`${capCount} over maxTests=${s.maxTests}`);\n  const combined = [...budgetDeferred, ...(sel.skippedGroups || [])];\n  const shown = combined.slice(0, 3).map(g => `\\`${spec(g.file)} \\u203a ${g.title}\\`` + ((g.siblings || []).length ? ` (+${g.siblings.length})` : ''));\n  const more = combined.length > shown.length ? `, +${combined.length - shown.length} more` : '';\n  lines.push(`_${notRun} not investigated: ${reasons.join(', ')}${shown.length ? ': ' + shown.join(', ') + more : ''}_`);\n}\nif (sel.invalidRows > 0) lines.push(`_${sel.invalidRows} invalid artifact rows dropped_`);\nreturn { text: [head, ...lines].join('\\n'), costText };\n"
         }
       },
       "outputs": {
@@ -914,7 +941,7 @@
         "script": {
           "type": "literal",
           "fieldType": "string",
-          "expression": "const s = $vars.start.output;\nconst sel = $vars.selectTests.output || { groups: [], total: 0, totalTests: 0 };\nconst base = (path) => String(path || '').split('/').pop().replace(/\\.(spec|test)?\\.?tsx?$/i, '').replace(/\\.[a-z]+$/i, '').toLowerCase();\nconst prList = ((($vars.parsePrs || {}).output || {}).prs || []).filter(p => p && p.number).map(p => ({ number: p.number, title: p.title || '', url: p.url || '', state: p.state || 'open', files: (p.files || []).map(String) }));\n// A group is covered when an open PR touches its spec file or a page object named in its error.\nconst tokens = (t) => {\n  const set = new Set([base(t.file)]);\n  const first = String(t.error || '').split('\\n')[0];\n  for (const m of first.matchAll(/\\b([A-Z][A-Za-z0-9]+(?:Page|Dialog|Panel|Rail|Service|Client|Store))\\b/g)) set.add(m[1].toLowerCase());\n  return set;\n};\nconst covered = [];\nconst open = [];\nfor (const t of sel.groups || []) {\n  const tk = tokens(t);\n  let hit = null;\n  for (const pr of prList) {\n    const f = pr.files.find(x => base(x) === base(t.file) || tk.has(base(x)));\n    if (f) { hit = { number: pr.number, title: pr.title, url: pr.url, state: pr.state, file: f }; break; }\n  }\n  if (hit) covered.push({ ...t, coveredBy: hit }); else open.push(t);\n}\n// An absent maxTests means \"one\", but an explicit 0 means zero: it is how a release is smoke-tested\n// without spending a VmAgent run. Only a missing/blank value falls back.\nconst maxRaw = s.maxTests;\nconst max = (maxRaw === undefined || maxRaw === null || maxRaw === '') ? 1 : Math.max(0, Math.floor(Number(maxRaw) || 0));\nconst selected = open.slice(0, max);\n// Named, so the digest says what the cap dropped instead of only how many.\nconst skippedGroups = open.slice(max).map(t => ({ file: t.file, title: t.title, siblings: t.siblings || [] }));\nreturn { selected, covered, skippedGroups, skipped: skippedGroups.length, total: sel.total, totalTests: sel.totalTests, prs: prList };"
+          "expression": "const s = $vars.start.output;\nconst sel = $vars.selectTests.output || { groups: [], total: 0, totalTests: 0 };\nconst base = (path) => String(path || '').split('/').pop().replace(/\\.(spec|test)?\\.?tsx?$/i, '').replace(/\\.[a-z]+$/i, '').toLowerCase();\nconst prList = ((($vars.parsePrs || {}).output || {}).prs || []).filter(p => p && p.number).map(p => ({ number: p.number, title: p.title || '', url: p.url || '', state: p.state || 'open', files: (p.files || []).map(String) }));\n// A group is covered when an open PR touches its spec file or a page object named in its error.\nconst tokens = (t) => {\n  const set = new Set([base(t.file)]);\n  const first = String(t.error || '').split('\\n')[0];\n  for (const m of first.matchAll(/\\b([A-Z][A-Za-z0-9]+(?:Page|Dialog|Panel|Rail|Service|Client|Store))\\b/g)) set.add(m[1].toLowerCase());\n  return set;\n};\nconst covered = [];\nconst open = [];\nfor (const t of sel.groups || []) {\n  const tk = tokens(t);\n  let hit = null;\n  for (const pr of prList) {\n    const f = pr.files.find(x => base(x) === base(t.file) || tk.has(base(x)));\n    if (f) { hit = { number: pr.number, title: pr.title, url: pr.url, state: pr.state, file: f }; break; }\n  }\n  if (hit) covered.push({ ...t, coveredBy: hit }); else open.push(t);\n}\n// An absent maxTests means \"four\", but an explicit 0 means zero: it is how a release is smoke-tested\n// without spending a VmAgent run. Only a missing/blank value falls back.\nconst maxRaw = s.maxTests;\nconst max = (maxRaw === undefined || maxRaw === null || maxRaw === '') ? 4 : Math.max(0, Math.floor(Number(maxRaw) || 0));\nconst selected = open.slice(0, max);\n// Named, so the digest says what the cap dropped instead of only how many.\nconst skippedGroups = open.slice(max).map(t => ({ file: t.file, title: t.title, siblings: t.siblings || [] }));\n// Wall-clock budget for the sequential queue: blank/missing falls back to 240 minutes, but an\n// explicit 0 (immediate-break canary) must not be coerced back to the fallback.\nconst raw = s.budgetMinutes;\nconst blank = raw === undefined || raw === null || String(raw).trim() === '';\nconst minutes = blank ? 240 : Math.max(0, Number.isFinite(Number(raw)) ? Number(raw) : 240);\nconst deadline = Date.now() + minutes * 60000;\nreturn { selected, covered, skippedGroups, skipped: skippedGroups.length, total: sel.total, totalTests: sel.totalTests, prs: prList, deadline, invalidRows: sel.invalidRows || 0 };"
         }
       },
       "outputs": {
@@ -1038,6 +1065,12 @@
                     }
                   }
                 }
+              },
+              "deadline": {
+                "type": "number"
+              },
+              "invalidRows": {
+                "type": "number"
               }
             }
           }
@@ -1358,8 +1391,22 @@
       "id": "e_loop_start",
       "sourceNodeId": "investigate",
       "sourcePort": "start",
+      "targetNodeId": "withinBudget",
+      "targetPort": "input"
+    },
+    {
+      "id": "e_withinBudget_true_vm",
+      "sourceNodeId": "withinBudget",
+      "sourcePort": "true",
       "targetNodeId": "callVmAgent",
       "targetPort": "input"
+    },
+    {
+      "id": "e_withinBudget_false_break",
+      "sourceNodeId": "withinBudget",
+      "sourcePort": "false",
+      "targetNodeId": "investigate",
+      "targetPort": "break"
     },
     {
       "id": "e_vm_ok",
@@ -2907,7 +2954,14 @@
         "id": "maxTests",
         "direction": "in",
         "type": "number",
-        "defaultValue": 1,
+        "defaultValue": 4,
+        "triggerNodeId": "start"
+      },
+      {
+        "id": "budgetMinutes",
+        "direction": "in",
+        "type": "number",
+        "defaultValue": 240,
         "triggerNodeId": "start"
       },
       {
@@ -4051,6 +4105,17 @@
         "size": {
           "width": 576,
           "height": 320
+        },
+        "collapsed": false
+      },
+      "withinBudget": {
+        "position": {
+          "x": 24,
+          "y": 112
+        },
+        "size": {
+          "width": 96,
+          "height": 96
         },
         "collapsed": false
       },
