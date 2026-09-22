@@ -3,12 +3,15 @@
 Rewrite this file; do not append to it. Dated run write-ups belong in `LOG.md`, traps in
 `TRAPS.md` / `FINDINGS-uip.md`, commands in `RUNBOOK.md`, shape in `ARCHITECTURE.md`.
 
-Last updated 2026-09-21.
+Last updated 2026-09-22.
 
 ## Released
 
 - **Deployment:** `Shared/vm-agent 12`, package identity `vm-agent 8`, version **1.1.12**.
-- **`vm-exec` 1.0.5** is published and live (`vm-exec-vm` points at it).
+- **`vm-exec` 1.0.9** is published and live (`vm-exec-vm` points at it). 1.0.6-1.0.8 were
+  published by earlier work that never updated this file; a version that already exists gets a
+  409 `El paquete ya existe` and `release-vm-exec.sh` aborts there, so check
+  `uip or packages versions vm-exec` before picking one.
 - **CI hook:** flow-workbench PR
   [#3756](https://github.com/UiPath/flow-workbench/pull/3756) posts the nightly payload.
 
@@ -39,31 +42,24 @@ Details and dates: `LOG.md`.
   patch is sound and the spec passes; the fixer said `confidence: medium` and that is the honest
   reading.
 
-## Blocked on a human
+## Slack upload: proven
 
-**The Slack app is not approved for the workspace yet**, so there is no token with
-`files:write` to put in the asset. The `SLACK_BOT_TOKEN` Secret asset in folder
-**`e2e-investigator`** is still empty: `vm-exec` injects nothing, and the `report` phase
-renders its file into `state.zip` and uploads nothing. That is
-the safe state - no fault, no silence - but it is also why `summarize` **still carries the
-per-group cause / repro / finding lines**. Deleting them before the upload works would make
-the nightly say less than it does today; the block to delete is marked in the `summarize`
-script. Until then the only net change to the nightly message is the 3500-char cap.
+The Slack app was approved on 2026-09-22 and the upload works end to end. Proven on the VM
+with `./probe-script.sh vm/probes/slack-upload.ps1`: `posted: true`, file in-thread with its
+`initial_comment`, one second.
 
-To turn the per-group reports on:
+- App **E2E test failure investigator**, Product workspace, scope **`files:write`**, invited
+  to `#flow-dev-frontend` (`C0AH25MT3L5`). The first approval covered the original scope set
+  and had to be re-requested once `files:write` was added.
+- The token is the **`SLACK_BOT_TOKEN` Secret asset** in `e2e-investigator` (the process
+  folder for `vm-exec-vm`, not the deployment folder - `release.sh` recreates that one).
+  A bot token has no username half, so it is a Secret read with `GetSecret`, not a Credential.
+- Slack token rotation must stay **off** on the app: a rotating `xoxb` expires every 12 hours
+  and a static asset has no way to refresh it. Revocation is app reinstall.
 
-1. Get a Slack app token with the **`files:write`** scope.
-2. **Invite that app to `#flow-dev-frontend` (`C0AH25MT3L5`)** — a bot identity previously got
-   `channel_not_found` there precisely because it was not a member, which is why the connector
-   nodes run `send_as=user`.
-3. Set it as the value of the `SLACK_BOT_TOKEN` **Secret** asset in `e2e-investigator` (the
-   process folder for `vm-exec-vm`). Not the deployment folder: `release.sh` recreates that
-   one every time. A bot token has no username half, so this is a Secret, not a Credential -
-   `vm-exec` reads it with `GetSecret`, and the switch needs a `./release-vm-exec.sh <version>`
-   to reach the VM.
-
-Then `./probe-script.sh vm/probes/slack-upload.ps1` proves it in ~5 minutes, and the marked
-block in `summarize` comes out.
+Still to do, now that it works: delete the marked block in `summarize` that keeps the
+per-group cause / repro / finding lines in the roll-up. They stayed only because the upload
+did not work yet; the uploaded report carries all three.
 
 ## In the tree, not released
 
@@ -76,13 +72,11 @@ block in `summarize` comes out.
 
 ## Do this next
 
-1. **Per-group Slack reports.** `vm/selfcheck.ps1` passes locally; nothing else is verified,
-   and the upload is blocked on the app approval above. What does not need the token:
-   `./probe-phase.sh report <runId>` against a runId whose `state.zip` still has a
-   `notebook.md` (push first — the bootstrap fetches the ref), which proves the rendering and
-   the STATUS line. Once the token exists: `./probe-script.sh vm/probes/slack-upload.ps1`,
-   then one `VmAgent` group end to end with `slackThreadTs` set to a scratch thread, then drop
-   the marked block in `summarize`.
+1. **Per-group Slack reports.** `vm/selfcheck.ps1` and the upload probe both pass; the
+   `report` phase itself has never run. Next: `./probe-phase.sh report <runId>` against a
+   runId whose `state.zip` still has a `notebook.md` (push first — the bootstrap fetches the
+   ref, not your working tree), then one `VmAgent` group end to end with `slackThreadTs` set
+   to a scratch thread, then drop the marked block in `summarize`.
 2. **Release and run the queued-groups work.** `./release.sh <version>
    inputs/orchestrator-<latest>.json NightlyOrchestrator`, starting with a `maxTests: 0` canary.
 3. **Take PR #3756 out of draft** once one tenant-side CI run has proven the token exchange.
@@ -95,7 +89,7 @@ block in `summarize` comes out.
 ## Open items / cleanup owed
 
 - Slack "edit one message" is dropped rather than owed: with one report per group there is
-  nothing left to edit. The upload path needs a real `SLACK_BOT_TOKEN` (see below).
+  nothing left to edit.
 - Slack renders `<`/`>` from the hypothesis escaped (`&lt;nav&gt;`); strip them in `summarize`.
 - VmAgent still reproduced the Map-operation failure on `develop` after flow-workbench #3758
   merged; #3758 may not cover it.

@@ -11,7 +11,7 @@
 $ErrorActionPreference = 'Continue'
 
 $CHANNEL = 'C0AH25MT3L5'   # #flow-dev-frontend
-$THREAD_TS = ''            # <- the ts of a scratch thread in that channel
+$THREAD_TS = '1790056701.314419'   # <- scratch thread in that channel
 
 # probe-script.sh inlines this from the working tree; there is no checkout on the VM.
 . vm/lib/prologue.ps1
