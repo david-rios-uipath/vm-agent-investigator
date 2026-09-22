@@ -6,13 +6,80 @@
     "type": "flow",
     "apiVersion": "orchestrator.uipath.com/v1",
     "projectKey": "31eb5740-29bc-40a7-a848-5ca76aba9013",
+    "isOverridable": true,
     "dependencies": [
       {
         "kind": "package",
         "name": "NightlyOrchestrator"
       }
     ],
-    "runtimeDependencies": [],
+    "runtimeDependencies": [
+      {
+        "bindingType": "process",
+        "bindingKey": "4a7879cf-7494-4ada-9e83-ea487a4b55cb",
+        "bindingValues": {
+          "folderPath": {
+            "defaultValue": "",
+            "isExpression": false
+          },
+          "name": {
+            "defaultValue": "VmAgent",
+            "isExpression": false
+          }
+        },
+        "bindingMetadata": {
+          "activityName": "Failed tests (nightly artifact on the VM)",
+          "bindingsVersion": "2.2",
+          "solutionsSupport": "true"
+        },
+        "resourceKind": "Process"
+      },
+      {
+        "bindingType": "connection",
+        "bindingKey": "ccf82d4b-3c2a-492f-bf8f-939b565366a2",
+        "bindingValues": {
+          "connectionId": {
+            "defaultValue": "ccf82d4b-3c2a-492f-bf8f-939b565366a2",
+            "isExpression": false
+          }
+        },
+        "bindingMetadata": {
+          "activityName": "Send 'start' notification in Slack thread",
+          "bindingsVersion": "2.2",
+          "connector": "uipath-salesforce-slack",
+          "useConnectionService": "true"
+        },
+        "resourceKind": "Connection",
+        "resourceType": "uipath-salesforce-slack",
+        "resourceKey": "ccf82d4b-3c2a-492f-bf8f-939b565366a2",
+        "resourceName": "david.rios",
+        "folderKey": "0b28296b-1f4a-4ea9-a3d5-8b0abaac1cf0"
+      },
+      {
+        "bindingType": "process",
+        "bindingKey": "e2e-investigator.vm-exec-vm",
+        "bindingValues": {
+          "folderKey": {
+            "defaultValue": "0b28296b-1f4a-4ea9-a3d5-8b0abaac1cf0",
+            "isExpression": false
+          },
+          "folderPath": {
+            "defaultValue": "e2e-investigator",
+            "isExpression": false
+          },
+          "name": {
+            "defaultValue": "vm-exec-vm",
+            "isExpression": false
+          }
+        },
+        "bindingMetadata": {
+          "activityName": "Failed tests (nightly artifact on the VM)",
+          "bindingsVersion": "2.2",
+          "solutionsSupport": "true"
+        },
+        "resourceKind": "Process"
+      }
+    ],
     "folders": [
       {
         "fullyQualifiedName": "solution_folder"
