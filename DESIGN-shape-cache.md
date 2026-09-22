@@ -1,6 +1,9 @@
 # Design: failure-shape cache and a backlog that drains
 
-Status: proposed, 2026-09-08. Nothing here is built.
+Status: proposed, 2026-09-08. Built so far (2026-09-22): the sequential budgeted queue, and a
+level-0 history — `cache/history.zip` in the bucket, one row per investigated group, and
+`pickTests` skipping any shape investigated in the last 3 nights (`ARCHITECTURE.md`, "Shape
+history"). The record below (`shapes.jsonl`, `fix`, `hypothesis`, the verifier) is not built.
 
 ## The problem, in one run
 

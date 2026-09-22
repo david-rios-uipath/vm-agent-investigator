@@ -96,10 +96,11 @@ single investigate pass cost $4.51 and a fix pass $2.29 on 2026-09-08, the wrong
 job meant to run nightly. Set `claude-haiku-4-5-20251001` when testing plumbing rather than
 reasoning; `probe-phase.sh` reads the same lever from `CLAUDE_MODEL` and also defaults to Sonnet.
 
-The summarizer agent node stays on `anthropic.claude-opus-4-8`: it runs through the LLM gateway,
-which is billed separately from the Claude Code account the phases use. If it ever moves, that
-model lives in `VmAgent.flow` **and** in two `agent.json` copies, all three of which must be
-patched together.
+The summarizer agent node runs on `anthropic.claude-sonnet-5` (moved from Opus 4.8 on
+2026-09-22: it has no tools and only restates the notebook, so Opus bought nothing). It runs
+through the LLM gateway, which is billed separately from the Claude Code account the phases use.
+If it ever moves, that model lives in `VmAgent.flow` **and** in two `agent.json` copies, all
+three of which must be patched together.
 
 `maxIterations` and the `iteration` global are gone with the investigator loop.
 
@@ -151,8 +152,8 @@ posts its own report into the Slack thread as it finishes; the orchestrator adds
 the end.
 
 Shape: `start -> selectTests -> investigate` (sequential loop with a budget check:
-`withinBudget -> callVmAgent -> recordResult`) `-> summarize -> replyInSlackThread1 -> end`.
-17 nodes.
+`withinBudget -> callVmAgent -> recordResult`) `-> summarize -> recordHistory -> replyInSlackThread1
+-> end`. 18 nodes.
 
 ### Trigger inputs
 
@@ -211,8 +212,8 @@ manual run may use, and the cost of raising the default — is in `RUNBOOK.md`.
   connector — it needs `files.completeUploadExternal`, which the connector has no operation for,
   so it runs on the VM against the `SLACK_BOT_TOKEN` asset and therefore posts as the app. That app
   must be a member of `#flow-dev-frontend` or the upload gets the same `channel_not_found`.
-- **Open/merged PR check before investigating.** `ghPrs` is a `vm-exec-vm` job (no state key,
-  5 min) whose PowerShell calls the GitHub API with the injected `GH_TOKEN`: the 40 most recently
+- **Open/merged PR check before investigating.** `ghPrs` is a `vm-exec-vm` job (state key
+  `cache/history.zip`, 5 min) whose PowerShell calls the GitHub API with the injected `GH_TOKEN`: the 40 most recently
   updated PRs, kept if open (updated ≤14 days) or merged ≤48 h, each with its changed-file
   basenames, printed as one compact `PRS_JSON=[{n,t,s,f}]` line (≈20 KB). `parsePrs` expands it;
   `pickTests` marks a group covered when a PR touches its spec file or a page object named in its
@@ -221,6 +222,21 @@ manual run may use, and the cost of raising the default — is in `RUNBOOK.md`.
   the Integration Service GitHub connector returns ~20 KB per PR and Maestro faulted with "The
   instance's variables exceed the maximum allowed size" even at 10 PRs; 153 PRs with patches also
   stalled a parallel loop for 10+ minutes. Keep flow variables small.
+- **Shape history: a cause investigated in the last 3 nights waits.** The same three groups
+  came back on consecutive nights and one was inconclusive twice, each time for a fresh VmAgent
+  run. `selectTests` now names each group's cause key as `shape`. `recordHistory` (after
+  `summarize`, same `vm-exec-vm` shape as `ghPrs`) appends one row per non-faulted result to
+  `history.jsonl` inside bucket `e2e-investigations/cache/history.zip`, which vm-exec's
+  `StateKey` already pulls and pushes: `{s: shape, f: file, t: title, r: nightly runId, a: ISO
+  time, v: verdict, p: prUrl}`, rows older than 30 days dropped on write. `ghPrs` reads the
+  same archive and prints `HISTORY_JSON=[...]`; `parsePrs` expands it; `pickTests` moves any
+  open group whose shape was recorded within 72 h to `recent`, and the digest says `not
+  investigated: same cause seen yesterday (reproduced, no fix)`. Rules: a PR touching the spec
+  wins (`covered` is computed first); faulted children are never recorded, so an infrastructure
+  failure cannot hide a group; a missing or unreadable archive is simply no history. A failed
+  `recordHistory` still posts the digest (its error port also goes to `hasSlackThreadEnd`).
+  This is the level-0 slice of `DESIGN-shape-cache.md`; the verifier, `nightsSeen` ordering
+  and `hypothesis` carry-over are not built.
 - **CI hand-off:** flow-workbench PR
   [#3756](https://github.com/UiPath/flow-workbench/pull/3756) posts this payload from the nightly
   workflow. It resolves the release by process name `NightlyOrchestrator`, so do not rename the

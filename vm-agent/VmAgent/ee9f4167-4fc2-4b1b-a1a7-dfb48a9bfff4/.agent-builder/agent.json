@@ -1,7 +1,7 @@
 {
   "version": "1.2.0",
   "settings": {
-    "model": "anthropic.claude-opus-4-8",
+    "model": "anthropic.claude-sonnet-5",
     "maxTokens": 16384,
     "temperature": 0,
     "engine": "basic-v2",

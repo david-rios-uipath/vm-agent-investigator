@@ -69,6 +69,9 @@ did not work yet; the uploaded report carries all three.
   failure groups — PR
   [#1](https://github.com/david-rios-uipath/vm-agent-investigator/pull/1). `ARCHITECTURE.md` does
   not describe these yet.
+- Shape history (`recordHistory`, `cache/history.zip`): a cause investigated in the last 3
+  nights is not investigated again. Unit-tested against the flow source; never run on a VM. The
+  summarizer moved from Opus 4.8 to Sonnet 5 (branch `chore/summarizer-sonnet-5`).
 
 ## Do this next
 
@@ -77,7 +80,10 @@ did not work yet; the uploaded report carries all three.
    runId whose `state.zip` still has a `notebook.md` (push first — the bootstrap fetches the
    ref, not your working tree), then one `VmAgent` group end to end with `slackThreadTs` set
    to a scratch thread, then drop the marked block in `summarize`.
-2. **Release and run the queued-groups work.** `./release.sh <version>
+2. **Release and run the queued-groups work** (now including shape history: after the first
+   run, `uip or bucket-files list be6369c7-02a4-4b80-957b-e95d06177692 --folder-path
+   "e2e-investigator"` should show `cache/history.zip`; the second night's digest should name
+   the repeated causes as `same cause seen yesterday`). `./release.sh <version>
    inputs/orchestrator-<latest>.json NightlyOrchestrator`, starting with a `maxTests: 0` canary.
 3. **Take PR #3756 out of draft** once one tenant-side CI run has proven the token exchange.
 4. **Uninstall the wedged `vm-agent 11` deployment** once Orchestrator clears its three

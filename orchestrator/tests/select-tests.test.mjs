@@ -8,7 +8,11 @@ const scriptOf = (id) => {
   assert.ok(n, `node ${id} missing`);
   return n.inputs.script.expression;
 };
-const run = (id, $vars) => new Function('$vars', scriptOf(id))($vars);
+const run = (id, $vars) => {
+  const m = id.match(/^(.+)-Script$/);
+  if (m) return new Function('$vars', 'return ' + flow.nodes.find((n) => n.id === m[1]).inputs.Script.expression)($vars);
+  return new Function('$vars', scriptOf(id))($vars);
+};
 const input = JSON.parse(readFileSync(new URL('../../inputs/orchestrator-34015558366.json', import.meta.url)));
 const night2 = JSON.parse(readFileSync(new URL('../../inputs/orchestrator-34089391590.json', import.meta.url)));
 
@@ -83,7 +87,7 @@ const prsOut = { prs: [
   const stdout = 'noise\n[prcheck] 2 candidate PRs\nPRS_JSON=' + JSON.stringify(compact) + '\n';
   const out = run('parsePrs', { ghPrs: { output: { ExitCode: 0, Stdout: stdout } } });
   assert.equal(out.ok, true); assert.equal(out.prs.length, 2); assert.deepEqual(out.prs[0], { number: 3758, title: prsOut.prs[0].title, url: 'https://github.com/UiPath/flow-workbench/pull/3758', state: 'merged', files: ['StudioProjectsPage.ts', 'NeighborRail.tsx'] });
-  assert.deepEqual(run('parsePrs', { ghPrs: { output: { ExitCode: 1, Stdout: 'boom' } } }), { prs: [], ok: false, exitCode: 1 });
+  assert.deepEqual(run('parsePrs', { ghPrs: { output: { ExitCode: 1, Stdout: 'boom' } } }), { prs: [], ok: false, exitCode: 1, history: [] });
   assert.equal(run('parsePrs', { ghPrs: { output: { Stdout: 'PRS_JSON={bad' } } }).ok, false);
   assert.equal(run('parsePrs', { ghPrs: { error: { message: 'x' } } }).ok, false);
 }
@@ -122,6 +126,55 @@ console.log('pickTests ok');
   assert.equal(failed.costUsd, 0, 'a faulted run contributes nothing');
 }
 console.log('recordResult ok');
+// History: a shape investigated in the last 3 nights waits; older, faulted or PR-covered ones do not.
+{
+  assert.ok(sel2.groups.every((g) => g.shape), 'selectTests names every group\'s shape');
+  const compact = (shape, daysAgo, extra = {}) => ({ s: shape, f: 'x.spec.ts', t: 'x', r: '1', a: new Date(Date.now() - daysAgo * 86400000).toISOString(), v: 'reproduced, no fix', ...extra });
+  const target = sel2.groups.find((g) => g.title === 'should add a Map operation with field mappings');
+  const stdout = 'PRS_JSON=[]\nHISTORY_JSON=' + JSON.stringify([compact(target.shape, 1, { p: 'https://x/9' }), compact('other', 1)]) + '\n';
+  const parsed = run('parsePrs', { ghPrs: { output: { ExitCode: 0, Stdout: stdout } } });
+  assert.equal(parsed.history.length, 2); assert.equal(parsed.history[0].shape, target.shape); assert.equal(parsed.history[0].prUrl, 'https://x/9');
+  assert.deepEqual(run('parsePrs', { ghPrs: { output: { Stdout: 'PRS_JSON=[]\nHISTORY_JSON={bad' } } }).history, [], 'bad history is no history');
+
+  const pick = run('pickTests', { start: { output: night2 }, selectTests: { output: sel2 }, parsePrs: { output: { ...parsed, ok: true } } });
+  assert.equal(pick.recent.length, 1, 'the Map group was investigated yesterday');
+  assert.equal(pick.recent[0].title, target.title); assert.equal(pick.recent[0].lastRun.prUrl, 'https://x/9');
+  assert.ok(!pick.selected.some((t) => t.title === target.title), 'and is not selected again');
+  assert.ok(!pick.skippedGroups.some((t) => t.title === target.title), 'nor counted as dropped by the cap');
+
+  const stale = run('parsePrs', { ghPrs: { output: { Stdout: 'PRS_JSON=[]\nHISTORY_JSON=' + JSON.stringify([compact(target.shape, 4)]) } } });
+  const pickStale = run('pickTests', { start: { output: night2 }, selectTests: { output: sel2 }, parsePrs: { output: stale } });
+  assert.equal(pickStale.recent.length, 0, 'four nights ago is old enough to look again');
+
+  // A PR that touches the spec wins over history: the group is reported as covered, not recent.
+  const coveredShape = sel2.groups.find((g) => /StudioProjectsPage/.test(g.error)).shape;
+  const both = run('pickTests', { start: { output: night2 }, selectTests: { output: sel2 }, parsePrs: { output: { ...prsOut, history: [{ shape: coveredShape, at: new Date().toISOString(), verdict: 'x' }] } } });
+  assert.equal(both.covered.length, 1); assert.equal(both.recent.length, 0);
+
+  // The digest names what waited and why.
+  const text = run('summarize', { start: { output: night2 }, pickTests: { output: pick }, investigate: { output: [] } }).text;
+  assert.match(text, /not investigated: same cause seen yesterday \(reproduced, no fix, <https:\/\/x\/9\|draft PR>\)/);
+
+  // recordResult carries the shape; recordHistory writes only non-faulted rows, base64-encoded.
+  const t = pick.selected[0];
+  const rec = run('recordResult', { investigate: { currentItem: t }, pickTests: { output: pick }, callVmAgent: { output: { reproduced: true } } });
+  assert.equal(rec.shape, t.shape);
+  const faulted = { ...rec, failed: true, title: 'faulted one' };
+  const ps = run('recordHistory-Script', { start: { output: { runId: '999' } }, investigate: { output: [{ recordResult: { output: rec } }, faulted] } });
+  assert.match(ps, /history-999\.state\.zip/);
+  const rows = JSON.parse(Buffer.from(ps.match(/FromBase64String\('([^']+)'\)/)[1], 'base64').toString('utf8'));
+  assert.equal(rows.length, 1, 'the faulted row is not recorded');
+  assert.deepEqual([rows[0].s, rows[0].t, rows[0].v, rows[0].r], [t.shape, t.title, 'reproduced, no fix', '999']);
+  // ghPrs pulls the same archive it will be asked to read.
+  const gh = flow.nodes.find((n) => n.id === 'ghPrs');
+  assert.equal(gh.inputs.StateKey.expression, 'cache/history.zip');
+  assert.equal(flow.nodes.find((n) => n.id === 'recordHistory').inputs.StateKey.expression, 'cache/history.zip');
+  assert.match(run('ghPrs-Script', { start: { output: { runId: '999' } } }), /\$vmRunId = 'prcheck-999'[\s\S]*HISTORY_JSON=/);
+  assert.ok(flow.edges.some((e) => e.sourceNodeId === 'summarize' && e.targetNodeId === 'recordHistory'));
+  assert.ok(flow.edges.some((e) => e.sourceNodeId === 'recordHistory' && e.sourcePort === 'error' && e.targetNodeId === 'hasSlackThreadEnd'), 'a failed history write still posts the digest');
+}
+console.log('history ok');
+
 
 // summarize: total Claude spend is the sum over the runs
 {
