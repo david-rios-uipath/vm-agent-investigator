@@ -42,9 +42,9 @@ Details and dates: `LOG.md`.
 ## Blocked on a human
 
 **The Slack app is not approved for the workspace yet**, so there is no token with
-`files:write` to put in the asset. The `SLACK_TOKEN` Credential asset in folder
-**`e2e-investigator`** is still a placeholder with an empty password: `vm-exec` injects
-nothing, and the `report` phase renders its file into `state.zip` and uploads nothing. That is
+`files:write` to put in the asset. The `SLACK_BOT_TOKEN` Secret asset in folder
+**`e2e-investigator`** is still empty: `vm-exec` injects nothing, and the `report` phase
+renders its file into `state.zip` and uploads nothing. That is
 the safe state - no fault, no silence - but it is also why `summarize` **still carries the
 per-group cause / repro / finding lines**. Deleting them before the upload works would make
 the nightly say less than it does today; the block to delete is marked in the `summarize`
@@ -56,8 +56,11 @@ To turn the per-group reports on:
 2. **Invite that app to `#flow-dev-frontend` (`C0AH25MT3L5`)** — a bot identity previously got
    `channel_not_found` there precisely because it was not a member, which is why the connector
    nodes run `send_as=user`.
-3. Set it as the password of `SLACK_TOKEN` in `e2e-investigator` (the process folder for
-   `vm-exec-vm`). Not the deployment folder: `release.sh` recreates that one every time.
+3. Set it as the value of the `SLACK_BOT_TOKEN` **Secret** asset in `e2e-investigator` (the
+   process folder for `vm-exec-vm`). Not the deployment folder: `release.sh` recreates that
+   one every time. A bot token has no username half, so this is a Secret, not a Credential -
+   `vm-exec` reads it with `GetSecret`, and the switch needs a `./release-vm-exec.sh <version>`
+   to reach the VM.
 
 Then `./probe-script.sh vm/probes/slack-upload.ps1` proves it in ~5 minutes, and the marked
 block in `summarize` comes out.
@@ -92,7 +95,7 @@ block in `summarize` comes out.
 ## Open items / cleanup owed
 
 - Slack "edit one message" is dropped rather than owed: with one report per group there is
-  nothing left to edit. The upload path needs a real `SLACK_TOKEN` (see below).
+  nothing left to edit. The upload path needs a real `SLACK_BOT_TOKEN` (see below).
 - Slack renders `<`/`>` from the hypothesis escaped (`&lt;nav&gt;`); strip them in `summarize`.
 - VmAgent still reproduced the Map-operation failure on `develop` after flow-workbench #3758
   merged; #3758 may not cover it.
@@ -103,7 +106,8 @@ block in `summarize` comes out.
   machine-wide.
 - The `Shared/vm-agent 12` folder is recreated on every redeploy, which drops machine assignments
   and hand-made assets. The three placeholder credential assets
-  (`GH_TOKEN`/`SLACK_TOKEN`/`SLACK_COOKIE`) and the VM machine template assignment from the
+  (`GH_TOKEN`/`SLACK_COOKIE`, and `SLACK_BOT_TOKEN` before it became a Secret) and the VM machine
+  template assignment from the
   abandoned single-folder experiment may or may not still be there; they are harmless.
 - `vm-agent-priv` deployment in the personal workspace — dead end, uninstall it.
 - Nine Studio Web solutions `vm-agent` … `vm-agent 9` exist; David declined bulk deletion.

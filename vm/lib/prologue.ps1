@@ -385,12 +385,12 @@ function Send-SlackFile {
     [string] $Title = ''
   )
   if (-not $Channel -or -not $ThreadTs) { Write-Host '[slack] no channel/thread given; rendered only, nothing uploaded'; return $false }
-  if (-not $env:SLACK_TOKEN) { Write-Host '[slack] SLACK_TOKEN was not injected; nothing uploaded'; return $false }
+  if (-not $env:SLACK_BOT_TOKEN) { Write-Host '[slack] SLACK_BOT_TOKEN was not injected; nothing uploaded'; return $false }
   if (-not (Test-Path $Path)) { Write-Host "[slack] $Path does not exist; nothing uploaded"; return $false }
 
   $name = Split-Path $Path -Leaf
   $bytes = [System.IO.File]::ReadAllBytes($Path)
-  $auth = @{ Authorization = "Bearer $($env:SLACK_TOKEN)" }
+  $auth = @{ Authorization = "Bearer $($env:SLACK_BOT_TOKEN)" }
   try {
     $res = Invoke-RestMethod 'https://slack.com/api/files.getUploadURLExternal' -Method Post -Headers $auth `
       -Body @{ filename = $name; length = $bytes.Length }

@@ -49,7 +49,7 @@ settled with it.
 ./probe-script.sh vm/probes/slack-upload.ps1    # set $THREAD_TS in the file first
 ```
 
-That probe is where a missing `files:write` scope, a placeholder `SLACK_TOKEN` asset or an app
+That probe is where a missing `files:write` scope, a placeholder `SLACK_BOT_TOKEN` asset or an app
 that was never invited to `#flow-dev-frontend` shows up, before the `report` phase depends on
 any of them.
 

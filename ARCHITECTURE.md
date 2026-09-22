@@ -45,7 +45,8 @@ is a roll-up after it (counts, spend, covered and deferred groups, capped at 350
 The VM uploads it, not the flow: `callVmAgent`'s output schema has no room for a notebook, and
 routing 4 x 20 KB of one through flow variables is what broke the GitHub-connector PR fetch
 ("The instance's variables exceed the maximum allowed size"). `vm-exec` already injects and
-redacts `SLACK_TOKEN`, so the file never leaves the VM as a flow variable.
+redacts `SLACK_BOT_TOKEN` (a **Secret** asset, read with `GetSecret` - a bot token has no
+username half), so the file never leaves the VM as a flow variable.
 
 Three calls, in `Send-SlackFile` (prologue): `files.getUploadURLExternal`, the bytes, then
 `files.completeUploadExternal` with `channel_id`, `thread_ts` and `initial_comment`. An empty
@@ -105,10 +106,11 @@ patched together.
 ### `vm-exec` (`vm-agent/vm-exec/Main.xaml`)
 
 An `ANTHROPIC_API_KEY` asset injected as an env var and added to the redaction list; a `StateKey`
-in-argument; defaults of 45 minutes and 32000 output chars. The key is a **Secret** asset in
-`e2e-investigator`, so `vm-exec` reads it with `ui:GetSecret`, not `ui:GetRobotCredential` (the
-other three tokens are Credential assets). Both hand back a `SecureString`, so the env-var
-injection is identical.
+in-argument; defaults of 45 minutes and 32000 output chars. `ANTHROPIC_API_KEY`,
+`GH_NPM_REGISTRY_TOKEN`, `PLAYWRIGHT_PASSWORD` and `SLACK_BOT_TOKEN` are **Secret** assets in
+`e2e-investigator`, read with `ui:GetSecret`; `GH_TOKEN` and `SLACK_COOKIE` are Credentials,
+read with `ui:GetRobotCredential`. A bot token has no username half, which is why `SLACK_BOT_TOKEN`
+is a Secret. Both activities hand back a `SecureString`, so the env-var injection is identical.
 
 `vm-exec` **does not ship through `release.sh`** — see `RUNBOOK.md`.
 
@@ -207,7 +209,7 @@ manual run may use, and the cost of raising the default — is in `RUNBOOK.md`.
   token is. The node id is **`replyInSlackThread1`**; `uip maestro flow node add` does not let you
   choose an id. The per-group file upload is the one Slack call that does *not* go through the
   connector — it needs `files.completeUploadExternal`, which the connector has no operation for,
-  so it runs on the VM against the `SLACK_TOKEN` asset and therefore posts as the app. That app
+  so it runs on the VM against the `SLACK_BOT_TOKEN` asset and therefore posts as the app. That app
   must be a member of `#flow-dev-frontend` or the upload gets the same `channel_not_found`.
 - **Open/merged PR check before investigating.** `ghPrs` is a `vm-exec-vm` job (no state key,
   5 min) whose PowerShell calls the GitHub API with the injected `GH_TOKEN`: the 40 most recently
