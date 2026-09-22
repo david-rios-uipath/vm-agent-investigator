@@ -134,6 +134,28 @@ Deployment moved to `vm-agent 12` the same day: `vm-agent 11` is wedged with thr
 stuck in `Terminating` after `jobs stop --strategy Kill`, so its uninstall fails validation. Leave
 it. CI (`start-nightly-investigation.sh`) targets the new folder.
 
+## 1.1.19 — the sequential queue, proven (2026-09-22)
+
+Released 1.1.18 (`3c0d370`) then 1.1.19 (`8e3a865`) into `e2e-investigator/vm-agent 13`; each
+started with a `maxTests: 0` / `budgetMinutes: 0` canary (Successful in 4 and 7.5 min, no
+children, no Slack). The deployed version before this was **1.1.17**, not the 1.1.12 STATUS.md
+claimed — `uip solution deploy list` is the truth, and publish rejects an existing version with
+HTTP 400.
+
+Sequential test, job `6b4d9bf0` (`maxTests: 2`, `budgetMinutes: 120`,
+`claudeModel: claude-haiku-4-5-20251001`, `slackTs` stripped so nothing posted):
+
+| job | start | end |
+|---|---|---|
+| parent `6b4d9bf0` | 15:24:35Z | 15:34:54Z |
+| child 1 `bc7940f6` | 15:26:52Z | 15:31:27Z |
+| child 2 `4b0acb08` | 15:31:35Z | 15:34:46Z |
+
+Child 2 started 8 s after child 1 ended — no overlap, which `parallel: true` could not produce.
+Both children exited early as `CLASSIFICATION: flake` ("CI history shows the targeted test ending
+green in the newest nightly"), so no repro ran: the loop and the child call path are proven, the
+long-tail phase timing is not. No PRs opened, cost effectively zero.
+
 ## Bugs fixed, with commits
 
 | what | commit |

@@ -7,7 +7,10 @@ Last updated 2026-09-22.
 
 ## Released
 
-- **Deployment:** `Shared/vm-agent 12`, package identity `vm-agent 8`, version **1.1.12**.
+- **Deployment:** `e2e-investigator/vm-agent 13`, package identity `vm-agent 8`, version
+  **1.1.19** (2026-09-22). 1.1.13-1.1.17 were released by earlier work that never updated this
+  file; `uip solution deploy list` is the truth, and a version that already exists is rejected
+  with HTTP 400 at publish.
 - **`vm-exec` 1.0.9** is published and live (`vm-exec-vm` points at it). 1.0.6-1.0.8 were
   published by earlier work that never updated this file; a version that already exists gets a
   409 `El paquete ya existe` and `release-vm-exec.sh` aborts there, so check
@@ -21,6 +24,10 @@ Last updated 2026-09-22.
   -> summarizer -> end`, twice, on two different specs, with a real draft PR both times.
 - `NightlyOrchestrator` end to end on the 2026-09-07 nightly: 6 failed tests -> 3 causes, 2
   attributed to a merged PR by the PR check, the third investigated, one Slack reply posted.
+- **The sequential queue** (2026-09-22, 1.1.19): `maxTests: 2`, `budgetMinutes: 120`, Haiku.
+  Child 1 ran 15:26:52-15:31:27 UTC, child 2 started 15:31:35 — 8 s after child 1 ended, no
+  overlap. Both children exited early as `CLASSIFICATION: flake`, so the loop and the child call
+  path are proven; the long-tail phase timing is not.
 - The in-solution `VmAgent` process binding resolves in a deployed folder.
 - vsix phases `repro` / `investigate` / `fix` on `vsix-alpha-windows`, one at a time through
   `probe-phase.sh`.
@@ -65,13 +72,9 @@ did not work yet; the uploaded report carries all three.
 
 - Per-group Slack reports: the `report` phase, `vm/lib/report.ps1`, `Send-SlackFile`, and the
   shrunken `summarize` roll-up (this branch).
-- The VM-side `fetchFailures` process, the cost report, and the queued (rather than dropped)
-  failure groups — PR
-  [#1](https://github.com/david-rios-uipath/vm-agent-investigator/pull/1). `ARCHITECTURE.md` does
-  not describe these yet.
-- Shape history (`recordHistory`, `cache/history.zip`): a cause investigated in the last 3
-  nights is not investigated again. Unit-tested against the flow source; never run on a VM. The
-  summarizer moved from Opus 4.8 to Sonnet 5 (branch `chore/summarizer-sonnet-5`).
+- Shape history (`recordHistory`, `cache/history.zip`) is **released in 1.1.19 but unproven**: a
+  cause investigated in the last 3 nights should not be investigated again. Unit-tested against
+  the flow source; no VM run has written `cache/history.zip` yet.
 
 ## Do this next
 
@@ -80,11 +83,11 @@ did not work yet; the uploaded report carries all three.
    runId whose `state.zip` still has a `notebook.md` (push first — the bootstrap fetches the
    ref, not your working tree), then one `VmAgent` group end to end with `slackThreadTs` set
    to a scratch thread, then drop the marked block in `summarize`.
-2. **Release and run the queued-groups work** (now including shape history: after the first
-   run, `uip or bucket-files list be6369c7-02a4-4b80-957b-e95d06177692 --folder-path
-   "e2e-investigator"` should show `cache/history.zip`; the second night's digest should name
-   the repeated causes as `same cause seen yesterday`). `./release.sh <version>
-   inputs/orchestrator-<latest>.json NightlyOrchestrator`, starting with a `maxTests: 0` canary.
+2. **Confirm shape history on the first real night.** 1.1.19 is deployed and the sequential
+   queue is proven, but nothing has written the cache yet: after tonight's run,
+   `uip or bucket-files list be6369c7-02a4-4b80-957b-e95d06177692 --folder-path
+   "e2e-investigator"` should show `cache/history.zip`, and the next night's digest should name
+   the repeated causes as `same cause seen yesterday`.
 3. **Take PR #3756 out of draft** once one tenant-side CI run has proven the token exchange.
 4. **Uninstall the wedged `vm-agent 11` deployment** once Orchestrator clears its three
    `Terminating` Maestro jobs, and report the Kill behaviour to the Maestro team.
