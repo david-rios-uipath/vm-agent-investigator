@@ -5,15 +5,18 @@
 #   ./probe-phase.sh investigate <runId>
 #   ./probe-phase.sh fix         <runId>
 #   ./probe-phase.sh pr          <runId>
+#   ./probe-phase.sh report      <runId>
 #
 # Calls e2e-investigator/vm-exec-vm directly with the bootstrap PowerShell that the flow's
 # bootstrap<Phase> node generates - rendered from VmAgent.flow with node, not a copy, so the
 # probe cannot drift from what the flow runs. State is pulled from and pushed back to
 # <runId>/state.zip in the e2e-investigations bucket, exactly as in a real run.
 #
-# Budget: repro ~10 min (or ~2 with smokeOnly=1), investigate ~10, fix ~25, pr ~3.
+# Budget: repro ~10 min (or ~2 with smokeOnly=1), investigate ~10, fix ~25, pr ~3, report ~2.
+# `report` posts nothing: the probe leaves slackChannel/slackThreadTs empty, which the phase
+# reads as render-only.
 set -euo pipefail
-PHASE="${1:?phase: repro | investigate | fix | pr}"
+PHASE="${1:?phase: repro | investigate | fix | pr | report}"
 RUNID="${2:?runId, e.g. debug-execution-20260904-143456}"
 CMD="${3:-$(python3 -c "import json;print(json.load(open('inputs/debug-execution.json'))['testCommand'])")}"
 VMEXEC=CA36341D-ECEC-4BA6-AA76-134D0AFE4BA7   # e2e-investigator/vm-exec-vm
@@ -33,6 +36,7 @@ BRANCH="${TARGET_BRANCH:-}" # empty = the branch in inputs/debug-execution.json
 case "$PHASE" in
   repro) TIMEOUT="${TIMEOUT_MINUTES:-15}";; investigate) TIMEOUT="${TIMEOUT_MINUTES:-20}";;
   fix) TIMEOUT="${TIMEOUT_MINUTES:-45}";; pr) TIMEOUT="${TIMEOUT_MINUTES:-10}";;
+  report) TIMEOUT="${TIMEOUT_MINUTES:-10}";;
   *) echo "unknown phase: $PHASE" >&2; exit 1;;
 esac
 cd "$(dirname "$0")"
@@ -46,7 +50,9 @@ expr = [n for n in d['nodes'] if n['id'] == node][0]['inputs']['script']['expres
 vars_ = {'deriveRunId': {'output': runid}, 'fixAttempts': 1,
          'start': {'output': {'testCommand': cmd, 'repoUrl': '', 'branch': '',
                               'runnerRepoUrl': runner, 'runnerRef': ref,
-                              'smokeOnly': smoke == '1', 'maxFixAttempts': 3, 'claudeModel': model}}}
+                              'smokeOnly': smoke == '1', 'maxFixAttempts': 3, 'claudeModel': model,
+                              # empty = the report phase renders but uploads nothing
+                              'slackChannel': '', 'slackThreadTs': '', 'runUrl': '', 'reportUrl': ''}}}
 inp = json.load(open('inputs/debug-execution.json'))
 vars_['start']['output']['repoUrl'] = inp['repoUrl']
 vars_['start']['output']['branch'] = branch or inp['branch']

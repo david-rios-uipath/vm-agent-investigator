@@ -203,6 +203,22 @@ function Resolve-TestCommand([string]$TestCommand) {
 
 function Test-IsVsixCommand([string]$TestCommand) { return $TestCommand -match '--project[=\s]+"?vsix-' }
 
+# The spec the command targets. Prefer the .spec.ts: the plain .ts branch matches
+# `playwright.config.ts` first, which is how run 130020's PR came out titled
+# `- Spec: playwright.config` (the same trap as deriveRunId, hit twice).
+function Get-SpecName([string]$TestCommand) {
+  if ($TestCommand -match '([\w.-]+?)\.spec\.ts\b') { return $Matches[1] }
+  if ($TestCommand -match '([\w.-]+?)\.ts\b') { return $Matches[1] }
+  return 'e2e'
+}
+
+# The --grep title names the one test this run is about; the spec can fail on a different one.
+function Get-TestTitle([string]$TestCommand) {
+  $m = [regex]::Match($TestCommand, '--grep[= ]+(?:"([^"]*)"|''([^'']*)''|(\S+))')
+  if (-not $m.Success) { return '' }
+  return [string](@($m.Groups[1].Value, $m.Groups[2].Value, $m.Groups[3].Value | Where-Object { $_ }) + @(''))[0]
+}
+
 $script:VsixHome = 'C:\vm-agent\home'
 
 # %USERPROFILE% for LOCAL SERVICE lives under C:\Windows\ServiceProfiles and is not dependable
@@ -350,6 +366,51 @@ function Write-Status([hashtable]$Status) {
   $json = [regex]::Replace($json, '[^\x20-\x7E]', { param($m) '\u{0:x4}' -f [int][char]$m.Value })
   Write-Output ''
   Write-Output "STATUS_JSON=$json"
+}
+
+# Uploads one file into a Slack thread and posts $Comment with it, in three calls: reserve an
+# upload URL, send the bytes, complete the upload into the channel. `files.upload` is retired,
+# and `initial_comment` on the last call is what lets one call post both the message and the
+# file - two separate calls could get out of sync.
+#
+# An empty channel or thread means "render only": manual VmAgent runs and probe-phase.sh must
+# stay silent in Slack. Never throws - a Slack failure must not fault an investigation that has
+# already done its work.
+function Send-SlackFile {
+  param(
+    [Parameter(Mandatory)][string] $Path,
+    [string] $Channel = '',
+    [string] $ThreadTs = '',
+    [string] $Comment = '',
+    [string] $Title = ''
+  )
+  if (-not $Channel -or -not $ThreadTs) { Write-Host '[slack] no channel/thread given; rendered only, nothing uploaded'; return $false }
+  if (-not $env:SLACK_BOT_TOKEN) { Write-Host '[slack] SLACK_BOT_TOKEN was not injected; nothing uploaded'; return $false }
+  if (-not (Test-Path $Path)) { Write-Host "[slack] $Path does not exist; nothing uploaded"; return $false }
+
+  $name = Split-Path $Path -Leaf
+  $bytes = [System.IO.File]::ReadAllBytes($Path)
+  $auth = @{ Authorization = "Bearer $($env:SLACK_BOT_TOKEN)" }
+  try {
+    $res = Invoke-RestMethod 'https://slack.com/api/files.getUploadURLExternal' -Method Post -Headers $auth `
+      -Body @{ filename = $name; length = $bytes.Length }
+    if (-not $res.ok) { throw "files.getUploadURLExternal: $($res.error)" }
+
+    Invoke-RestMethod $res.upload_url -Method Post -Body $bytes -ContentType 'application/octet-stream' | Out-Null
+
+    # ConvertTo-Json unrolls a one-element array into a bare object in 5.1, and this field must
+    # be a JSON array whatever its length.
+    $files = '[' + (ConvertTo-Json @{ id = $res.file_id; title = $(if ($Title) { $Title } else { $name }) } -Compress) + ']'
+    $done = Invoke-RestMethod 'https://slack.com/api/files.completeUploadExternal' -Method Post -Headers $auth `
+      -Body @{ files = $files; channel_id = $Channel; thread_ts = $ThreadTs; initial_comment = $Comment }
+    # channel_not_found here almost always means the app is not a member of the channel.
+    if (-not $done.ok) { throw "files.completeUploadExternal: $($done.error)" }
+    Write-Host "[slack] uploaded $name ($($bytes.Length) bytes) to $Channel thread $ThreadTs"
+    return $true
+  } catch {
+    Write-Host "[slack] upload failed: $_"
+    return $false
+  }
 }
 
 # Turns the newest .webm under $SearchRoot into the mp4/gif pair a PR body can render, in

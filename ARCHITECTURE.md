@@ -30,8 +30,33 @@ Everything below `vm/` runs ON the VM; the flow only orchestrates it.
 | `vm/lib/prologue.ps1` | `Ensure-Tools` (rg, gh, pnpm shim, Claude Code — idempotent), `Refresh-Repo`, `Invoke-Cmd`, `Write-Utf8Lf`, `Write-Status` |
 | `vm/lib/ci-history.ps1` | the old `ciHistoryInstructions` node, ported to a function |
 | `vm/lib/pr-body.ps1` | `New-PrBody`, the reviewer-facing PR description |
+| `vm/lib/report.ps1` | `Get-ReportFacts` / `New-ReportBody` / `New-ReportVerdict`, the per-group Slack report |
 | `vm/prompts/{investigator,fixer}.md` | the two agent prompts, written for real file tools |
 | `vm/selfcheck.ps1` | `pwsh -NoProfile -File vm/selfcheck.ps1` — asserts over the pure logic (status line, patch encoding, PR title, repro routing) |
+
+### The per-group report
+
+The last phase, `report`, renders `report.md` from what is already in `state.zip` — notebook,
+evidence, fix summary, patch — and uploads it into the nightly's Slack thread with a one-line
+verdict as the upload's `initial_comment`. One message per group, posted the moment that group
+finishes, instead of one message per night carrying every group; the orchestrator's `summarize`
+is a roll-up after it (counts, spend, covered and deferred groups, capped at 3500 chars).
+
+The VM uploads it, not the flow: `callVmAgent`'s output schema has no room for a notebook, and
+routing 4 x 20 KB of one through flow variables is what broke the GitHub-connector PR fetch
+("The instance's variables exceed the maximum allowed size"). `vm-exec` already injects and
+redacts `SLACK_BOT_TOKEN` (a **Secret** asset, read with `GetSecret` - a bot token has no
+username half), so the file never leaves the VM as a flow variable.
+
+Three calls, in `Send-SlackFile` (prologue): `files.getUploadURLExternal`, the bytes, then
+`files.completeUploadExternal` with `channel_id`, `thread_ts` and `initial_comment`. An empty
+`slackChannel` or `slackThreadTs` renders the report and uploads nothing, which is what keeps a
+manual `VmAgent` run and `probe-phase.sh` out of Slack. The phase skips the prologue entirely —
+it never touches the checkout — and its failures are caught, never faulted: the run has already
+reproduced, fixed and opened a PR by then.
+
+`endNotReproduced` and `terminateSetupFailed` bypass `investigationSummarizer`, so those groups
+post no file; they get their line in the roll-up instead.
 
 ### PR videos
 
@@ -47,9 +72,10 @@ spec never runs here, so there is no clip and the body links the failing nightly
 ### Flow shape
 
 `start -> deriveRunId -> decisionResume -> bootstrap<Phase> -> <phase RPA node>
--> parseStatus<Phase> -> decision… -> investigationSummarizer -> end`, 29 nodes.
+-> parseStatus<Phase> -> decision… -> investigationSummarizer -> bootstrapReport -> report
+-> parseStatusReport -> end`, 28 nodes plus the sticky notes.
 
-The four `bootstrap*` script nodes emit a ~15-line PowerShell that clones this repo to
+The five `bootstrap*` script nodes emit a ~15-line PowerShell that clones this repo to
 `C:\vm-agent\runner` at `runnerRef` and invokes `vm/run-phase.ps1` — so a runner change is a
 git push, not a solution release. Each phase prints one `STATUS_JSON=<json>` line as its last
 line of stdout and `parseStatus*` parses only that; its absence routes to `endSetupFailed`.
@@ -61,7 +87,9 @@ clone it), branch **`master`** — `runnerRef` defaults to `master`, not `main`.
 
 ### Trigger inputs
 
-`maxFixAttempts` (3), `runnerRepoUrl`, `runnerRef` (`master`), and `claudeModel` —
+`maxFixAttempts` (3), `runnerRepoUrl`, `runnerRef` (`master`), `claudeModel`, and the report
+phase's Slack context — `slackChannel`, `slackThreadTs`, `runUrl`, `reportUrl`, all defaulting
+to `''`, which `NightlyOrchestrator` fills in and a manual run leaves empty. `claudeModel` —
 **defaults to `claude-sonnet-5`**, and `NightlyOrchestrator` passes the same value to every child
 rather than an empty string. Empty means the CLI's account default on the VM, which is Opus: a
 single investigate pass cost $4.51 and a fix pass $2.29 on 2026-09-08, the wrong default for a
@@ -78,10 +106,11 @@ patched together.
 ### `vm-exec` (`vm-agent/vm-exec/Main.xaml`)
 
 An `ANTHROPIC_API_KEY` asset injected as an env var and added to the redaction list; a `StateKey`
-in-argument; defaults of 45 minutes and 32000 output chars. The key is a **Secret** asset in
-`e2e-investigator`, so `vm-exec` reads it with `ui:GetSecret`, not `ui:GetRobotCredential` (the
-other three tokens are Credential assets). Both hand back a `SecureString`, so the env-var
-injection is identical.
+in-argument; defaults of 45 minutes and 32000 output chars. `ANTHROPIC_API_KEY`,
+`GH_NPM_REGISTRY_TOKEN`, `PLAYWRIGHT_PASSWORD` and `SLACK_BOT_TOKEN` are **Secret** assets in
+`e2e-investigator`, read with `ui:GetSecret`; `GH_TOKEN` and `SLACK_COOKIE` are Credentials,
+read with `ui:GetRobotCredential`. A bot token has no username half, which is why `SLACK_BOT_TOKEN`
+is a Secret. Both activities hand back a `SecureString`, so the env-var injection is identical.
 
 `vm-exec` **does not ship through `release.sh`** — see `RUNBOOK.md`.
 
@@ -117,8 +146,9 @@ source; it forbids dependency bumps, lockfiles and generated files.
 
 A second flow in the same solution (`vm-agent/NightlyOrchestrator/`). It takes one nightly
 Playwright run's failures and works through the first `maxTests` of them one at a time over
-`VmAgent` (one child job each, sequentially, until the wall-clock budget runs out), then posts a
-single summary back into the Slack thread that reported the failure.
+`VmAgent` (one child job each, sequentially, until the wall-clock budget runs out). Each child
+posts its own report into the Slack thread as it finishes; the orchestrator adds a roll-up at
+the end.
 
 Shape: `start -> selectTests -> investigate` (sequential loop with a budget check:
 `withinBudget -> callVmAgent -> recordResult`) `-> summarize -> replyInSlackThread1 -> end`.
@@ -177,7 +207,10 @@ manual run may use, and the cost of raising the default — is in `RUNBOOK.md`.
   connection `david.rios` (`uipath-salesforce-slack`), **`send_as=user`** — the bot identity got
   `channel_not_found` on run 55f82a07 (the app is not a member of `#flow-dev-frontend`), the user
   token is. The node id is **`replyInSlackThread1`**; `uip maestro flow node add` does not let you
-  choose an id.
+  choose an id. The per-group file upload is the one Slack call that does *not* go through the
+  connector — it needs `files.completeUploadExternal`, which the connector has no operation for,
+  so it runs on the VM against the `SLACK_BOT_TOKEN` asset and therefore posts as the app. That app
+  must be a member of `#flow-dev-frontend` or the upload gets the same `channel_not_found`.
 - **Open/merged PR check before investigating.** `ghPrs` is a `vm-exec-vm` job (no state key,
   5 min) whose PowerShell calls the GitHub API with the injected `GH_TOKEN`: the 40 most recently
   updated PRs, kept if open (updated ≤14 days) or merged ≤48 h, each with its changed-file
