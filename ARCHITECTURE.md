@@ -96,10 +96,11 @@ single investigate pass cost $4.51 and a fix pass $2.29 on 2026-09-08, the wrong
 job meant to run nightly. Set `claude-haiku-4-5-20251001` when testing plumbing rather than
 reasoning; `probe-phase.sh` reads the same lever from `CLAUDE_MODEL` and also defaults to Sonnet.
 
-The summarizer agent node stays on `anthropic.claude-opus-4-8`: it runs through the LLM gateway,
-which is billed separately from the Claude Code account the phases use. If it ever moves, that
-model lives in `VmAgent.flow` **and** in two `agent.json` copies, all three of which must be
-patched together.
+The summarizer agent node runs on `anthropic.claude-sonnet-5` (moved from Opus 4.8 on
+2026-09-22: it has no tools and only restates the notebook, so Opus bought nothing). It runs
+through the LLM gateway, which is billed separately from the Claude Code account the phases use.
+If it ever moves, that model lives in `VmAgent.flow` **and** in two `agent.json` copies, all
+three of which must be patched together.
 
 `maxIterations` and the `iteration` global are gone with the investigator loop.
 
