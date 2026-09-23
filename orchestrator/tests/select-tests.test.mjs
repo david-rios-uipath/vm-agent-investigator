@@ -8,10 +8,10 @@ const scriptOf = (id) => {
   assert.ok(n, `node ${id} missing`);
   return n.inputs.script.expression;
 };
-const run = (id, $vars) => {
+const run = (id, $vars, $metadata = {}) => {
   const m = id.match(/^(.+)-Script$/);
-  if (m) return new Function('$vars', 'return ' + flow.nodes.find((n) => n.id === m[1]).inputs.Script.expression)($vars);
-  return new Function('$vars', scriptOf(id))($vars);
+  if (m) return new Function('$vars', '$metadata', 'return ' + flow.nodes.find((n) => n.id === m[1]).inputs.Script.expression)($vars, $metadata);
+  return new Function('$vars', '$metadata', scriptOf(id))($vars, $metadata);
 };
 const input = JSON.parse(readFileSync(new URL('../../inputs/orchestrator-34015558366.json', import.meta.url)));
 const night2 = JSON.parse(readFileSync(new URL('../../inputs/orchestrator-34089391590.json', import.meta.url)));
@@ -196,6 +196,23 @@ console.log('history ok');
   assert.match(unread.costText, /No Claude spend/);
 }
 console.log('spend ok');
+
+// summarize and the ack link to this Maestro instance, and drop the link when a key is missing
+{
+  const pick = run('pickTests', { start: { output: night2 }, selectTests: { output: sel2 }, parsePrs: { output: { prs: [], ok: false } } });
+  const vars = { start: { output: night2 }, pickTests: { output: pick }, investigate: { output: [] } };
+  const meta = { InstanceId: 'i-1', ProcessKey: 'p-1', FolderKey: 'f-1' };
+  const url = 'https://alpha.uipath.com/popoc/DefaultTenant/maestro_/flows/p-1/instances/i-1?folderKey=f-1';
+  assert.ok(run('summarize', vars, meta).text.split('\n')[0].endsWith(`<${url}|orchestrator job>`));
+  assert.doesNotMatch(run('summarize', vars, { ...meta, ProcessKey: null }).text, /orchestrator job/);
+  const empty = { total: 0, skipped: 0, selected: [], covered: [], totalTests: 0, fetched: 0 };
+  assert.match(run('summarize', { ...vars, pickTests: { output: empty } }, meta).text, /: no .* failures to investigate.*orchestrator job>$/);
+  assert.match(run('summarize', { ...vars, start: { output: { ...night2, failedCount: 5 } }, pickTests: { output: empty } }, meta).text, /could not read.*orchestrator job>$/);
+  const ack = flow.nodes.find((n) => n.id === 'ackInSlackThread').inputs.detail.bodyParameters.messageToSend.slice('=js:'.length);
+  const ackText = new Function('$vars', '$metadata', 'return ' + ack)({ start: { output: night2 } }, meta);
+  assert.match(ackText, new RegExp(`\\|run ${night2.runId}> \u00b7 <${url.replace(/[.?]/g, '\\$&')}\\|orchestrator job>`));
+}
+console.log('instance link ok');
 
 // summarize: the cap names what it dropped, not just how many
 {
