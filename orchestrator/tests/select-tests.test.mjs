@@ -194,6 +194,19 @@ console.log('history ok');
   assert.match(none.costText, /No Claude spend/);
   const unread = run('summarize', { start: { output: { ...night2, failedCount: 101 } }, pickTests: { output: { total: 0, skipped: 0, selected: [], covered: [], totalTests: 0, fetched: 0 } }, investigate: { output: [] } });
   assert.match(unread.costText, /No Claude spend/);
+  // A refused API call (2026-09-23: workspace spend limit) says so, in the digest and the spend line.
+  const limit = 'API Error: 400 You have reached your specified workspace API usage limits.';
+  const refused = run('summarize', { start: { output: night2 }, pickTests: { output: pick }, investigate: { output: [{ ...row(0), reproduced: true, claudeError: limit }, row(0)] } });
+  assert.match(refused.costText, /Claude API refused 1 investigation\* .*nothing was investigated: `API Error: 400 You have reached/);
+  assert.doesNotMatch(refused.costText, /No Claude spend/);
+  assert.match(refused.text, /reproduced, not investigated: Claude API refused the call/);
+}
+// recordResult carries the child's claudeError through to the digest row
+{
+  const t = { environment: 'studio-alpha', file: 'specs/a.spec.ts', title: 'a test' };
+  const out = run('recordResult', { investigate: { currentItem: t }, callVmAgent: { output: { claudeError: 'API Error: 400 x' } }, pickTests: { output: {} } });
+  assert.equal(out.claudeError, 'API Error: 400 x');
+  assert.equal(run('recordResult', { investigate: { currentItem: t }, callVmAgent: { output: {} }, pickTests: { output: {} } }).claudeError, '');
 }
 console.log('spend ok');
 

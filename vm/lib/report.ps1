@@ -51,6 +51,7 @@ function Get-ReportFacts([string]$Notes) {
   $f.patch = Read-StateText $Notes 'fix.patch'
   $f.notebook = Read-StateText $Notes 'notebook.md'
   $f.verify = Read-StateText $Notes 'verify-output.log'
+  $f.claudeError = (Read-StateText $Notes 'claude-error.txt').Trim()
   return $f
 }
 
@@ -89,6 +90,10 @@ function New-ReportVerdict {
   $name = Format-SlackCode $Spec
   if ($Title) { $name += " $ReportArrow " + (Format-SlackCode $Title) }
   $line = ':mag: `' + $name + '` - ' + ($parts -join ', ')
+  # "no verified fix" alone reads as a failed attempt; a refused API call means no attempt at all.
+  if ($Facts.claudeError) {
+    $line = ':no_entry: `' + $name + '` - ' + $parts[0] + ', *not investigated: the Claude API refused the call* (' + (Format-SlackCode $Facts.claudeError) + ')'
+  }
   if ($RunUrl) { $line += " $ReportDot <$RunUrl|nightly run>" }
   return $line
 }
@@ -129,6 +134,10 @@ function New-ReportBody {
   $meta += $(if ($Facts.prUrl) { "[draft PR]($($Facts.prUrl))" } else { 'no PR' })
   Add-Line ($meta -join " $ReportDot ")
   Add-Line ''
+  if ($Facts.claudeError) {
+    Add-Line ('> **Not investigated: the Claude API refused the call.** `{0}`' -f (Format-SlackCode $Facts.claudeError))
+    Add-Line ''
+  }
 
   Add-Line '## Cause'
   Add-Line ''
