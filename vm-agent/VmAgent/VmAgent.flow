@@ -99,6 +99,14 @@
             "fieldType": "number"
           },
           "type": "number"
+        },
+        "claudeError": {
+          "source": {
+            "type": "jsExpression",
+            "expression": "($vars.parseStatusPr.output ?? {}).claudeError ?? ($vars.parseStatusFix.output ?? {}).claudeError ?? ($vars.parseStatusInvestigate.output ?? {}).claudeError ?? ($vars.parseStatusRepro.output ?? {}).claudeError ?? ''",
+            "fieldType": "string"
+          },
+          "type": "string"
         }
       }
     },
@@ -586,6 +594,14 @@
             "fieldType": "number"
           },
           "type": "number"
+        },
+        "claudeError": {
+          "source": {
+            "type": "jsExpression",
+            "expression": "($vars.parseStatusPr.output ?? {}).claudeError ?? ($vars.parseStatusFix.output ?? {}).claudeError ?? ($vars.parseStatusInvestigate.output ?? {}).claudeError ?? ($vars.parseStatusRepro.output ?? {}).claudeError ?? ''",
+            "fieldType": "string"
+          },
+          "type": "string"
         }
       }
     },
@@ -888,6 +904,9 @@
               },
               "costUsd": {
                 "type": "number"
+              },
+              "claudeError": {
+                "type": "string"
               }
             }
           }
@@ -1148,6 +1167,9 @@
               },
               "costUsd": {
                 "type": "number"
+              },
+              "claudeError": {
+                "type": "string"
               }
             }
           }
@@ -1420,6 +1442,9 @@
               },
               "costUsd": {
                 "type": "number"
+              },
+              "claudeError": {
+                "type": "string"
               }
             }
           }
@@ -1680,6 +1705,9 @@
               },
               "costUsd": {
                 "type": "number"
+              },
+              "claudeError": {
+                "type": "string"
               }
             }
           }
@@ -3454,6 +3482,11 @@
         "type": "number"
       },
       {
+        "id": "claudeError",
+        "direction": "out",
+        "type": "string"
+      },
+      {
         "id": "fixCostCarry",
         "direction": "inout",
         "type": "number",
@@ -4623,11 +4656,27 @@
         }
       },
       {
+        "id": "end.claudeError",
+        "type": "string",
+        "binding": {
+          "nodeId": "end",
+          "outputId": "claudeError"
+        }
+      },
+      {
         "id": "endNotReproduced.costUsd",
         "type": "number",
         "binding": {
           "nodeId": "endNotReproduced",
           "outputId": "costUsd"
+        }
+      },
+      {
+        "id": "endNotReproduced.claudeError",
+        "type": "string",
+        "binding": {
+          "nodeId": "endNotReproduced",
+          "outputId": "claudeError"
         }
       },
       {

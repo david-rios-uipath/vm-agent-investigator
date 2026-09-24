@@ -360,6 +360,10 @@ function Write-Utf8Lf([string]$Path, [string]$Text) {
 
 # The flow parses this line and nothing else. It must be the last line of stdout.
 function Write-Status([hashtable]$Status) {
+  # Every phase repeats a Claude API refusal from any earlier phase, so the flow sees it whichever
+  # phase it reads. $notes is run-phase.ps1's state directory.
+  $refusal = if ($notes) { Join-Path $notes 'claude-error.txt' } else { '' }
+  if ($refusal -and (Test-Path $refusal)) { $Status.claudeError = (Get-Content -Raw $refusal).Trim() }
   $json = ($Status | ConvertTo-Json -Compress -Depth 6)
   # Stdout comes back through a legacy codepage, which turns a U+2014 into bytes ending in a
   # literal quote and breaks JSON.parse in the flow. Keep the line pure ASCII.

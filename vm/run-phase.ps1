@@ -153,6 +153,11 @@ function Invoke-Claude([string]$PromptFile, [string]$AllowedTools, [int]$MaxTurn
     Write-Host ('[claude] ended {0}{1} after {2} turns in {3}s, cost ${4:N4}' -f `
       $r.subtype, $(if ($r.is_error) { ' (ERROR)' } else { '' }), $r.num_turns,
       [int]($r.duration_ms / 1000), [double]$r.total_cost_usd)
+    # An API refusal (spend limit, revoked key, outage) ends the run on turn 1 with the error as
+    # its result. Kept in state so later phases and the Slack report say why nothing happened.
+    if ($r.is_error -and [string]$r.result -match '^API Error: \d{3}') {
+      Write-Utf8Lf (Join-Path $notes 'claude-error.txt') ([string]$r.result).Trim()
+    }
   }
   $text = ''
   try { $text = [string]$r.result } catch { }
@@ -371,7 +376,8 @@ switch ($Phase) {
 'fix' {
   if (-not (Test-Path $notebook)) {
     Write-Output '[fix] no notebook.md in state; refusing to guess a fix'
-    Write-Status @{ patchWritten = $false; fixVerified = $false; declined = $true; fixSummary = 'no investigator notebook in state'; confidence = 'low'; attempt = $FixAttempt }
+    $why = if (Test-Path (Join-Path $notes 'claude-error.txt')) { 'not attempted: the Claude API refused the investigation' } else { 'no investigator notebook in state' }
+    Write-Status @{ patchWritten = $false; fixVerified = $false; declined = $true; fixSummary = $why; confidence = 'low'; attempt = $FixAttempt }
     exit 0
   }
   $ev = if (Test-Path (Join-Path $notes 'evidence.json')) { Get-Content -Raw (Join-Path $notes 'evidence.json') | ConvertFrom-Json } else { $null }
