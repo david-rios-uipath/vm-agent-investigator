@@ -229,7 +229,7 @@ switch ($Phase) {
   if ($SmokeOnly) {
     # Same stub the old flow used, so a smoke iteration costs ~2 minutes instead of ~10.
     $ci = @{ classification = 'flaky'; summary = 'smoke stub'; firstFailSha = ''; lastPassSha = ''
-             runs = @(); ciFailureExcerpt = 'smoke stub: no CI lookup'; ciJobLog = '' }
+             runs = @(); ciFailureExcerpt = 'smoke stub: no CI lookup'; ciJobLog = ''; ciTestResults = '' }
   } else {
     $ci = Get-CiHistory $RepoUrl $Branch $TestCommand $notes
   }

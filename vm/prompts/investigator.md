@@ -40,7 +40,11 @@ trace.zip the step trace). The checkout's own `e2e\test-results` is from a later
 is not your evidence.
 Evidence source `ci` means CI history already settled that the failure is deterministic or
 flaky, so the test was NOT re-run: the failing CI job log is `{{NOTES_DIR}}\ci-job.log` and
-there are NO local Playwright artifacts.
+there are NO local Playwright artifacts. The vsix projects echo VS Code's own output into that
+log as `[vscode stdout]` / `[vscode stderr]` lines; an extension that failed to activate shows
+up there and nowhere in the Playwright error. The CI run's artifacts for the failing test
+(error-context.md, trace.zip, the workbench screenshot) are in `{{NOTES_DIR}}\ci-test-results`
+when that directory exists.
 
 ## How to work
 
