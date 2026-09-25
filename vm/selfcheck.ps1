@@ -42,6 +42,29 @@ Assert ((Get-CiJobPlatform 'e2e-vsix-alpha / E2E (vsix-alpha, Linux)') -eq 'Linu
 Assert ((Get-CiJobPlatform 'e2e-vsix-staging / E2E (vsix-staging, macOS)') -eq 'macOS') 'macOS too'
 Assert ((Get-CiJobPlatform 'e2e-studio / E2E (studio-alpha) [2/5]') -eq '') 'a studio shard has no platform'
 
+# One failing platform keeps the targeted test failed, not flaky: sequences stay per job.
+Assert ((Get-CiVerdict @('FFF', 'P')) -eq 'failed') 'a test failing every attempt on one job is failed even if another job passed'
+
+# Get-CiStaleNote: a nightly older than three days means GitHub served a stale run listing.
+$now = [datetime]'2026-09-25T12:00:00Z'
+Assert ((Get-CiStaleNote ([datetime]'2026-09-25T04:17:00Z') $now) -eq '') 'this morning''s nightly is not stale'
+Assert ((Get-CiStaleNote ([datetime]'2026-09-23T04:17:00Z') $now) -eq '') 'a two-day gap (a cancelled night) is not stale'
+Assert ((Get-CiStaleNote ([datetime]'2026-09-08T04:17:00Z') $now) -like '*STALE HISTORY*2026-09-08, 17 days old*') 'the 09-08 snapshot served on 09-25 is flagged'
+
+# Get-CiTracesArtifactName: the upload names in playwright-vsix.yml / playwright-action.yml.
+Assert ((Get-CiTracesArtifactName 'e2e-vsix-alpha / E2E (vsix-alpha, Windows)') -eq 'playwright-traces-vsix-alpha-windows') 'a vsix job maps to its lower-cased platform artifact'
+Assert ((Get-CiTracesArtifactName 'e2e-vsix-alpha-cursor / E2E (vsix-alpha-cursor, Linux)') -eq 'playwright-traces-vsix-alpha-cursor-linux') 'the cursor leg keeps its suffix'
+Assert ((Get-CiTracesArtifactName 'e2e-studio / E2E (studio-alpha) [2/5]') -eq 'playwright-traces-studio-alpha-2') 'a studio shard maps to its shard number'
+Assert ((Get-CiTracesArtifactName 'Merge reports') -eq '') 'a job without a project maps to nothing'
+
+# Test-ErrorContextFor: the `- Name:` line identifies the test; folder names are hashed.
+$ctx = "# Test info`n`n- Name: connectors\connectors.spec.ts >> Connector configuration (DAP) >> loads the DAP configuration for a Slack connector activity`n- Location: e2e\specs\connectors\connectors.spec.ts:107:3`n"
+Assert (Test-ErrorContextFor $ctx 'connectors.spec.ts' 'loads the DAP configuration') 'the targeted test matches its error-context.md'
+Assert (Test-ErrorContextFor $ctx 'connectors.spec.ts' '') 'no --grep matches any failing test of the spec'
+Assert (-not (Test-ErrorContextFor $ctx 'connectors.spec.ts' 'some other test')) 'another test of the same spec does not match'
+Assert (-not (Test-ErrorContextFor $ctx 'other-connectors.spec.ts' '')) 'a spec whose name only ends the same does not match'
+Assert (-not (Test-ErrorContextFor '# Instructions' 'connectors.spec.ts' '')) 'a file without a Name line does not match'
+
 # The Windows runners print ASCII marks; taking only the Unicode pair read every Windows job as
 # `absent`. Lines are verbatim from the 2026-09-08 nightly.
 $winLines = @(

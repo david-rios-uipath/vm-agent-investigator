@@ -21,7 +21,7 @@ function Get-CiJobPlatform([string]$JobName) {
 
 function Get-CiHistory([string]$RepoUrl, [string]$Branch, [string]$TestCommand, [string]$NotesDir) {
   $ErrorActionPreference = 'Continue'
-  $r = [ordered]@{ classification = 'unknown'; summary = ''; firstFailSha = ''; lastPassSha = ''; runs = @(); ciFailureExcerpt = ''; ciJobLog = ''; target = ''; targetVerdict = 'absent' }
+  $r = [ordered]@{ classification = 'unknown'; summary = ''; firstFailSha = ''; lastPassSha = ''; runs = @(); ciFailureExcerpt = ''; ciJobLog = ''; ciTestResults = ''; target = ''; targetVerdict = 'absent' }
 
   # The GH_TOKEN asset may hold a placeholder; take the first token GitHub actually accepts.
   $token = $null
@@ -46,17 +46,27 @@ function Get-CiHistory([string]$RepoUrl, [string]$Branch, [string]$TestCommand, 
   # ponytail: nightly workflow file is fixed; make it a flow input if a second repo ever uses this
   # The vsix projects run inside this same nightly, as jobs of the reusable playwright-vsix.yml.
   $workflow = 'playwright-ci.yml'
-  # `event=schedule` combined with `branch=` returns a stale, wrongly-ordered set from this
-  # endpoint: on 2026-09-16 it answered with runs from June to August while the unfiltered
-  # branch query returned every nightly through 09-16, all of them event=schedule. Every verdict
-  # built on it compared against six-week-old nightlies. Filter client-side instead.
-  try { $runs = @((Invoke-RestMethod "$api/actions/workflows/$workflow/runs?branch=$Branch&per_page=30" -Headers $h).workflow_runs |
-                  Where-Object { $_.event -eq 'schedule' } | Select-Object -First 8) }
+  # `branch=` intermittently serves a stale snapshot from this endpoint: runs from June to August
+  # on 2026-09-16, nothing newer than 09-08 on the morning of 09-25, current again two hours
+  # later. And since 2026-09-18 the nightly starts on `workflow_run` (after the 04:00 VSIX build),
+  # not `schedule`. So: no `branch=`, one query per event, branch filtered here, and a staleness
+  # warning below, since no query shape is proven immune.
+  # A `skipped` run is a PR-label or manual VSIX build the workflow's own guard turned away; those
+  # share the `workflow_run` page, hence 100 rather than 30, or nightlies fall off it over time.
+  try {
+    $all = @()
+    foreach ($ev in 'workflow_run', 'schedule') {
+      $all += @((Invoke-RestMethod "$api/actions/workflows/$workflow/runs?event=$ev&per_page=100" -Headers $h).workflow_runs)
+    }
+    $runs = @($all | Where-Object { $_.head_branch -eq $Branch -and $_.conclusion -ne 'skipped' } |
+              Sort-Object { [datetime]$_.created_at } -Descending | Select-Object -First 8)
+  }
   catch { $r.summary = 'GitHub API error listing runs: ' + $_.Exception.Message; return $r }
-  if (-not $runs -or $runs.Count -eq 0) { $r.summary = "no scheduled $workflow runs on $Branch"; return $r }
+  if (-not $runs -or $runs.Count -eq 0) { $r.summary = "no nightly $workflow runs on $Branch"; return $r }
+  $stale = Get-CiStaleNote ([datetime]$runs[0].created_at) (Get-Date)
 
   $savedLog = $false
-  $runSignals = @{}; $runExcerpts = @{}; $newestTarget = ''
+  $runSignals = @{}; $runExcerpts = @{}; $newestTargets = @()
   foreach ($run in $runs) {
     $isNewest = ($run.id -eq $runs[0].id)
     $sha = $run.head_sha.Substring(0, 7); $date = ([datetime]$run.created_at).ToUniversalTime().ToString('yyyy-MM-dd')
@@ -76,7 +86,9 @@ function Get-CiHistory([string]$RepoUrl, [string]$Branch, [string]$TestCommand, 
         foreach ($k in $m.marks.Keys) { $platformMarks[$plat][$k] = [string]$platformMarks[$plat][$k] + $m.marks[$k] }
       }
       $sawFail = @($m.marks.Values | Where-Object { ([string]$_).Contains('F') }).Count -gt 0
-      if ($isNewest) { $newestTarget += $m.target }
+      # One sequence per job: joined, Windows' `FFF` and Linux's `P` read as a flaky `FFFP`, and
+      # run-phase then skipped a test that failed every attempt on one platform as a flake.
+      if ($isNewest -and $m.target) { $newestTargets += $m.target }
       # Environment signals in every sampled night, not just the newest, so a shared-environment
       # pattern (identity 429, cleanup 400s, editor load failure) shows up as a trend.
       $clean = [System.IO.File]::ReadLines($tmp) | ForEach-Object { ($_ -replace '^\S+Z ?', '') -replace '\x1b\[[0-9;]*m', '' }
@@ -104,6 +116,7 @@ function Get-CiHistory([string]$RepoUrl, [string]$Branch, [string]$TestCommand, 
           $r.ciJobLog = Join-Path $NotesDir 'ci-job.log'
           [System.IO.File]::WriteAllLines($r.ciJobLog, [string[]]$clean)
           $r.ciFailureExcerpt = $excerpt
+          $r.ciTestResults = Save-CiTestResults $api $h $run.id $job.name $spec $grep $NotesDir
         } else {
           $runExcerpts[$sha] = $excerpt.Substring(0, [Math]::Min(800, $excerpt.Length))
         }
@@ -128,12 +141,12 @@ function Get-CiHistory([string]$RepoUrl, [string]$Branch, [string]$TestCommand, 
   }
 
   $r.target = $grep
-  if ($grep) { $r.targetVerdict = Get-CiVerdict @(@($newestTarget) | Where-Object { $_ }) }
+  if ($grep) { $r.targetVerdict = Get-CiVerdict $newestTargets }
 
   $obs = @($r.runs | Where-Object { $_.verdict -in 'failed', 'flaky', 'passed' })
   if ($obs.Count -eq 0) {
     $r.classification = 'absent'
-    $r.summary = "$spec did not run in the last $($r.runs.Count) scheduled runs of $workflow on $Branch"
+    $r.summary = "$spec did not run in the last $($r.runs.Count) nightly runs of $workflow on $Branch$stale"
     return $r
   }
   $streak = 0; foreach ($o in $obs) { if ($o.verdict -eq 'failed') { $streak++ } else { break } }
@@ -162,6 +175,7 @@ function Get-CiHistory([string]$RepoUrl, [string]$Branch, [string]$TestCommand, 
   if ($split.Count -gt 0) {
     $r.summary += "; PLATFORM SPLIT in $($split.Count) of $($r.runs.Count) runs - the same commit passes on some runners and fails on others, so suspect the runner environment (screen size, display server, OS paths) before the product"
   }
+  $r.summary += $stale
   $sigRuns = @($r.runs | Where-Object { $_.envSignals })
   if ($sigRuns.Count -gt 0) {
     $r.summary += '; environment signals: ' + (($sigRuns | ForEach-Object { $_.sha + '=' + (($_.envSignals.GetEnumerator() | ForEach-Object { $_.Key + ':' + $_.Value }) -join ',') }) -join ' ')
@@ -192,6 +206,15 @@ function Get-CiMarks([string[]]$Lines, [string]$Spec, [string]$Grep) {
   return @{ marks = $marks; target = $target }
 }
 
+# The nightly runs every day, so a newest run older than three days means GitHub answered with a
+# stale listing (it has twice) and every verdict below compares against old code. Said in the
+# summary rather than silently trusted. Covered by selfcheck.
+function Get-CiStaleNote([datetime]$Newest, [datetime]$Now) {
+  $days = [int][Math]::Floor(($Now.ToUniversalTime() - $Newest.ToUniversalTime()).TotalDays)
+  if ($days -lt 3) { return '' }
+  return "; STALE HISTORY: the newest nightly GitHub listed is from $($Newest.ToUniversalTime().ToString('yyyy-MM-dd')), $days days old - the run listing is likely stale, so do not trust these verdicts or the failing-since range"
+}
+
 # Playwright retries: 'FP' is a flaky test, 'F' a failed one, 'P' a pass.
 function Get-CiVerdict([string[]]$Seqs) {
   if ($Seqs.Count -eq 0) { return 'absent' }
@@ -202,16 +225,86 @@ function Get-CiVerdict([string[]]$Seqs) {
 }
 
 function Get-CiJobLog([string]$JobId, [string]$Path, [string]$Api, [hashtable]$Headers) {
-  $url = "$Api/actions/jobs/$JobId/logs"
-  try { Invoke-WebRequest $url -Headers $Headers -UseBasicParsing -OutFile $Path; return $true } catch { }
-  try { Invoke-WebRequest $url -Headers $Headers -UseBasicParsing -MaximumRedirection 0 -ErrorAction Stop | Out-Null } catch {
+  if (Save-GitHubDownload "$Api/actions/jobs/$JobId/logs" $Path $Headers) { return $true }
+  Write-Output "[ci-history] could not fetch log for job $JobId"
+  return $false
+}
+
+# Job logs and artifact zips both answer with a redirect to signed storage.
+function Save-GitHubDownload([string]$Url, [string]$Path, [hashtable]$Headers) {
+  try { Invoke-WebRequest $Url -Headers $Headers -UseBasicParsing -OutFile $Path; return $true } catch { }
+  try { Invoke-WebRequest $Url -Headers $Headers -UseBasicParsing -MaximumRedirection 0 -ErrorAction Stop | Out-Null } catch {
     # Response is null for non-HTTP failures; indexing it would kill the whole phase.
     $resp = $_.Exception.Response
     $loc = if ($resp -and $resp.Headers) { $resp.Headers['Location'] } else { $null }
     if ($loc) { try { Invoke-WebRequest $loc -UseBasicParsing -OutFile $Path; return $true } catch { } }
   }
-  Write-Output "[ci-history] could not fetch log for job $JobId"
   return $false
+}
+
+# The failing job's name -> its `playwright-traces-*` artifact, mirroring the upload names in
+# flow-workbench's playwright-vsix.yml and playwright-action.yml:
+#   `e2e-vsix-alpha / E2E (vsix-alpha, Windows)` -> `playwright-traces-vsix-alpha-windows`
+#   `e2e-studio / E2E (studio-alpha) [2/5]`      -> `playwright-traces-studio-alpha-2`
+# The last parenthesised group, since the caller prefix could carry its own. Covered by selfcheck.
+function Get-CiTracesArtifactName([string]$JobName) {
+  $m = [regex]::Match($JobName, '\(([^()]+)\)\s*(?:\[(\d+)/\d+\])?\s*$')
+  if (-not $m.Success) { return '' }
+  $parts = @($m.Groups[1].Value -split ',' | ForEach-Object { $_.Trim() })
+  $name = 'playwright-traces-' + $parts[0]
+  if ($parts.Count -gt 1) { $name += '-' + $parts[1].ToLower() }
+  if ($m.Groups[2].Success) { $name += '-' + $m.Groups[2].Value }
+  return $name
+}
+
+# Test-results folder names are truncated and hashed, so the `- Name:` line of error-context.md
+# (`connectors\connectors.spec.ts >> <describe> >> <title>`) is what identifies the test.
+# Covered by selfcheck.
+function Test-ErrorContextFor([string]$Text, [string]$Spec, [string]$Grep) {
+  $m = [regex]::Match($Text, '(?m)^- Name: (.+?)\s*$')
+  if (-not $m.Success) { return $false }
+  $name = $m.Groups[1].Value
+  $file = @(($name -split ' >> ')[0] -split '[\\/]')[-1]
+  if ($file -ne $Spec) { return $false }
+  return (-not $Grep) -or ($name.IndexOf($Grep, [StringComparison]::OrdinalIgnoreCase) -ge 0)
+}
+
+# The CI run's own Playwright artifacts for the failing test (error-context.md, trace, workbench
+# screenshot). When CI settles the verdict the VM never re-runs the test, and these plus
+# ci-job.log are the only evidence. The artifact is uploaded on failure only, so a missing one
+# is normal. Returns the directory, or '' when nothing was saved. Logs with Write-Host: output
+# here would land in the caller's return value.
+function Save-CiTestResults([string]$Api, [hashtable]$Headers, $RunId, [string]$JobName, [string]$Spec, [string]$Grep, [string]$NotesDir) {
+  $name = Get-CiTracesArtifactName $JobName
+  if (-not $name) { return '' }
+  try { $arts = @((Invoke-RestMethod "$Api/actions/runs/$RunId/artifacts?name=$name" -Headers $Headers).artifacts) } catch { $arts = @() }
+  $a = @($arts | Where-Object { -not $_.expired }) | Select-Object -First 1
+  if (-not $a) { Write-Host "[ci-history] run $RunId has no $name artifact"; return '' }
+  # ponytail: whole-artifact download; a macOS leg reached 218 MB once. Past this, skip it.
+  if ($a.size_in_bytes -gt 300MB) { Write-Host "[ci-history] $name is $([int]($a.size_in_bytes/1MB)) MB; not downloaded"; return '' }
+  $zip = Join-Path $env:TEMP "$name.zip"
+  $dir = Join-Path $env:TEMP $name
+  if (-not (Save-GitHubDownload $a.archive_download_url $zip $Headers)) { Write-Host "[ci-history] could not download $name"; return '' }
+  $dest = Join-Path $NotesDir 'ci-test-results'
+  $kept = 0
+  try {
+    if (Test-Path $dir) { Remove-Item $dir -Recurse -Force }
+    Expand-Archive -Path $zip -DestinationPath $dir -Force
+    foreach ($ctx in @(Get-ChildItem $dir -Recurse -File -Filter 'error-context.md')) {
+      if (-not (Test-ErrorContextFor ([System.IO.File]::ReadAllText($ctx.FullName)) $Spec $Grep)) { continue }
+      $to = Join-Path $dest $ctx.Directory.Name
+      New-Item -ItemType Directory -Force -Path $to | Out-Null
+      # Same guard as the repro copy: the traces are what makes a folder big.
+      $size = (Get-ChildItem $ctx.Directory.FullName -Recurse -File | Measure-Object -Property Length -Sum).Sum
+      if ($size -lt 25MB) { Copy-Item (Join-Path $ctx.Directory.FullName '*') $to -Recurse -Force }
+      else { Copy-Item $ctx.FullName $to -Force }
+      $kept++
+    }
+  } catch { Write-Host "[ci-history] could not unpack $($name): $($_.Exception.Message)" }
+  finally { Remove-Item $zip, $dir -Recurse -Force -ErrorAction SilentlyContinue }
+  Write-Host "[ci-history] kept $kept failing-test folder(s) from $name"
+  if ($kept -eq 0) { return '' }
+  return $dest
 }
 
 # CI history alone settles a deterministic or flaky verdict; anything else needs a local repro.
